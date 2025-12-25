@@ -104,6 +104,26 @@ AICouncil/
 
 ---
 
+## 📝 TODOs
+
+### 已完成
+- [x] **多智能体架构**：实现议长、策论家、监察官、记录员的协同工作流。
+- [x] **增强型搜索**：集成 DrissionPage 支持多引擎（Baidu, Bing, DuckDuckGo）并行搜索。
+- [x] **UI 交互升级**：全站移除原生弹窗，采用 Tailwind CSS 自定义模态框。
+- [x] **历史记录管理**：支持议事记录的持久化存储、回溯及物理删除。
+- [x] **模型适配**：支持 DeepSeek, OpenAI, OpenRouter, Ollama 等主流模型。
+- [x] **报告导出**：支持 HTML 报告生成及长图导出功能。
+
+### 计划中
+- [ ] **更多 Agent 类型**：增加经济学家、法律顾问、技术专家等垂直领域智能体。
+- [ ] **本地知识库 (RAG)**：支持上传 PDF/Word/Markdown 等文档作为议事参考。
+- [ ] **用户介入模式**：允许用户在议事过程中随时“插话”，引导辩论方向。
+- [ ] **多语言支持**：实现前端界面的国际化 (i18n)。
+- [ ] **导出格式扩展**：支持导出为 PDF、Markdown 或 Word 文档。
+- [ ] **搜索源扩展**：接入 Google Search API 等专业搜索服务。
+
+---
+
 ## 🤝 贡献指南
 
 我们欢迎任何形式的贡献！如果您有好的建议或发现了 Bug，请提交 Issue 或 Pull Request。
@@ -125,6 +145,12 @@ AICouncil/
 ## 🏛️ 愿景
 
 让 AI 不再只是简单的问答工具，而是成为能够深度思考、多维辩论的决策智囊团。
+
+---
+
+## 📈 Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=mzniu/AICouncil&type=Date)](https://star-history.com/#mzniu/AICouncil&Date)
 
 ---
 *如果这个项目对您有帮助，请给一个 ⭐️ Star，这是对我们最大的支持！*
