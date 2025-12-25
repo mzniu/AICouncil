@@ -9,6 +9,7 @@ import atexit
 import signal
 import pathlib
 import shutil
+from datetime import datetime
 
 # 确保项目根目录在 sys.path 中，以便能够导入 src 模块
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -188,6 +189,46 @@ def update_event():
             backend_logs.pop(0)
     else:
         discussion_events.append(data)
+    return jsonify({"status": "ok"})
+
+@app.route('/api/intervene', methods=['POST'])
+def intervene():
+    global current_session_id
+    if not current_session_id:
+        return jsonify({"status": "error", "message": "没有正在进行的讨论"}), 400
+    
+    data = request.json
+    content = data.get('content')
+    if not content:
+        return jsonify({"status": "error", "message": "干预内容不能为空"}), 400
+    
+    workspace_path = os.path.join(os.getcwd(), "workspaces", current_session_id)
+    if not os.path.exists(workspace_path):
+        return jsonify({"status": "error", "message": "工作区不存在"}), 400
+    
+    intervention_file = os.path.join(workspace_path, "user_intervention.json")
+    
+    # 如果已经存在干预，则追加
+    existing_content = ""
+    if os.path.exists(intervention_file):
+        try:
+            with open(intervention_file, "r", encoding="utf-8") as f:
+                existing_data = json.load(f)
+                existing_content = existing_data.get("content", "") + "\n"
+        except:
+            pass
+            
+    with open(intervention_file, "w", encoding="utf-8") as f:
+        json.dump({"content": existing_content + content}, f, ensure_ascii=False, indent=4)
+    
+    # 同时作为一个事件记录到讨论流中，方便前端展示
+    intervention_event = {
+        "type": "user_intervention",
+        "content": content,
+        "timestamp": datetime.now().strftime("%H:%M:%S")
+    }
+    discussion_events.append(intervention_event)
+    
     return jsonify({"status": "ok"})
 
 @app.route('/api/rereport', methods=['POST'])

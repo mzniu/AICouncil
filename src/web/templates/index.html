@@ -290,6 +290,7 @@
                         <div class="flex justify-between items-center mb-2">
                             <h3 class="font-bold text-slate-700 flex items-center text-base">
                                 <span class="mr-2">💬</span> 议事过程
+                                <span id="round-info" class="ml-2 text-xs font-normal text-slate-400 hidden">Round 1 / 3</span>
                             </h3>
                             <span id="progress-percentage" class="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">0%</span>
                         </div>
@@ -300,6 +301,19 @@
                     <div id="discussion-container" class="p-4 overflow-y-auto flex-1 space-y-4 bg-gray-50/50">
                         <div id="discussion-flow" class="space-y-4">
                             <!-- 动态插入内容 -->
+                        </div>
+                    </div>
+                    <!-- 用户干预输入区 -->
+                    <div id="intervention-area" class="hidden p-3 border-t border-slate-200 bg-white">
+                        <div class="flex space-x-2">
+                            <input type="text" id="intervention-input" 
+                                   placeholder="输入干预指令（例如：请更多关注成本问题）..." 
+                                   class="flex-1 px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm focus:border-blue-500 transition"
+                                   onkeyup="if(event.keyCode===13) sendIntervention()">
+                            <button onclick="sendIntervention()" 
+                                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition shadow-sm">
+                                发送干预
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -715,6 +729,34 @@
                 }
             }
 
+            async function sendIntervention() {
+                const input = document.getElementById('intervention-input');
+                const content = input.value.trim();
+                if (!content || !isRunning) return;
+
+                try {
+                    const response = await fetch('/api/intervene', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ content: content })
+                    });
+                    const data = await response.json();
+                    if (data.status === 'ok') {
+                        input.value = '';
+                        // 立即滚动到底部
+                        discussionContainer.scrollTo({
+                            top: discussionContainer.scrollHeight,
+                            behavior: 'smooth'
+                        });
+                    } else {
+                        showAlert('发送失败: ' + data.message, '错误', 'error');
+                    }
+                } catch (error) {
+                    console.error('Intervention error:', error);
+                    showAlert('发送请求失败', '错误', 'error');
+                }
+            }
+
             function showAlert(message, title = '提示', type = 'info') {
                 const modal = document.getElementById('alert-modal');
                 const titleEl = document.getElementById('alert-title');
@@ -782,6 +824,7 @@
                 const reportLoader = document.getElementById('report-loader');
                 const loaderText = document.getElementById('loader-text');
                 const loaderSubtext = document.getElementById('loader-subtext');
+                const interventionArea = document.getElementById('intervention-area');
                 
                 // 如果正在运行且输入框为空（说明是刷新页面），则填充配置
                 if (running && config) {
@@ -804,6 +847,7 @@
                     stopBtn.classList.remove('hidden');
                     statusDot.className = 'w-3 h-3 bg-green-500 rounded-full animate-pulse';
                     statusText.innerText = '正在讨论';
+                    interventionArea.classList.remove('hidden');
 
                     // 如果是刷新页面且还没有加载出事件，显示恢复状态
                     if (lastEventCount === 0 && flowContainer.innerHTML.trim() === '') {
@@ -829,12 +873,25 @@
                     stopBtn.classList.add('hidden');
                     statusDot.className = 'w-3 h-3 bg-blue-500 rounded-full';
                     statusText.innerText = '就绪';
+                    interventionArea.classList.add('hidden');
                     // 隐藏报告加载遮罩
                     if (reportLoader) reportLoader.classList.add('hidden');
                 }
+                updateRoundUI();
             }
 
             let currentRound = 1;
+
+            function updateRoundUI() {
+                const roundInfo = document.getElementById('round-info');
+                const maxRounds = parseInt(document.getElementById('rounds-input').value) || 3;
+                if (isRunning) {
+                    roundInfo.innerText = `Round ${currentRound} / ${maxRounds}`;
+                    roundInfo.classList.remove('hidden');
+                } else {
+                    roundInfo.classList.add('hidden');
+                }
+            }
 
             function updateProgress(event) {
                 const progressBar = document.getElementById('progress-bar');
@@ -879,6 +936,7 @@
                     progressBar.style.width = `${currentProgress}%`;
                     progressText.innerText = `${Math.round(currentProgress)}%`;
                 }
+                updateRoundUI();
             }
 
             function appendEvent(event) {
@@ -975,6 +1033,18 @@
                 } else if (event.type === 'round_start') {
                     div.className = 'flex justify-center my-4';
                     div.innerHTML = `<span class="bg-slate-200 text-slate-600 px-3 py-0.5 rounded-full text-xs font-bold uppercase">Round ${event.round}</span>`;
+                } else if (event.type === 'user_intervention') {
+                    div.className = 'flex justify-end my-4';
+                    div.innerHTML = `
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 max-w-[80%] shadow-sm">
+                            <div class="flex items-center mb-1">
+                                <span class="text-sm mr-1">👤</span>
+                                <h4 class="text-[10px] font-bold text-blue-600 uppercase tracking-wider">用户干预指令</h4>
+                            </div>
+                            <p class="text-sm text-blue-800 leading-relaxed">${event.content}</p>
+                            <div class="text-[9px] text-blue-400 mt-1 text-right">${event.timestamp || ''}</div>
+                        </div>
+                    `;
                 } else if (event.type === 'final_report') {
                     // 进入报告生成阶段，更新状态文字
                     toggleReportLoading(true, '📜 议事达成共识，正在生成最终报告...', '请稍候，正在整理元老们的智慧结晶');

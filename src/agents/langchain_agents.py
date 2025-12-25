@@ -305,7 +305,7 @@ def make_leader_chain(model_config: Dict[str, Any]):
         你是本次讨论的议长（组织者）。
         任务：
         1) 拆解用户议题，提取核心目标与关键问题；
-        2) 为本次议题设计一份最终报告的结构（report_design），包含必要的模块和每个模块的侧重点；
+        2) 为本次议题设计一份最终报告的结构（report_design）。**核心要求：大纲必须紧扣用户原始问题，确保每个模块都能为回答该问题提供实质性贡献，严禁偏离主题**；
         3) 在每轮结束后，根据多位策论家/监察官的JSON输出进行去重、汇总与判定；
         4) 删除与议题无关的内容；
         5) 仅以JSON格式输出汇总结果。
@@ -321,7 +321,10 @@ def make_leader_chain(model_config: Dict[str, Any]):
         3. **极简原则**：搜索词必须控制在 **20个字以内**。请提炼最核心的关键词短语，**严禁直接复制背景或长句**。
         4. **严禁包含无意义的填充词**（如“内容”、“汇总”、“列表”、“有哪些”）。
         
-        **注意**：如果输入中包含 `original_goal`，请务必在 `decomposition` 中保留该核心目标，不要随意修改。
+        **注意**：
+        - **问题导向**：在设计 `report_design` 时，请反复检查：如果按照这个大纲生成报告，是否能完整、直接地回答用户最初提出的问题？
+        - 如果输入中包含 `original_goal`，请务必在 `decomposition` 中保留该核心目标，不要随意修改。
+        - 如果输入中包含 `previous_decomposition`，请参考之前的报告大纲设计（report_design），除非有极其重要的理由，否则**严禁大幅修改大纲结构**，以保持议事的一致性。你可以在原有大纲基础上进行微调或深化。
         
         严格遵守以下 JSON 格式，不要输出任何其他文字：
         {{
@@ -331,8 +334,8 @@ def make_leader_chain(model_config: Dict[str, Any]):
                 "key_questions": ["关键问题1", "关键问题2"],
                 "boundaries": "讨论边界",
                 "report_design": {{
-                    "模块名1": "该模块应包含的内容描述",
-                    "模块名2": "该模块应包含的内容描述"
+                    "模块名1": "该模块应如何直接回答用户问题的描述",
+                    "模块名2": "该模块应如何直接回答用户问题的描述"
                 }}
             }},
             "instructions": "本轮协作指令（如：请策论家聚焦XX方向）",
@@ -470,11 +473,34 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
     
     last_plans_map = {i: None for i in range(1, num_planners + 1)}
     last_audits = []
+    user_interventions = []
 
     for r in range(1, max_rounds + 1):
         logger.info(f"=== 开始第 {r} 轮讨论 ===")
         send_web_event("round_start", round=r)
         
+        # 检查用户干预
+        intervention_file = os.path.join(workspace_path, "user_intervention.json")
+        if os.path.exists(intervention_file):
+            try:
+                with open(intervention_file, "r", encoding="utf-8") as f:
+                    intervention_data = json.load(f)
+                    user_msg = intervention_data.get("content")
+                    if user_msg:
+                        logger.info(f"[round {r}] 收到用户干预: {user_msg}")
+                        # 将干预加入指令
+                        current_instructions += f"\n\n[用户干预指令]: {user_msg}"
+                        user_interventions.append(user_msg)
+                        # 记录到 history 中
+                        history.append({
+                            "round": r,
+                            "type": "user_intervention",
+                            "content": user_msg
+                        })
+                os.remove(intervention_file)
+            except Exception as e:
+                logger.error(f"处理用户干预失败: {e}")
+
         def execute_planner(i):
             logger.info(f"[round {r}] 策论家 {i} 正在生成/迭代方案...")
             feedback = "无（首轮或上轮无反馈）"
@@ -575,9 +601,11 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
         logger.info(f"[round {r}] 议长正在汇总本轮结果...")
         inputs = {
             "original_goal": decomposition['core_goal'],
+            "previous_decomposition": decomposition,
             "plans": plans,
             "audits": audits,
-            "previous_instructions": current_instructions
+            "previous_instructions": current_instructions,
+            "user_interventions": user_interventions
         }
         
         final_summary = None
@@ -673,18 +701,29 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
     
     simplified_history = []
     for h in history:
+        if h.get("type") == "user_intervention":
+            simplified_history.append(h)
+            continue
+            
         simplified_history.append({
             "round": h["round"],
-            "plans": [{"id": p.get("id"), "text": p.get("text")} for p in h["plans"]],
-            "audits": [{"auditor_id": a.get("auditor_id"), "reviews": a.get("reviews")} for a in h["audits"]],
-            "summary": h["summary"]
+            "plans": [{"id": p.get("id"), "text": p.get("text")} for p in h.get("plans", [])],
+            "audits": [{"auditor_id": a.get("auditor_id"), "reviews": a.get("reviews")} for a in h.get("audits", [])],
+            "summary": h.get("summary")
         })
+
+    # 找到最后一个包含 summary 的记录作为最终总结
+    last_summary = None
+    for h in reversed(history):
+        if "summary" in h:
+            last_summary = h["summary"]
+            break
 
     final_data = {
         "issue": issue_text,
         "decomposition": decomposition,
         "history": simplified_history,
-        "final_summary": history[-1]["summary"] if history else None
+        "final_summary": last_summary
     }
     
     # 保存最终输入数据
@@ -700,7 +739,7 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
     return {
         "decomposition": decomposition,
         "history": history,
-        "final": history[-1]["summary"] if history else None,
+        "final": last_summary,
         "report_html": report_html
     }
 
