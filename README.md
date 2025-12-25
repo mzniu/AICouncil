@@ -1,4 +1,4 @@
-# 🏛️ 元老院议事厅 (AICouncil)
+# 🏛️ AI 元老院 (AICouncil)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
@@ -25,8 +25,7 @@
 
 ## 📸 界面展示
 
-![元老院议事厅界面展示](https://via.placeholder.com/1000x600.png?text=AICouncil+Dashboard+Preview)
-*(此处可替换为您的实际运行截图)*
+![AI 元老院界面展示](assets/demo.png)
 
 ---
 
@@ -37,7 +36,7 @@
 
 ### 2. 克隆项目
 ```bash
-git clone https://github.com/your-username/AICouncil.git
+git clone https://github.com/mzniu/AICouncil.git
 cd AICouncil
 ```
 
@@ -69,6 +68,7 @@ pip install -r requirements.txt
    # ... 其他配置
    ```
 或者您也可以在项目根目录下创建 `.env` 文件，程序会自动读取环境变量。
+或者您也可以在页面右上角的设置中进行配置。
 
 ### 5. 启动应用
 ```bash
