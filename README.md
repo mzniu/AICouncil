@@ -4,6 +4,8 @@
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![Flask](https://img.shields.io/badge/framework-Flask-lightgrey.svg)](https://flask.palletsprojects.com/)
 
+中文 | [English](README_EN.md)
+
 **AICouncil** 是一个基于大语言模型（LLM）的多智能体协作决策系统。它模拟了古代元老院的议事流程，通过多个不同职责的 AI 智能体（议长、策论家、监察官、记录员）进行多轮辩论、质疑与汇总，最终为复杂问题提供深度、客观且多维度的决策建议。
 
 ---
@@ -114,6 +116,7 @@ AICouncil/
 - [x] **模型适配**：支持 DeepSeek, OpenAI, OpenRouter, Ollama 等主流模型。
 - [x] **报告导出**：支持 HTML 报告生成及长图导出功能。
 - [x] **用户介入模式**：允许用户在议事过程中随时“插话”，引导辩论方向。
+- [x] **多语言文档**：提供中英文双语 README。
 
 ### 计划中
 - [ ] **更多 Agent 类型**：增加经济学家、法律顾问、技术专家等垂直领域智能体。
