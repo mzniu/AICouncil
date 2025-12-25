@@ -1,0 +1,130 @@
+# 🏛️ 元老院议事厅 (AICouncil)
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Flask](https://img.shields.io/badge/framework-Flask-lightgrey.svg)](https://flask.palletsprojects.com/)
+
+**AICouncil** 是一个基于大语言模型（LLM）的多智能体协作决策系统。它模拟了古代元老院的议事流程，通过多个不同职责的 AI 智能体（议长、策论家、监察官、记录员）进行多轮辩论、质疑与汇总，最终为复杂问题提供深度、客观且多维度的决策建议。
+
+---
+
+## 🌟 核心特性
+
+- **🎭 多角色协同**：
+  - **议长 (Leader)**：负责议题拆解、流程引导及最终报告汇总。
+  - **策论家 (Planner)**：基于搜索增强（RAG）提供专业方案与深度见解。
+  - **监察官 (Auditor)**：对策论家的方案进行批判性审查，指出潜在风险与漏洞。
+  - **记录员 (Reporter)**：实时记录议事过程，确保信息不遗漏。
+- **🔍 增强型搜索**：集成 Bing、Baidu、DuckDuckGo 等多引擎并行搜索，支持多页抓取，确保 AI 获取最新、最全的信息。
+- **💻 实时监控面板**：基于 Flask 的 Web 界面，实时展示智能体思考过程、搜索进度及辩论流。
+- **📄 深度报告生成**：自动生成结构化的 HTML 议事报告，支持一键复制、下载 HTML 或导出为长图。
+- **📜 历史管理**：完整的会话持久化，支持随时回溯、加载或删除历史议事记录。
+- **🤖 广泛的模型支持**：原生支持 DeepSeek、OpenAI、Aliyun (Qwen)、OpenRouter 及本地 Ollama 模型。
+
+---
+
+## 📸 界面展示
+
+![元老院议事厅界面展示](https://via.placeholder.com/1000x600.png?text=AICouncil+Dashboard+Preview)
+*(此处可替换为您的实际运行截图)*
+
+---
+
+## 🚀 快速部署
+
+### 1. 环境准备
+确保您的系统已安装 Python 3.9 或更高版本。
+
+### 2. 克隆项目
+```bash
+git clone https://github.com/your-username/AICouncil.git
+cd AICouncil
+```
+
+### 3. 安装依赖
+建议使用虚拟环境：
+```bash
+# 创建虚拟环境
+python -m venv .venv
+
+# 激活虚拟环境 (Windows)
+.\.venv\Scripts\activate
+
+# 激活虚拟环境 (Linux/macOS)
+source .venv/bin/activate
+
+# 安装依赖
+pip install -r requirements.txt
+```
+
+### 4. 配置 API 密钥
+1. 复制配置模板文件：
+   ```bash
+   cp src/config_template.py src/config.py
+   ```
+2. 编辑 `src/config.py`，填入您的 API 密钥及相关配置：
+   ```python
+   DEEPSEEK_API_KEY = "您的密钥"
+   OPENAI_API_KEY = "您的密钥"
+   # ... 其他配置
+   ```
+或者您也可以在项目根目录下创建 `.env` 文件，程序会自动读取环境变量。
+
+### 5. 启动应用
+```bash
+python src/web/app.py
+```
+启动后，在浏览器访问 `http://127.0.0.1:5000` 即可开始议事。
+
+---
+
+## 🛠️ 技术栈
+
+- **后端**: Python, Flask, LangChain
+- **前端**: Tailwind CSS, JavaScript (ES6+)
+- **搜索**: DrissionPage (自动化抓取), BeautifulSoup4
+- **模型**: OpenAI API 兼容接口, Ollama (本地)
+
+---
+
+## 📂 项目结构
+
+```text
+AICouncil/
+├── src/
+│   ├── agents/          # 智能体核心逻辑与提示词模板
+│   ├── web/             # Flask Web 服务与前端模板
+│   ├── utils/           # 搜索、日志等工具类
+│   └── config.py        # 全局配置文件
+├── workspaces/          # 议事历史记录存储目录
+├── tests/               # 单元测试
+├── requirements.txt     # 项目依赖
+└── README.md            # 项目说明文档
+```
+
+---
+
+## 🤝 贡献指南
+
+我们欢迎任何形式的贡献！如果您有好的建议或发现了 Bug，请提交 Issue 或 Pull Request。
+
+1. Fork 本仓库
+2. 创建您的特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交您的更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 开启一个 Pull Request
+
+---
+
+## 📄 开源协议
+
+本项目采用 [MIT 协议](LICENSE) 开源。
+
+---
+
+## 🏛️ 愿景
+
+让 AI 不再只是简单的问答工具，而是成为能够深度思考、多维辩论的决策智囊团。
+
+---
+*如果这个项目对您有帮助，请给一个 ⭐️ Star，这是对我们最大的支持！*

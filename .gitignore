@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+
+# Logs
+*.log
+aicouncil.log
+
+# Project specific
+workspaces/
+.env
+src/config.py
+
+# OS
+.DS_Store
+Thumbs.db

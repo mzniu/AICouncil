@@ -1,0 +1,1767 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 元老院 - 实时讨论视图</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <style>
+        .role-leader { border-left: 4px solid #3b82f6; }
+        .role-planner { border-left: 4px solid #10b981; }
+        .role-auditor { border-left: 4px solid #f59e0b; }
+        .role-reporter { border-left: 4px solid #8b5cf6; }
+        .markdown-body h1 { font-size: 1.5rem; font-weight: bold; margin-top: 1rem; }
+        .markdown-body h2 { font-size: 1.25rem; font-weight: bold; margin-top: 0.75rem; }
+        .markdown-body p { margin-bottom: 0.5rem; }
+        .markdown-body ul { list-style-type: disc; margin-left: 1.5rem; }
+        .markdown-body table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.875rem; }
+        .markdown-body th, .markdown-body td { border: 1px solid #e2e8f0; padding: 0.5rem; text-align: left; }
+        .markdown-body th { background-color: #f8fafc; font-weight: bold; }
+        .markdown-body tr:nth-child(even) { background-color: #f8fafc; }
+        .markdown-body {
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+            word-break: break-word;
+        }
+        .search-progress-card {
+            margin: 0.75rem 0;
+            transition: all 0.3s ease;
+        }
+        .search-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.25rem 0.5rem;
+            background-color: rgba(219, 234, 254, 0.5); /* bg-blue-100/50 */
+            border-left: 2px solid #bfdbfe; /* border-blue-200 */
+            border-top-left-radius: 0.5rem;
+            border-top-right-radius: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .search-header:hover {
+            background-color: rgba(191, 219, 254, 0.5); /* bg-blue-200/50 */
+        }
+        .search-header h5 {
+            color: #1d4ed8; /* text-blue-700 */
+            font-weight: 800;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin: 0;
+            display: flex;
+            align-items: center;
+        }
+        .search-content {
+            padding: 0.75rem;
+            background-color: rgba(239, 246, 255, 0.4); /* bg-blue-50/40 */
+            border-left: 2px solid #bfdbfe; /* border-blue-200 */
+            border-bottom-left-radius: 0.5rem;
+            border-bottom-right-radius: 0.5rem;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #475569; /* text-slate-600 */
+            transition: max-height 0.3s ease-out, opacity 0.3s ease-out, padding 0.3s ease-out;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .search-content.collapsed {
+            max-height: 0;
+            opacity: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+            margin: 0;
+            border-bottom: none;
+            overflow: hidden;
+        }
+        .event-reasoning {
+            transition: max-height 0.3s ease-out, opacity 0.3s ease-out, padding 0.3s ease-out;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .event-reasoning.collapsed {
+            max-height: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+            margin-bottom: 0;
+            opacity: 0;
+            border: none;
+            overflow: hidden;
+        }
+
+        .discussion-card {
+            max-width: 900px;
+            margin-left: auto;
+            margin-right: auto;
+            width: 100%;
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+            word-break: break-word;
+        }
+
+        .event-content, .event-reasoning {
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+            word-break: break-word;
+        }
+        
+        /* 自定义滚动条样式 */
+        .event-reasoning::-webkit-scrollbar,
+        .search-content::-webkit-scrollbar {
+            width: 4px;
+        }
+        .event-reasoning::-webkit-scrollbar-track,
+        .search-content::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .event-reasoning::-webkit-scrollbar-thumb,
+        .search-content::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+        .event-reasoning::-webkit-scrollbar-thumb:hover,
+        .search-content::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans">
+    <nav class="bg-slate-800 text-white p-4 shadow-lg sticky top-0 z-50">
+        <div class="px-4 flex justify-between items-center">
+            <h1 class="text-3xl font-black tracking-tighter">🏛️ AI 元老院 <span class="text-lg font-normal text-slate-400 ml-3 tracking-normal">实时监控面板</span></h1>
+            <div class="flex items-center space-x-4">
+                <div id="status-indicator" class="flex items-center space-x-3 bg-slate-700/50 px-4 py-2 rounded-full border border-slate-600">
+                    <span id="status-dot" class="w-3 h-3 bg-gray-500 rounded-full"></span>
+                    <span id="status-text" class="text-base">就绪</span>
+                </div>
+                <button onclick="toggleLogs()" class="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg border border-slate-600 transition group" title="切换日志显示">
+                    <svg class="w-5 h-5 text-slate-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                </button>
+                <button onclick="toggleSettingsModal()" class="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg border border-slate-600 transition group" title="系统设置">
+                    <svg class="w-5 h-5 text-slate-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto py-4 px-4 max-w-[98vw] h-[calc(100vh-80px)] flex flex-col">
+        <!-- 输入区域 -->
+        <div class="bg-white rounded-xl shadow-md p-4 mb-4 border border-slate-200 flex-shrink-0">
+            <div class="flex flex-col md:flex-row gap-4">
+                <div class="flex-1">
+                    <label class="block text-sm font-bold text-slate-500 uppercase mb-1">议题内容</label>
+                    <textarea id="issue-input" placeholder="请输入您想要讨论的议题（支持多行输入，Enter 发送，Shift+Enter 换行）..." rows="1"
+                           class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition text-base resize-none min-h-[42px] max-h-48 overflow-y-auto"
+                           oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"></textarea>
+                </div>
+                <div class="w-full md:w-32">
+                    <label class="block text-sm font-bold text-slate-500 uppercase mb-1">后端</label>
+                    <select id="backend-select" 
+                            class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-base bg-white">
+                        <option value="deepseek">DeepSeek</option>
+                        <option value="openai">OpenAI</option>
+                        <option value="openrouter">OpenRouter</option>
+                        <option value="aliyun">Aliyun</option>
+                        <option value="ollama">Ollama</option>
+                    </select>
+                </div>
+                <div class="w-full md:w-48">
+                    <label class="block text-sm font-bold text-slate-500 uppercase mb-1">全局模型 (可选)</label>
+                    <input type="text" id="global-model-input" placeholder="默认模型"
+                           class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-base">
+                </div>
+                <div class="w-full md:w-32 hidden" id="global-reasoning-container">
+                    <label class="block text-sm font-bold text-slate-500 uppercase mb-1">推理强度</label>
+                    <select id="global-reasoning-input" 
+                            class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-base bg-white">
+                        <option value="">关闭</option>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                    </select>
+                </div>
+                <div class="w-full md:w-20">
+                    <label class="block text-sm font-bold text-slate-500 uppercase mb-1">轮数</label>
+                    <input type="number" id="rounds-input" value="3" min="1" max="10" 
+                           class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-base">
+                </div>
+                <div class="w-full md:w-20">
+                    <label class="block text-sm font-bold text-slate-500 uppercase mb-1">策论家</label>
+                    <input type="number" id="planners-input" value="2" min="1" max="5" 
+                           class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-base">
+                </div>
+                <div class="w-full md:w-20">
+                    <label class="block text-sm font-bold text-slate-500 uppercase mb-1">监察官</label>
+                    <input type="number" id="auditors-input" value="2" min="1" max="5" 
+                           class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-base">
+                </div>
+                <div class="flex items-end space-x-2">
+                    <button id="start-btn" onclick="startDiscussion()" 
+                            class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-8 rounded-lg transition shadow-lg shadow-blue-200 disabled:bg-gray-400 disabled:shadow-none">
+                        开始议事
+                    </button>
+                    <button id="advanced-toggle-btn" onclick="toggleAdvancedSettings()" 
+                            class="w-full md:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg transition border border-slate-300">
+                        ⚙️ 高级配置
+                    </button>
+                    <button id="history-btn" onclick="toggleHistoryModal()" 
+                            class="w-full md:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg transition border border-slate-300">
+                        📜 历史
+                    </button>
+                    <button id="stop-btn" onclick="stopDiscussion()" 
+                            class="hidden w-full md:w-auto bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-8 rounded-lg transition shadow-lg shadow-red-200">
+                        停止
+                    </button>
+                </div>
+            </div>
+
+            <!-- 高级配置面板 -->
+            <div id="advanced-settings" class="hidden mt-4 pt-4 border-t border-slate-100">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-sm font-bold text-slate-700 flex items-center">
+                        <span class="mr-2">⚙️</span> 席位专家配置
+                    </h3>
+                    <button onclick="resetAgentConfigs()" class="text-xs text-blue-600 hover:text-blue-800 font-medium">重置为默认</button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="agent-configs-container">
+                    <!-- 动态生成 Agent 配置 -->
+                    <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                        <h4 class="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center">
+                            <span class="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>议长 (Leader)
+                        </h4>
+                        <div class="flex gap-2">
+                            <select class="agent-backend flex-1 text-xs p-1 border rounded" data-agent="leader">
+                                <option value="default">默认后端</option>
+                                <option value="deepseek">DeepSeek</option>
+                                <option value="openai">OpenAI</option>
+                                <option value="openrouter">OpenRouter</option>
+                                <option value="aliyun">Aliyun</option>
+                                <option value="ollama">Ollama</option>
+                            </select>
+                            <input type="text" class="agent-model flex-1 text-xs p-1 border rounded" placeholder="模型名称 (可选)" data-agent="leader">
+                        </div>
+                        <select class="agent-reasoning hidden text-[10px] p-1 border rounded mt-1 w-full" data-agent="leader">
+                            <option value="">推理: 关闭</option>
+                            <option value="low">推理: Low</option>
+                            <option value="medium">推理: Medium</option>
+                            <option value="high">推理: High</option>
+                        </select>
+                    </div>
+                    <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                        <h4 class="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center">
+                            <span class="w-2 h-2 bg-purple-500 rounded-full mr-2"></span>记录员 (Reporter)
+                        </h4>
+                        <div class="flex gap-2">
+                            <select class="agent-backend flex-1 text-xs p-1 border rounded" data-agent="reporter">
+                                <option value="default">默认后端</option>
+                                <option value="deepseek">DeepSeek</option>
+                                <option value="openai">OpenAI</option>
+                                <option value="openrouter">OpenRouter</option>
+                                <option value="aliyun">Aliyun</option>
+                                <option value="ollama">Ollama</option>
+                            </select>
+                            <input type="text" class="agent-model flex-1 text-xs p-1 border rounded" placeholder="模型名称 (可选)" data-agent="reporter">
+                        </div>
+                        <select class="agent-reasoning hidden text-[10px] p-1 border rounded mt-1 w-full" data-agent="reporter">
+                            <option value="">推理: 关闭</option>
+                            <option value="low">推理: Low</option>
+                            <option value="medium">推理: Medium</option>
+                            <option value="high">推理: High</option>
+                        </select>
+                    </div>
+                </div>
+                <datalist id="openrouter-models-list"></datalist>
+                <datalist id="deepseek-models-list"></datalist>
+            </div>
+        </div>
+
+        <div id="main-layout" class="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
+            <!-- 左侧讨论流 -->
+            <div id="discussion-section" class="flex flex-col min-h-0 transition-all duration-300 flex-1">
+                <div class="bg-white rounded-xl shadow-lg border border-slate-200 flex flex-col flex-1 min-h-0 overflow-hidden">
+                    <div class="bg-slate-50 px-4 py-3 border-b border-slate-200">
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="font-bold text-slate-700 flex items-center text-base">
+                                <span class="mr-2">💬</span> 议事过程
+                            </h3>
+                            <span id="progress-percentage" class="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">0%</span>
+                        </div>
+                        <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                            <div id="progress-bar" class="bg-blue-500 h-full w-0 transition-all duration-500 ease-out"></div>
+                        </div>
+                    </div>
+                    <div id="discussion-container" class="p-4 overflow-y-auto flex-1 space-y-4 bg-gray-50/50">
+                        <div id="discussion-flow" class="space-y-4">
+                            <!-- 动态插入内容 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 中间最终报告 -->
+            <div id="report-section" class="flex flex-col min-h-0 transition-all duration-300 flex-[2]">
+                <div class="bg-white rounded-xl shadow-lg border border-purple-200 flex flex-col flex-1 min-h-0 overflow-hidden">
+                    <div class="bg-purple-600 text-white px-4 py-3 flex justify-between items-center">
+                        <h3 class="font-bold flex items-center text-base">
+                            <span class="mr-2">📜</span> 最终议事报告
+                        </h3>
+                        <div id="report-actions" class="flex space-x-2">
+                            <button onclick="reReport()" class="text-xs bg-white/20 hover:bg-white/30 px-2 py-1 rounded transition disabled:opacity-50 disabled:cursor-not-allowed">重新生成报告</button>
+                            <button onclick="copyReport()" class="text-xs bg-white/20 hover:bg-white/30 px-2 py-1 rounded transition disabled:opacity-50 disabled:cursor-not-allowed">复制</button>
+                            <button onclick="downloadReport()" class="text-xs bg-white/20 hover:bg-white/30 px-2 py-1 rounded transition disabled:opacity-50 disabled:cursor-not-allowed">下载HTML</button>
+                            <button onclick="downloadImage(event)" class="text-xs bg-white/20 hover:bg-white/30 px-2 py-1 rounded transition disabled:opacity-50 disabled:cursor-not-allowed">下载图片</button>
+                        </div>
+                    </div>
+                    <div id="report-container" class="relative flex-1 min-h-0 overflow-hidden">
+                        <iframe id="report-iframe" class="w-full h-full border-none" srcdoc="<div style='color:#94a3b8; font-style:italic; text-align:center; margin-top:100px; font-family:sans-serif;'></div>"></iframe>
+                        <!-- 报告生成遮罩层 -->
+                        <div id="report-loader" class="hidden absolute inset-0 bg-white/70 backdrop-blur-[1px] flex flex-col items-center justify-center z-10">
+                            <div class="w-12 h-12 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mb-4"></div>
+                            <p id="loader-text" class="text-purple-700 font-bold animate-pulse text-base">正在进行议事讨论...</p>
+                            <p id="loader-subtext" class="text-slate-400 text-sm mt-2">元老们正在激烈辩论中</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧日志窗口 -->
+            <div id="log-section" class="hidden flex flex-col min-h-0 transition-all duration-300 flex-1">
+                <div class="bg-slate-900 rounded-xl shadow-lg overflow-hidden flex flex-col flex-1 min-h-0">
+                    <div class="bg-slate-800 px-4 py-3 flex justify-between items-center border-b border-slate-700">
+                        <h3 class="text-slate-300 text-sm font-bold flex items-center">
+                            <span class="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+                            系统执行日志
+                        </h3>
+                        <button onclick="clearLogs()" class="text-xs text-slate-500 hover:text-slate-300">清除</button>
+                    </div>
+                    <div id="log-container" class="p-3 font-mono text-[13px] text-slate-400 overflow-y-auto flex-1 space-y-1">
+                        <!-- 日志内容 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 历史记录模态框 -->
+        <div id="history-modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[120] flex items-center justify-center">
+            <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-2xl w-full mx-4 flex flex-col max-h-[80vh]">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-slate-800">议事历史记录</h3>
+                    <button onclick="toggleHistoryModal()" class="text-slate-400 hover:text-slate-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+                <div id="history-list" class="overflow-y-auto flex-1 space-y-2 pr-2">
+                    <!-- 历史项动态插入 -->
+                    <div class="text-center py-8 text-slate-400 italic">正在加载历史记录...</div>
+                </div>
+                <div class="mt-6 pt-4 border-t border-slate-100 flex justify-end">
+                    <button onclick="toggleHistoryModal()" class="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition">
+                        关闭
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 通用确认模态框 -->
+        <div id="confirm-modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[150] flex items-center justify-center">
+            <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all">
+                <div class="text-center">
+                    <div id="confirm-icon" class="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <h3 id="confirm-title" class="text-xl font-bold text-slate-800 mb-2">确认</h3>
+                    <p id="confirm-message" class="text-slate-600 mb-8 text-base"></p>
+                    <div class="flex space-x-4">
+                        <button id="confirm-cancel-btn" class="flex-1 px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition">
+                            取消
+                        </button>
+                        <button id="confirm-ok-btn" class="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-lg shadow-blue-200">
+                            确认
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 提示模态框 -->
+        <div id="alert-modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[200] flex items-center justify-center">
+            <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all">
+                <div class="text-center">
+                    <div id="alert-icon" class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </div>
+                    <h3 id="alert-title" class="text-xl font-bold text-slate-800 mb-2">提示</h3>
+                    <p id="alert-message" class="text-slate-600 mb-8 text-base"></p>
+                    <div class="flex">
+                        <button onclick="closeAlertModal()" class="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-lg shadow-blue-200">
+                            确定
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 系统设置模态框 -->
+        <div id="settings-modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[150] flex items-center justify-center">
+            <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-xl w-full mx-4 flex flex-col">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-slate-800 flex items-center">
+                        <span class="mr-2 text-2xl">⚙️</span> 系统全局设置
+                    </h3>
+                    <button onclick="toggleSettingsModal()" class="text-slate-400 hover:text-slate-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+                
+                <div class="space-y-6 overflow-y-auto max-h-[60vh] pr-2">
+                    <section>
+                        <h4 class="text-sm font-bold text-slate-700 mb-3 flex items-center">
+                            <span class="w-1.5 h-4 bg-blue-500 rounded-full mr-2"></span> API 密钥配置
+                        </h4>
+                        <div class="grid grid-cols-1 gap-4">
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-slate-500 uppercase">DeepSeek API Key</label>
+                                <input type="password" id="settings-key-deepseek" placeholder="sk-..." 
+                                       class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-slate-500 uppercase">OpenAI API Key</label>
+                                <input type="password" id="settings-key-openai" placeholder="sk-..." 
+                                       class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-slate-500 uppercase">OpenRouter API Key</label>
+                                <input type="password" id="settings-key-openrouter" placeholder="sk-or-..." 
+                                       class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-slate-500 uppercase">Aliyun API Key</label>
+                                <input type="password" id="settings-key-aliyun" placeholder="sk-..." 
+                                       class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-xs font-bold text-slate-500 uppercase">搜索增强引擎 (可多选)</label>
+                                <div id="settings-search-providers" class="grid grid-cols-2 gap-2">
+                                    <label class="flex items-center space-x-2 p-2 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition">
+                                        <input type="checkbox" value="bing" class="search-provider-checkbox w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
+                                        <span class="text-sm text-slate-700">Bing (稳定)</span>
+                                    </label>
+                                    <label class="flex items-center space-x-2 p-2 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition">
+                                        <input type="checkbox" value="baidu" class="search-provider-checkbox w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
+                                        <span class="text-sm text-slate-700">Baidu (中文)</span>
+                                    </label>
+                                    <label class="flex items-center space-x-2 p-2 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition">
+                                        <input type="checkbox" value="duckduckgo" class="search-provider-checkbox w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
+                                        <span class="text-sm text-slate-700">DuckDuckGo</span>
+                                    </label>
+                                    <label class="flex items-center space-x-2 p-2 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition">
+                                        <input type="checkbox" value="tavily" class="search-provider-checkbox w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
+                                        <span class="text-sm text-slate-700">Tavily (Key)</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-slate-500 uppercase">Tavily API Key</label>
+                                <input type="password" id="settings-key-tavily" placeholder="tvly-..." 
+                                       class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <div class="mt-8 pt-4 border-t border-slate-100 flex justify-end space-x-3">
+                    <button onclick="toggleSettingsModal()" class="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition">
+                        取消
+                    </button>
+                    <button onclick="saveSettings()" class="px-8 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-lg shadow-blue-200">
+                        保存并应用
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            function toggleReportLoading(isLoading, text = '', subtext = '') {
+                const loader = document.getElementById('report-loader');
+                const loaderText = document.getElementById('loader-text');
+                const loaderSubtext = document.getElementById('loader-subtext');
+                const actionButtons = document.querySelectorAll('#report-actions button');
+
+                if (isLoading) {
+                    loader.classList.remove('hidden');
+                    if (text) loaderText.innerText = text;
+                    if (subtext) loaderSubtext.innerText = subtext;
+                    actionButtons.forEach(btn => btn.disabled = true);
+                } else {
+                    loader.classList.add('hidden');
+                    actionButtons.forEach(btn => btn.disabled = false);
+                }
+            }
+
+            // 配置 marked
+            marked.setOptions({
+                breaks: true,
+                gfm: true
+            });
+
+            let lastEventCount = 0;
+            let lastLogCount = 0;
+            let currentProgress = 0;
+            let isRunning = false;
+            let openRouterModelsFetched = false;
+            let isFetchingModels = false;
+            const flowContainer = document.getElementById('discussion-flow');
+            const discussionContainer = document.getElementById('discussion-container');
+            const logContainer = document.getElementById('log-container');
+            const reportIframe = document.getElementById('report-iframe');
+            const startBtn = document.getElementById('start-btn');
+            const stopBtn = document.getElementById('stop-btn');
+            const statusDot = document.getElementById('status-dot');
+            const statusText = document.getElementById('status-text');
+
+            async function startDiscussion() {
+                if (isRunning) return;
+                
+                const issue = document.getElementById('issue-input').value.trim();
+                const backend = document.getElementById('backend-select').value;
+                const model = document.getElementById('global-model-input').value;
+                const reasoningEffort = document.getElementById('global-reasoning-input').value;
+                const rounds = document.getElementById('rounds-input').value;
+                const planners = document.getElementById('planners-input').value;
+                const auditors = document.getElementById('auditors-input').value;
+
+                // 收集 Agent 配置
+                const agentConfigs = {};
+                document.querySelectorAll('.agent-backend').forEach(select => {
+                    const agentId = select.dataset.agent;
+                    const agentBackend = select.value;
+                    const modelEl = document.querySelector(`.agent-model[data-agent="${agentId}"]`);
+                    const reasoningEl = document.querySelector(`.agent-reasoning[data-agent="${agentId}"]`);
+                    
+                    const agentModel = modelEl ? modelEl.value.trim() : '';
+                    const agentReasoning = reasoningEl ? reasoningEl.value : '';
+                    
+                    if (agentBackend !== 'default' || agentModel !== '' || agentReasoning !== '') {
+                        agentConfigs[agentId] = {
+                            type: agentBackend === 'default' ? backend : agentBackend,
+                            model: agentModel || undefined,
+                            reasoning: agentReasoning ? { effort: agentReasoning } : undefined
+                        };
+                    }
+                });
+
+                if (!issue) {
+                    showAlert('请输入议题内容', '提示');
+                    return;
+                }
+
+                // 重置输入框高度
+                const issueInput = document.getElementById('issue-input');
+                issueInput.style.height = 'auto';
+
+                // 清空旧内容并显示初始化状态
+                flowContainer.innerHTML = '<div class="flex justify-center my-4 animate-pulse"><span class="bg-blue-100 text-blue-600 px-4 py-1 rounded-full text-sm font-medium">正在初始化议事厅...</span></div>';
+                logContainer.innerHTML = '<div class="text-slate-500 italic">正在连接后端引擎...</div>';
+                if (reportIframe) {
+                    reportIframe.srcdoc = '<div style="color:#94a3b8; font-style:italic; text-align:center; margin-top:100px; font-family:sans-serif;"></div>';
+                }
+                lastEventCount = 0;
+                lastLogCount = 0;
+                currentProgress = 0;
+                document.getElementById('progress-bar').style.width = '0%';
+                document.getElementById('progress-percentage').innerText = '0%';
+
+                try {
+                    const response = await fetch('/api/start', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            issue, 
+                            backend, 
+                            model: model || undefined,
+                            reasoning: reasoningEffort ? { effort: reasoningEffort } : undefined,
+                            rounds, 
+                            planners, 
+                            auditors,
+                            agent_configs: Object.keys(agentConfigs).length > 0 ? agentConfigs : null
+                        })
+                    });
+                    const data = await response.json();
+                    if (data.status === 'ok') {
+                        console.log('讨论已启动');
+                    } else {
+                        showAlert('启动失败: ' + data.message, '错误', 'error');
+                    }
+                } catch (error) {
+                    console.error('Start error:', error);
+                    showAlert('启动请求发送失败', '错误', 'error');
+                }
+            }
+
+            async function reReport() {
+                if (isRunning) return;
+                
+                const backend = document.getElementById('backend-select').value;
+                toggleReportLoading(true, '正在重新生成报告...', `正在使用 ${backend} 重新撰写报告`);
+                
+                try {
+                    const response = await fetch('/api/rereport', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ backend: backend })
+                    });
+                    const data = await response.json();
+                    if (data.status === 'ok') {
+                        console.log('重新生成报告请求已发送');
+                    } else {
+                        showAlert('重新生成失败: ' + data.message, '错误', 'error');
+                        toggleReportLoading(false);
+                    }
+                } catch (error) {
+                    console.error('Re-report error:', error);
+                    showAlert('重新生成请求发送失败', '错误', 'error');
+                    toggleReportLoading(false);
+                }
+            }
+
+            async function fetchUpdates() {
+                try {
+                    // 检查状态
+                    const statusResponse = await fetch('/api/status');
+                    const statusData = await statusResponse.json();
+                    updateStatusUI(statusData);
+
+                    const response = await fetch('/api/events');
+                    const data = await response.json();
+
+                    // 更新讨论流
+                    if (data.events.length > lastEventCount) {
+                        // 检查是否在底部 (允许 50px 误差)
+                        const isAtBottom = discussionContainer.scrollHeight - discussionContainer.scrollTop <= discussionContainer.clientHeight + 50;
+                        
+                        for (let i = lastEventCount; i < data.events.length; i++) {
+                            appendEvent(data.events[i]);
+                            updateProgress(data.events[i]);
+                        }
+                        lastEventCount = data.events.length;
+                        
+                        if (isAtBottom) {
+                            discussionContainer.scrollTo({
+                                top: discussionContainer.scrollHeight,
+                                behavior: 'smooth'
+                            });
+                        }
+                    }
+
+                    // 更新日志
+                    if (data.logs) {
+                        // 如果后端日志长度减少，说明可能被重置或轮转了
+                        if (data.logs.length < lastLogCount) {
+                            lastLogCount = 0;
+                            logContainer.innerHTML = '';
+                        }
+
+                        if (data.logs.length > lastLogCount) {
+                            const isAtBottom = logContainer.scrollHeight - logContainer.scrollTop <= logContainer.clientHeight + 50;
+                            
+                            for (let i = lastLogCount; i < data.logs.length; i++) {
+                                appendLog(data.logs[i]);
+                            }
+                            lastLogCount = data.logs.length;
+                            
+                            if (isAtBottom) {
+                                logContainer.scrollTop = logContainer.scrollHeight;
+                            }
+                        }
+                    }
+
+                    // 更新最终报告
+                    if (data.final_report) {
+                        if (reportIframe && reportIframe.srcdoc !== data.final_report) {
+                            reportIframe.srcdoc = data.final_report;
+                            // 只要开始有报告内容，就隐藏加载遮罩
+                            toggleReportLoading(false);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Fetch error:', error);
+                }
+            }
+
+            async function stopDiscussion() {
+                const confirmed = await showConfirm('停止后，当前的讨论进度将会丢失，且无法生成最终报告。', '确认停止议事？');
+                if (confirmed) {
+                    try {
+                        const response = await fetch('/api/stop', { method: 'POST' });
+                        const data = await response.json();
+                        if (data.status === 'ok') {
+                            console.log('已发送停止请求');
+                        } else {
+                            showAlert('停止失败: ' + data.message, '错误', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Stop error:', error);
+                        showAlert('停止请求发送失败', '错误', 'error');
+                    }
+                }
+            }
+
+            function showAlert(message, title = '提示', type = 'info') {
+                const modal = document.getElementById('alert-modal');
+                const titleEl = document.getElementById('alert-title');
+                const messageEl = document.getElementById('alert-message');
+                const iconEl = document.getElementById('alert-icon');
+                
+                titleEl.innerText = title;
+                messageEl.innerText = message;
+                
+                // 设置图标和颜色
+                if (type === 'error') {
+                    iconEl.className = 'w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4';
+                    iconEl.innerHTML = '<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
+                } else {
+                    iconEl.className = 'w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4';
+                    iconEl.innerHTML = '<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+                }
+                
+                modal.classList.remove('hidden');
+            }
+
+            function closeAlertModal() {
+                document.getElementById('alert-modal').classList.add('hidden');
+            }
+
+            function showConfirm(message, title = '确认') {
+                return new Promise((resolve) => {
+                    const modal = document.getElementById('confirm-modal');
+                    const titleEl = document.getElementById('confirm-title');
+                    const messageEl = document.getElementById('confirm-message');
+                    const okBtn = document.getElementById('confirm-ok-btn');
+                    const cancelBtn = document.getElementById('confirm-cancel-btn');
+                    
+                    titleEl.innerText = title;
+                    messageEl.innerText = message;
+                    
+                    const handleOk = () => {
+                        modal.classList.add('hidden');
+                        cleanup();
+                        resolve(true);
+                    };
+                    
+                    const handleCancel = () => {
+                        modal.classList.add('hidden');
+                        cleanup();
+                        resolve(false);
+                    };
+                    
+                    const cleanup = () => {
+                        okBtn.removeEventListener('click', handleOk);
+                        cancelBtn.removeEventListener('click', handleCancel);
+                    };
+                    
+                    okBtn.addEventListener('click', handleOk);
+                    cancelBtn.addEventListener('click', handleCancel);
+                    
+                    modal.classList.remove('hidden');
+                });
+            }
+
+            function updateStatusUI(statusData) {
+                const running = statusData.is_running;
+                const config = statusData.config;
+                isRunning = running;
+                const reportLoader = document.getElementById('report-loader');
+                const loaderText = document.getElementById('loader-text');
+                const loaderSubtext = document.getElementById('loader-subtext');
+                
+                // 如果正在运行且输入框为空（说明是刷新页面），则填充配置
+                if (running && config) {
+                    const issueInput = document.getElementById('issue-input');
+                    if (!issueInput.value.trim()) {
+                        issueInput.value = config.issue || '';
+                        document.getElementById('backend-select').value = config.backend || 'deepseek';
+                        document.getElementById('rounds-input').value = config.rounds || 3;
+                        document.getElementById('planners-input').value = config.planners || 2;
+                        document.getElementById('auditors-input').value = config.auditors || 2;
+                        // 触发高度自适应
+                        issueInput.style.height = '';
+                        issueInput.style.height = issueInput.scrollHeight + 'px';
+                    }
+                }
+
+                if (running) {
+                    startBtn.disabled = true;
+                    startBtn.innerText = '议事中...';
+                    stopBtn.classList.remove('hidden');
+                    statusDot.className = 'w-3 h-3 bg-green-500 rounded-full animate-pulse';
+                    statusText.innerText = '正在讨论';
+
+                    // 如果是刷新页面且还没有加载出事件，显示恢复状态
+                    if (lastEventCount === 0 && flowContainer.innerHTML.trim() === '') {
+                        flowContainer.innerHTML = '<div class="flex justify-center my-4 animate-pulse"><span class="bg-blue-100 text-blue-600 px-4 py-1 rounded-full text-sm font-medium">正在恢复议事进度...</span></div>';
+                    }
+
+                    // 显示报告加载遮罩，初始设为讨论状态
+                    // 修复闪烁：如果已经有报告内容在显示，则不再强制显示蒙版
+                    if (reportLoader && (!reportIframe.srcdoc || reportIframe.srcdoc.includes('italic'))) {
+                        const currentText = loaderText.innerText;
+                        let targetText = '正在进行议事讨论...';
+                        let targetSub = '元老们正在激烈辩论中';
+                        
+                        if (currentText.includes('报告') || currentText.includes('撰写')) {
+                            targetText = currentText;
+                            targetSub = loaderSubtext.innerText;
+                        }
+                        toggleReportLoading(true, targetText, targetSub);
+                    }
+                } else {
+                    startBtn.disabled = false;
+                    startBtn.innerText = '开始议事';
+                    stopBtn.classList.add('hidden');
+                    statusDot.className = 'w-3 h-3 bg-blue-500 rounded-full';
+                    statusText.innerText = '就绪';
+                    // 隐藏报告加载遮罩
+                    if (reportLoader) reportLoader.classList.add('hidden');
+                }
+            }
+
+            let currentRound = 1;
+
+            function updateProgress(event) {
+                const progressBar = document.getElementById('progress-bar');
+                const progressText = document.getElementById('progress-percentage');
+                const maxRounds = parseInt(document.getElementById('rounds-input').value) || 3;
+                
+                let targetProgress = currentProgress;
+
+                if (event.type === 'system_start') {
+                    targetProgress = 5;
+                    currentRound = 1;
+                } else if (event.type === 'round_start') {
+                    currentRound = event.round;
+                    targetProgress = 5 + ((currentRound - 1) / maxRounds) * 85;
+                } else if (event.type === 'agent_action') {
+                    const roundWeight = 85 / maxRounds;
+                    const roundBase = 5 + ((currentRound - 1) / maxRounds) * 85;
+
+                    if (event.role_type === 'Leader') {
+                        if (currentProgress < 10) {
+                            targetProgress = 10;
+                        } else {
+                            // 汇总阶段
+                            targetProgress = Math.max(targetProgress, roundBase + roundWeight * 0.9);
+                        }
+                    } else if (event.role_type === 'Planner') {
+                        targetProgress = Math.max(targetProgress, roundBase + roundWeight * 0.3);
+                    } else if (event.role_type === 'Auditor') {
+                        targetProgress = Math.max(targetProgress, roundBase + roundWeight * 0.6);
+                    } else if (event.role_type === 'Reporter') {
+                        targetProgress = 98;
+                    }
+                } else if (event.type === 'final_report') {
+                    targetProgress = 100;
+                }
+
+                // 确保进度不会超过 100% 或出现异常值
+                targetProgress = Math.min(100, Math.max(0, targetProgress));
+
+                if (targetProgress > currentProgress) {
+                    currentProgress = targetProgress;
+                    progressBar.style.width = `${currentProgress}%`;
+                    progressText.innerText = `${Math.round(currentProgress)}%`;
+                }
+            }
+
+            function appendEvent(event) {
+                // 如果是第一个事件，且容器内只有初始化消息，则清空
+                if (lastEventCount === 0 && flowContainer.querySelector('.animate-pulse')) {
+                    flowContainer.innerHTML = '';
+                }
+
+                if (event.chunk_id) {
+                    let existing = document.getElementById(`event-${event.chunk_id}`);
+                    if (existing) {
+                        const contentDiv = existing.querySelector('.event-content');
+                        const reasoningDiv = existing.querySelector('.event-reasoning');
+                        
+                        if (event.reasoning && reasoningDiv) {
+                            reasoningDiv.textContent += event.reasoning;
+                            // 实时清理开头的空行和空格
+                            const trimmed = reasoningDiv.textContent.replace(/^\s+/, '');
+                            if (reasoningDiv.textContent !== trimmed) {
+                                reasoningDiv.textContent = trimmed;
+                            }
+                            reasoningDiv.closest('.reasoning-wrapper').classList.remove('hidden');
+                        }
+                        if (event.content && contentDiv) {
+                            const oldRaw = contentDiv.dataset.raw || "";
+                            const newRaw = oldRaw + event.content;
+                            
+                            // 1. 自动收缩推理 (Reasoning)
+                            // 如果推理部分还没收缩，且现在开始输出正式内容（非空且不是搜索标记），则收缩它
+                            if (reasoningDiv && !reasoningDiv.classList.contains('collapsed')) {
+                                if (event.content.trim() && !event.content.includes('SEARCH PROGRESS')) {
+                                    const header = reasoningDiv.closest('.reasoning-wrapper').querySelector('.cursor-pointer');
+                                    if (header) toggleReasoning(header);
+                                }
+                            }
+
+                            // 2. 自动收缩搜索 (Search)
+                            // 如果当前内容包含 SEARCH PROGRESS，且已经显示了结束标记，则收缩
+                            if (newRaw.includes('重新生成最终方案')) {
+                                const hasEndMarker = newRaw.includes('搜索完成') || 
+                                                   newRaw.includes('搜索已完成') || 
+                                                   newRaw.includes('重新生成最终方案');
+                                
+                                if (hasEndMarker) {
+                                    const searchCard = existing.querySelector('.search-progress-card');
+                                    if (searchCard) {
+                                        const searchContent = searchCard.querySelector('.search-content');
+                                        // 只有当新内容不是搜索标记本身时（即开始输出真正的方案时），才收缩
+                                        // 或者如果已经有了结束标记且当前卡片还是展开状态
+                                        if (!searchContent.classList.contains('collapsed')) {
+                                            const header = searchCard.querySelector('.cursor-pointer');
+                                            if (header) toggleSearchCard(header);
+                                        }
+                                    }
+                                }
+                            }
+
+                            contentDiv.dataset.raw = newRaw;
+                            
+                            let text = contentDiv.dataset.raw;
+                            // 实时清理 Markdown 标签 (针对 JSON 输出)
+                            if (text.includes('```')) {
+                                text = text.replace(/^(\s*```json\s*|\s*```\s*)/, '');
+                                text = text.replace(/(\s*```\s*)$/, '');
+                            }
+                            
+                            contentDiv.innerHTML = formatContent(text);
+                        }
+                        return;
+                    }
+                }
+
+                const div = document.createElement('div');
+                if (event.chunk_id) div.id = `event-${event.chunk_id}`;
+                
+                if (event.type === 'system_start') {
+                    div.className = 'space-y-4 my-6';
+                    div.innerHTML = `
+                        <div class="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-5 shadow-xl border border-slate-700 text-white">
+                            <div class="flex items-center mb-3">
+                                <span class="text-xl mr-2">🎯</span>
+                                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">当前议事主题</h4>
+                            </div>
+                            <p class="text-lg font-medium leading-relaxed">${event.issue || '未指定议题'}</p>
+                            <div class="mt-4 pt-4 border-t border-slate-700/50 flex justify-between items-center text-[10px] text-slate-500 uppercase tracking-widest">
+                                <span>AICouncil Protocol v1.0</span>
+                                <span>${new Date().toLocaleTimeString()}</span>
+                            </div>
+                        </div>
+                        <div class="flex justify-center">
+                            <span class="bg-slate-800 text-white px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-slate-200 border border-slate-700">System Startup</span>
+                        </div>
+                    `;
+                } else if (event.type === 'round_start') {
+                    div.className = 'flex justify-center my-4';
+                    div.innerHTML = `<span class="bg-slate-200 text-slate-600 px-3 py-0.5 rounded-full text-xs font-bold uppercase">Round ${event.round}</span>`;
+                } else if (event.type === 'final_report') {
+                    // 进入报告生成阶段，更新状态文字
+                    toggleReportLoading(true, '📜 议事达成共识，正在生成最终报告...', '请稍候，正在整理元老们的智慧结晶');
+                    return; // 报告内容由 handleFinalReport 处理
+                } else if (event.type === 'agent_action') {
+                    const roleClass = `role-${event.role_type.toLowerCase()}`;
+                    const roleIcon = getIcon(event.role_type);
+                    
+                    // 如果是记录员（Reporter）开始行动，更新报告窗口的加载文字
+                    if (event.role_type === 'Reporter') {
+                        toggleReportLoading(true, '正在撰写最终议事报告...', '请耐心等待元老院达成共识');
+                    }
+
+                    const hasReasoning = !!event.reasoning;
+                    const reasoningContent = (event.reasoning || '').replace(/^\s+/, '');
+                    const content = event.content || '';
+
+                    div.className = `bg-white rounded-lg shadow-sm p-4 border-l-4 ${roleClass} text-base discussion-card`;
+                    div.innerHTML = `
+                        <div class="flex items-center mb-2">
+                            <span class="text-xl mr-2">${roleIcon}</span>
+                            <div>
+                                <h4 class="font-bold text-slate-800 text-base">${event.agent_name}</h4>
+                            </div>
+                        </div>
+                        <div class="reasoning-wrapper mb-2 ${hasReasoning ? '' : 'hidden'}">
+                            <div class="flex items-center justify-between px-2 py-1 bg-amber-100/50 rounded-t-lg border-l-2 border-amber-200 cursor-pointer hover:bg-amber-200/50 transition-colors" onclick="toggleReasoning(this)">
+                                <span class="text-[10px] text-amber-700 font-bold uppercase tracking-wider flex items-center">
+                                    <span class="toggle-icon mr-1">▼</span> Thinking Process
+                                </span>
+                            </div>
+                            <div class="event-reasoning p-3 bg-amber-50/40 border-l-2 border-amber-200 text-[13px] leading-relaxed text-slate-600 italic whitespace-pre-wrap relative rounded-b-lg">
+                                ${reasoningContent}
+                            </div>
+                        </div>
+                        <div class="text-slate-600 leading-relaxed text-base event-content markdown-body">${formatContent(content)}</div>
+                    `;
+                }
+                
+                flowContainer.appendChild(div);
+            }
+
+            function toggleReasoning(header) {
+                const wrapper = header.closest('.reasoning-wrapper');
+                const content = wrapper.querySelector('.event-reasoning');
+                const icon = header.querySelector('.toggle-icon');
+                if (content.classList.contains('collapsed')) {
+                    content.classList.remove('collapsed');
+                    icon.textContent = '▼';
+                } else {
+                    content.classList.add('collapsed');
+                    icon.textContent = '▶';
+                }
+            }
+
+            function toggleSearchCard(header) {
+                const card = header.closest('.search-progress-card');
+                const content = card.querySelector('.search-content');
+                const icon = header.querySelector('.toggle-icon');
+                if (content.classList.contains('collapsed')) {
+                    content.classList.remove('collapsed');
+                    icon.textContent = '▼';
+                } else {
+                    content.classList.add('collapsed');
+                    icon.textContent = '▶';
+                }
+            }
+
+            function getIcon(role) {
+                const icons = {
+                    'Leader': '👨‍⚖️',
+                    'Planner': '💡',
+                    'Auditor': '🔍',
+                    'Reporter': '📝'
+                };
+                return icons[role] || '👤';
+            }
+
+            function formatContent(content) {
+                if (!content) return '';
+                
+                let text = content.trim();
+                let prefix = '';
+                let jsonData = null;
+
+                // 1. 寻找 JSON 的起始位置
+                // 逻辑：优先寻找 { (JSON对象)，或者寻找不带 SEARCH 关键字的 [ (JSON数组)
+                let jsonStartIndex = -1;
+                
+                // 寻找最后一个搜索相关的标记，JSON 通常在这些标记之后
+                const searchMarkers = ["重新生成", "搜索完成", "搜索已完成", "系统正在搜索", "SEARCH PROGRESS"];
+                let lastMarkerIndex = -1;
+                searchMarkers.forEach(marker => {
+                    const idx = text.lastIndexOf(marker);
+                    if (idx !== -1 && idx + marker.length > lastMarkerIndex) {
+                        lastMarkerIndex = idx + marker.length;
+                    }
+                });
+
+                if (lastMarkerIndex !== -1) {
+                    // 在搜索标记之后寻找 JSON
+                    const afterMarker = text.substring(lastMarkerIndex);
+                    const match = afterMarker.match(/\{|\[(?!\s*SEARCH)/);
+                    if (match) {
+                        jsonStartIndex = lastMarkerIndex + match.index;
+                    }
+                } else {
+                    // 没有搜索标记，直接寻找起始符号，排除 [SEARCH:
+                    const match = text.match(/\{|\[(?!\s*SEARCH)/);
+                    if (match) {
+                        jsonStartIndex = match.index;
+                    }
+                }
+
+                // 2. 提取前缀和尝试解析 JSON
+                if (jsonStartIndex !== -1) {
+                    prefix = text.substring(0, jsonStartIndex).trim();
+                    let potentialJson = text.substring(jsonStartIndex).trim();
+                    
+                    // 清理末尾的 Markdown 闭合标签
+                    potentialJson = potentialJson.replace(/(\s*```\s*)$/, '');
+                    
+                    try {
+                        jsonData = JSON.parse(potentialJson);
+                    } catch (e) {
+                        // 流式输出中 JSON 可能不完整，解析失败是正常的
+                    }
+                } else if (text.includes('SEARCH PROGRESS')) {
+                    // 如果没有 JSON 但有 SEARCH PROGRESS，整个内容都视为前缀，以便触发卡片渲染
+                    prefix = text;
+                }
+
+                let html = '';
+                if (prefix) {
+                    // 清理 prefix：移除 [SEARCH: ...] 标签和重复的 SEARCH PROGRESS 标题
+                    let cleanPrefix = prefix.replace(/\[SEARCH:.*?\]/g, '').trim();
+                    
+                    let prefixHtml = marked.parse(cleanPrefix);
+                    // 检查是否包含 SEARCH PROGRESS，如果是则包装成可折叠卡片
+                    if (prefix.includes('SEARCH PROGRESS')) {
+                        // 移除所有生成的 <h3>SEARCH PROGRESS</h3> 标签
+                        prefixHtml = prefixHtml.replace(/<h3[^>]*>SEARCH PROGRESS<\/h3>/gi, '');
+                        html += `
+                            <div class="search-progress-card mb-2">
+                                <div class="search-header" onclick="toggleSearchCard(this)">
+                                    <h5>
+                                        <span class="toggle-icon mr-1">▼</span>
+                                        <span class="mr-1">🌐</span> SEARCH PROGRESS
+                                    </h5>
+                                    <span class="text-[10px] text-blue-400 uppercase font-bold tracking-widest">Details</span>
+                                </div>
+                                <div class="search-content markdown-body">
+                                    ${prefixHtml}
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        html += `<div class="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600 italic shadow-sm">${prefixHtml}</div>`;
+                    }
+                }
+
+                if (jsonData) {
+                    html += renderStructuredData(jsonData);
+                } else {
+                    // 如果没有解析出 JSON，渲染剩余部分
+                    const remainingText = jsonStartIndex !== -1 ? text.substring(jsonStartIndex) : text;
+                    // 如果已经作为 prefix 渲染过了（即包含 SEARCH PROGRESS 且没有 JSON），则不再重复渲染
+                    if (jsonStartIndex !== -1 || !text.includes('SEARCH PROGRESS')) {
+                        html += marked.parse(remainingText);
+                    }
+                }
+
+                return html;
+            }
+
+            function renderStructuredData(data) {
+                let html = '<div class="space-y-4 mt-2">';
+
+                // 1. 监察官评论 (Auditor Review)
+                if (data.reviews && Array.isArray(data.reviews)) {
+                    data.reviews.forEach(review => {
+                        const ratingClass = {
+                            '优秀': 'bg-green-100 text-green-700',
+                            '合格': 'bg-blue-100 text-blue-700',
+                            '需重构': 'bg-amber-100 text-amber-700',
+                            '不可行': 'bg-red-100 text-red-700'
+                        }[review.rating] || 'bg-slate-100 text-slate-700';
+
+                        html += `
+                            <div class="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
+                                <div class="bg-slate-50 px-3 py-2 border-b border-slate-200 flex justify-between items-center">
+                                    <span class="font-bold text-slate-700 text-sm">🎯 针对: ${review.plan_id || '未知方案'}</span>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold ${ratingClass}">${review.rating || '未评级'}</span>
+                                </div>
+                                <div class="p-3 space-y-3">
+                                    <div>
+                                        <div class="text-[11px] font-bold text-red-500 uppercase mb-1">⚠️ 质疑点</div>
+                                        <ul class="list-disc ml-4 text-sm text-slate-600 space-y-1">
+                                            ${(review.issues || []).map(i => `<li>${i}</li>`).join('')}
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <div class="text-[11px] font-bold text-green-600 uppercase mb-1">💡 改进建议</div>
+                                        <ul class="list-disc ml-4 text-sm text-slate-600 space-y-1">
+                                            ${(review.suggestions || []).map(s => `<li>${s}</li>`).join('')}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    if (data.summary) {
+                        html += `
+                            <div class="bg-indigo-50 p-3 rounded-lg border border-indigo-100">
+                                <div class="text-[11px] font-bold text-indigo-600 uppercase mb-1">📝 审计总结</div>
+                                <div class="text-sm text-slate-700 leading-relaxed">${data.summary}</div>
+                            </div>
+                        `;
+                    }
+                }
+                // 2. 议长拆解 (Leader Decomposition)
+                else if (data.decomposition) {
+                    const d = data.decomposition;
+                    html += `
+                        <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 space-y-4">
+                            <div>
+                                <div class="text-[11px] font-bold text-blue-600 uppercase mb-1">🎯 核心目标</div>
+                                <div class="text-base font-bold text-slate-800">${d.core_goal || '未定义'}</div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <div class="text-[11px] font-bold text-blue-600 uppercase mb-1">❓ 关键问题</div>
+                                    <ul class="list-decimal ml-4 text-sm text-slate-700 space-y-1">
+                                        ${(d.key_questions || []).map(q => `<li>${q}</li>`).join('')}
+                                    </ul>
+                                </div>
+                                <div>
+                                    <div class="text-[11px] font-bold text-blue-600 uppercase mb-1">🚧 讨论边界</div>
+                                    <div class="text-sm text-slate-700">${d.boundaries || '无'}</div>
+                                </div>
+                            </div>
+                            ${d.report_design ? `
+                                <div>
+                                    <div class="text-[11px] font-bold text-blue-600 uppercase mb-1">📋 报告大纲设计</div>
+                                    <div class="grid grid-cols-1 gap-2 mt-2">
+                                        ${Object.entries(d.report_design).map(([name, desc]) => `
+                                            <div class="bg-white/60 p-2 rounded border border-blue-200/50">
+                                                <span class="font-bold text-slate-800 text-sm">${name}:</span>
+                                                <span class="text-sm text-slate-600">${desc}</span>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                    if (data.instructions) {
+                        html += `
+                            <div class="bg-amber-50 p-3 rounded-lg border border-amber-100">
+                                <div class="text-[11px] font-bold text-amber-600 uppercase mb-1">📢 本轮指令</div>
+                                <div class="text-sm text-slate-700 font-medium">${data.instructions}</div>
+                            </div>
+                        `;
+                    }
+                }
+                // 3. 策论家方案 (Planner Plan)
+                else if (data.core_idea || data.steps) {
+                    html += `
+                        <div class="bg-emerald-50 p-4 rounded-xl border border-emerald-100 space-y-4">
+                            <div>
+                                <div class="text-[11px] font-bold text-emerald-600 uppercase mb-1">💡 核心思路</div>
+                                <div class="text-base font-bold text-slate-800">${data.core_idea || '未定义'}</div>
+                            </div>
+                            <div>
+                                <div class="text-[11px] font-bold text-emerald-600 uppercase mb-1">🚀 执行步骤</div>
+                                <div class="space-y-2 mt-2">
+                                    ${(data.steps || []).map((step, i) => `
+                                        <div class="flex items-start">
+                                            <span class="bg-emerald-200 text-emerald-700 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold mr-2 mt-0.5 flex-shrink-0">${i+1}</span>
+                                            <span class="text-sm text-slate-700">${step}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                            ${data.feasibility ? `
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-emerald-200/50">
+                                    <div>
+                                        <div class="text-[11px] font-bold text-emerald-600 uppercase mb-1">✅ 优势</div>
+                                        <ul class="list-disc ml-4 text-sm text-slate-600">
+                                            ${(data.feasibility.advantages || []).map(a => `<li>${a}</li>`).join('')}
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <div class="text-[11px] font-bold text-emerald-600 uppercase mb-1">🛠️ 资源需求</div>
+                                        <ul class="list-disc ml-4 text-sm text-slate-600">
+                                            ${(data.feasibility.requirements || []).map(r => `<li>${r}</li>`).join('')}
+                                        </ul>
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }
+                // 4. 通用 JSON 展示 (Tree-like)
+                else {
+                    html += `<pre class="bg-slate-50 p-3 rounded-lg text-xs overflow-x-auto border border-slate-200 text-slate-600"><code>${JSON.stringify(data, null, 2)}</code></pre>`;
+                }
+
+                html += '</div>';
+                return html;
+            }
+
+            function appendLog(logText) {
+                const p = document.createElement('p');
+                p.className = 'break-all border-b border-slate-800 pb-1 last:border-0';
+                if (logText.includes('ERROR')) p.classList.add('text-red-400');
+                else if (logText.includes('WARNING')) p.classList.add('text-yellow-400');
+                else if (logText.includes('INFO')) p.classList.add('text-blue-300');
+                p.textContent = logText;
+                logContainer.appendChild(p);
+            }
+
+            function clearLogs() {
+                logContainer.innerHTML = '';
+                lastLogCount = 0;
+            }
+
+            function copyReport() {
+                if (reportIframe && reportIframe.contentDocument) {
+                    const text = reportIframe.contentDocument.body.innerText;
+                    navigator.clipboard.writeText(text).then(() => showAlert('报告内容已复制到剪贴板', '成功'));
+                }
+            }
+
+            function downloadReport() {
+                if (reportIframe && reportIframe.srcdoc) {
+                    const blob = new Blob([reportIframe.srcdoc], { type: 'text/html' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                    a.download = `议事报告_${timestamp}.html`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                } else {
+                    showAlert('报告尚未生成，无法下载', '提示');
+                }
+            }
+
+            async function downloadImage(e) {
+                if (reportIframe && reportIframe.contentDocument && reportIframe.contentDocument.body) {
+                    const btn = e.currentTarget;
+                    const originalText = btn.innerText;
+                    btn.innerText = '转换中...';
+                    btn.disabled = true;
+
+                    try {
+                        // 使用 html2canvas 渲染 iframe 内容
+                        // 注意：由于 iframe 是 srcdoc 模式，属于同源，可以直接访问
+                        const canvas = await html2canvas(reportIframe.contentDocument.body, {
+                            useCORS: true,
+                            allowTaint: true,
+                            backgroundColor: '#ffffff',
+                            scale: 2 // 提高清晰度
+                        });
+                        
+                        const url = canvas.toDataURL('image/png');
+                        const a = document.createElement('a');
+                        a.href = url;
+                        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                        a.download = `议事报告_${timestamp}.png`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                    } catch (error) {
+                        console.error('Image conversion error:', error);
+                        showAlert('图片转换失败，请尝试下载 HTML 格式', '错误', 'error');
+                    } finally {
+                        btn.innerText = originalText;
+                        btn.disabled = false;
+                    }
+                } else {
+                    showAlert('报告尚未生成，无法下载图片', '提示');
+                }
+            }
+
+            // 历史记录功能
+            async function deleteWorkspace(event, sessionId) {
+                event.stopPropagation(); // 阻止触发 loadWorkspace
+                
+                const confirmed = await showConfirm('确定要删除这条历史记录及其相关文件吗？此操作不可撤销。', '确认删除');
+                if (!confirmed) return;
+                
+                try {
+                    const response = await fetch(`/api/delete_workspace/${sessionId}`, {
+                        method: 'DELETE'
+                    });
+                    const data = await response.json();
+                    
+                    if (data.status === 'success') {
+                        // 重新加载历史列表
+                        const modal = document.getElementById('history-modal');
+                        modal.classList.add('hidden'); // 先关闭
+                        toggleHistoryModal(); // 再打开以触发刷新
+                        showAlert('历史记录已成功删除', '成功');
+                    } else {
+                        showAlert('删除失败: ' + (data.message || '未知错误'), '错误', 'error');
+                    }
+                } catch (error) {
+                    showAlert('删除出错: ' + error.message, '错误', 'error');
+                }
+            }
+
+            async function toggleHistoryModal() {
+                const modal = document.getElementById('history-modal');
+                const list = document.getElementById('history-list');
+                
+                if (modal.classList.contains('hidden')) {
+                    modal.classList.remove('hidden');
+                    list.innerHTML = '<div class="text-center py-8 text-slate-400 italic">正在加载历史记录...</div>';
+                    
+                    try {
+                        const response = await fetch('/api/workspaces');
+                        const data = await response.json();
+                        
+                        if (data.status === 'success' && data.workspaces.length > 0) {
+                            list.innerHTML = '';
+                            data.workspaces.forEach(ws => {
+                                const item = document.createElement('div');
+                                item.className = 'p-4 border border-slate-100 rounded-xl hover:bg-indigo-50 hover:border-indigo-200 cursor-pointer transition group';
+                                item.onclick = () => loadWorkspace(ws.id);
+                                item.innerHTML = `
+                                    <div class="flex justify-between items-start">
+                                        <div class="flex-1">
+                                            <h4 class="font-bold text-slate-800 group-hover:text-indigo-700">${ws.issue || '未命名议题'}</h4>
+                                            <p class="text-xs text-slate-400 mt-1">ID: ${ws.id}</p>
+                                        </div>
+                                        <div class="flex flex-col items-end space-y-2">
+                                            <span class="text-xs font-mono text-slate-400 bg-slate-50 px-2 py-1 rounded">${ws.timestamp}</span>
+                                            <button onclick="deleteWorkspace(event, '${ws.id}')" 
+                                                    class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition opacity-0 group-hover:opacity-100"
+                                                    title="删除记录">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                `;
+                                list.appendChild(item);
+                            });
+                        } else {
+                            list.innerHTML = '<div class="text-center py-8 text-slate-400 italic">暂无历史记录</div>';
+                        }
+                    } catch (error) {
+                        list.innerHTML = `<div class="text-center py-8 text-red-400 italic">加载失败: ${error.message}</div>`;
+                    }
+                } else {
+                    modal.classList.add('hidden');
+                }
+            }
+
+            function toggleLogs() {
+                const logSection = document.getElementById('log-section');
+                logSection.classList.toggle('hidden');
+            }
+
+            async function loadWorkspace(sessionId) {
+                const confirmed = await showConfirm('加载历史记录将清除当前讨论内容，是否继续？', '确认加载');
+                if (!confirmed) return;
+                
+                try {
+                    const response = await fetch(`/api/load_workspace/${sessionId}`);
+                    const data = await response.json();
+                    
+                    if (data.status === 'success') {
+                        // 重置UI
+                        document.getElementById('discussion-flow').innerHTML = '';
+                        // 清空并隐藏报告
+                        const reportIframe = document.getElementById('report-iframe');
+                        reportIframe.srcdoc = "<div style='color:#94a3b8; font-style:italic; text-align:center; margin-top:100px; font-family:sans-serif;'></div>";
+                        
+                        // 重置进度条
+                        currentProgress = 0;
+                        document.getElementById('progress-bar').style.width = '0%';
+                        document.getElementById('progress-percentage').innerText = '0%';
+                        
+                        // 更新输入框
+                        document.getElementById('issue-input').value = data.issue || '';
+                        if (data.rounds) {
+                            document.getElementById('rounds-input').value = data.rounds;
+                        }
+                        
+                        // 关闭模态框
+                        toggleHistoryModal();
+                        
+                        // 提示成功
+                        showAlert('历史记录加载成功，正在同步讨论流...', '成功');
+                        
+                        // 重置计数器以强制全量拉取
+                        lastEventCount = 0;
+                        lastLogCount = 0;
+                        
+                        // 触发一次更新以拉取所有历史事件
+                        fetchUpdates();
+                    } else {
+                        showAlert('加载失败: ' + (data.message || '未知错误'), '错误', 'error');
+                    }
+                } catch (error) {
+                    showAlert('加载出错: ' + error.message, '错误', 'error');
+                }
+            }
+
+            // 初始化
+            document.addEventListener('DOMContentLoaded', () => {
+                // 启动定时轮询
+                setInterval(fetchUpdates, 1000);
+                
+                // 监听全局后端选择
+                const globalBackend = document.getElementById('backend-select');
+                const globalModel = document.getElementById('global-model-input');
+                const updateGlobalList = () => {
+                    if (globalBackend.value === 'openrouter') {
+                        globalModel.setAttribute('list', 'openrouter-models-list');
+                        fetchOpenRouterModels();
+                    } else if (globalBackend.value === 'deepseek') {
+                        globalModel.setAttribute('list', 'deepseek-models-list');
+                        fetchDeepSeekModels();
+                    } else {
+                        globalModel.removeAttribute('list');
+                    }
+                };
+                globalBackend.addEventListener('change', updateGlobalList);
+                updateGlobalList(); // 初始检查
+
+                // 监听静态 Agent 后端选择 (Leader, Reporter)
+                document.querySelectorAll('.agent-backend').forEach(select => {
+                    const agentId = select.dataset.agent;
+                    const input = document.querySelector(`.agent-model[data-agent="${agentId}"]`);
+                    if (input) {
+                        const updateAgentList = () => {
+                            if (select.value === 'openrouter') {
+                                input.setAttribute('list', 'openrouter-models-list');
+                                fetchOpenRouterModels();
+                            } else if (select.value === 'deepseek') {
+                                input.setAttribute('list', 'deepseek-models-list');
+                                fetchDeepSeekModels();
+                            } else {
+                                input.removeAttribute('list');
+                            }
+                        };
+                        select.addEventListener('change', updateAgentList);
+                        updateAgentList(); // 初始检查
+                    }
+                });
+            });
+
+            function toggleAdvancedSettings() {
+                const panel = document.getElementById('advanced-settings');
+                panel.classList.toggle('hidden');
+                if (!panel.classList.contains('hidden')) {
+                    updateAgentConfigsUI();
+                }
+            }
+
+            function updateAgentConfigsUI() {
+                const container = document.getElementById('agent-configs-container');
+                const plannersCount = parseInt(document.getElementById('planners-input').value) || 0;
+                const auditorsCount = parseInt(document.getElementById('auditors-input').value) || 0;
+                
+                // 保留 Leader 和 Reporter，移除旧的 Planner 和 Auditor
+                const staticAgents = ['leader', 'reporter'];
+                const existingConfigs = Array.from(container.children);
+                
+                // 移除动态生成的配置
+                existingConfigs.forEach(child => {
+                    const agentType = child.querySelector('select')?.dataset.agent;
+                    if (agentType && !staticAgents.includes(agentType)) {
+                        container.removeChild(child);
+                    }
+                });
+
+                // 生成 Planner 配置
+                for (let i = 0; i < plannersCount; i++) {
+                    const div = createAgentConfigItem(`策论家 ${i+1}`, `planner_${i}`, 'bg-blue-50', 'bg-blue-500');
+                    container.appendChild(div);
+                }
+
+                // 生成 Auditor 配置
+                for (let i = 0; i < auditorsCount; i++) {
+                    const div = createAgentConfigItem(`监察官 ${i+1}`, `auditor_${i}`, 'bg-amber-50', 'bg-amber-500');
+                    container.appendChild(div);
+                }
+            }
+
+            function createAgentConfigItem(label, id, bgColor, dotColor) {
+                const div = document.createElement('div');
+                div.className = `p-3 ${bgColor} rounded-lg border border-slate-200`;
+                div.innerHTML = `
+                    <h4 class="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center">
+                        <span class="w-2 h-2 ${dotColor} rounded-full mr-2"></span>${label}
+                    </h4>
+                    <div class="flex gap-2">
+                        <select class="agent-backend flex-1 text-xs p-1 border rounded" data-agent="${id}">
+                            <option value="default">默认后端</option>
+                            <option value="deepseek">DeepSeek</option>
+                            <option value="openai">OpenAI</option>
+                            <option value="openrouter">OpenRouter</option>
+                            <option value="aliyun">Aliyun</option>
+                            <option value="ollama">Ollama</option>
+                        </select>
+                        <input type="text" class="agent-model flex-1 text-xs p-1 border rounded" placeholder="模型名称 (可选)" data-agent="${id}">
+                    </div>
+                    <select class="agent-reasoning hidden text-[10px] p-1 border rounded mt-1 w-full" data-agent="${id}">
+                        <option value="">推理: 关闭</option>
+                        <option value="low">推理: Low</option>
+                        <option value="medium">推理: Medium</option>
+                        <option value="high">推理: High</option>
+                    </select>
+                `;
+                
+                // 为后端选择添加监听器，动态切换 datalist
+                const select = div.querySelector('.agent-backend');
+                const input = div.querySelector('.agent-model');
+                const reasoningSelect = div.querySelector('.agent-reasoning');
+                const updateList = () => {
+                    if (select.value === 'openrouter') {
+                        input.setAttribute('list', 'openrouter-models-list');
+                        reasoningSelect.classList.remove('hidden');
+                        fetchOpenRouterModels();
+                    } else if (select.value === 'deepseek') {
+                        input.setAttribute('list', 'deepseek-models-list');
+                        reasoningSelect.classList.add('hidden');
+                        fetchDeepSeekModels();
+                    } else {
+                        input.removeAttribute('list');
+                        reasoningSelect.classList.add('hidden');
+                    }
+                };
+                select.addEventListener('change', updateList);
+                updateList(); // 初始检查
+                
+                return div;
+            }
+
+            async function fetchOpenRouterModels() {
+                try {
+                    const response = await fetch('/api/openrouter/models');
+                    const models = await response.json();
+                    const datalist = document.getElementById('openrouter-models-list');
+                    datalist.innerHTML = '';
+                    models.forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = model.id;
+                        option.textContent = model.name || model.id;
+                        datalist.appendChild(option);
+                    });
+                } catch (error) {
+                    console.error('Error fetching OpenRouter models:', error);
+                }
+            }
+
+            async function fetchDeepSeekModels() {
+                try {
+                    const response = await fetch('/api/deepseek/models');
+                    const models = await response.json();
+                    const datalist = document.getElementById('deepseek-models-list');
+                    datalist.innerHTML = '';
+                    models.forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = model.id;
+                        option.textContent = model.id;
+                        datalist.appendChild(option);
+                    });
+                } catch (error) {
+                    console.error('Error fetching DeepSeek models:', error);
+                }
+            }
+
+            // 监听全局后端选择
+            document.getElementById('backend-select').addEventListener('change', function() {
+                const modelInput = document.getElementById('global-model-input');
+                const reasoningContainer = document.getElementById('global-reasoning-container');
+                
+                if (this.value === 'openrouter') {
+                    modelInput.setAttribute('list', 'openrouter-models-list');
+                    reasoningContainer.classList.remove('hidden');
+                    fetchOpenRouterModels();
+                } else if (this.value === 'deepseek') {
+                    modelInput.setAttribute('list', 'deepseek-models-list');
+                    reasoningContainer.classList.add('hidden');
+                    fetchDeepSeekModels();
+                } else {
+                    modelInput.removeAttribute('list');
+                    reasoningContainer.classList.add('hidden');
+                }
+            });
+
+            // 监听代理人后端选择
+            document.addEventListener('change', function(e) {
+                if (e.target && e.target.classList.contains('agent-backend')) {
+                    const agentId = e.target.dataset.agent;
+                    const modelInput = document.querySelector(`.agent-model[data-agent="${agentId}"]`);
+                    const reasoningSelect = document.querySelector(`.agent-reasoning[data-agent="${agentId}"]`);
+                    
+                    if (e.target.value === 'openrouter') {
+                        modelInput.setAttribute('list', 'openrouter-models-list');
+                        reasoningSelect.classList.remove('hidden');
+                        fetchOpenRouterModels();
+                    } else if (e.target.value === 'deepseek') {
+                        modelInput.setAttribute('list', 'deepseek-models-list');
+                        reasoningSelect.classList.add('hidden');
+                        fetchDeepSeekModels();
+                    } else {
+                        modelInput.removeAttribute('list');
+                        reasoningSelect.classList.add('hidden');
+                    }
+                }
+            });
+
+            async function toggleSettingsModal() {
+                const modal = document.getElementById('settings-modal');
+                if (modal.classList.contains('hidden')) {
+                    // 打开时加载当前配置
+                    try {
+                        const response = await fetch('/api/config');
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            const cfg = data.config;
+                            document.getElementById('settings-key-deepseek').value = cfg.DEEPSEEK_API_KEY || '';
+                            document.getElementById('settings-key-openai').value = cfg.OPENAI_API_KEY || '';
+                            document.getElementById('settings-key-openrouter').value = cfg.OPENROUTER_API_KEY || '';
+                            document.getElementById('settings-key-aliyun').value = cfg.ALIYUN_API_KEY || '';
+                            document.getElementById('settings-key-tavily').value = cfg.TAVILY_API_KEY || '';
+                            
+                            // 处理多选搜索供应商
+                            if (cfg.SEARCH_PROVIDER) {
+                                const providers = cfg.SEARCH_PROVIDER.split(',').map(p => p.trim());
+                                document.querySelectorAll('.search-provider-checkbox').forEach(cb => {
+                                    cb.checked = providers.includes(cb.value);
+                                });
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Failed to load config:', error);
+                    }
+                    modal.classList.remove('hidden');
+                } else {
+                    modal.classList.add('hidden');
+                }
+            }
+
+            async function saveSettings() {
+                const selectedProviders = Array.from(document.querySelectorAll('.search-provider-checkbox:checked'))
+                    .map(cb => cb.value)
+                    .join(',');
+
+                const keys = {
+                    DEEPSEEK_API_KEY: document.getElementById('settings-key-deepseek').value.trim(),
+                    OPENAI_API_KEY: document.getElementById('settings-key-openai').value.trim(),
+                    OPENROUTER_API_KEY: document.getElementById('settings-key-openrouter').value.trim(),
+                    ALIYUN_API_KEY: document.getElementById('settings-key-aliyun').value.trim(),
+                    TAVILY_API_KEY: document.getElementById('settings-key-tavily').value.trim(),
+                    SEARCH_PROVIDER: selectedProviders
+                };
+
+                try {
+                    const response = await fetch('/api/config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(keys)
+                    });
+                    const data = await response.json();
+                    if (data.status === 'success') {
+                        showAlert('设置已保存并应用', '成功');
+                        toggleSettingsModal();
+                    } else {
+                        showAlert('保存失败: ' + data.message, '错误', 'error');
+                    }
+                } catch (error) {
+                    showAlert('保存请求失败: ' + error.message, '错误', 'error');
+                }
+            }
+        </script>
+    </main>
+</body>
+</html>
+
