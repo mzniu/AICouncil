@@ -1582,6 +1582,16 @@
                 globalBackend.addEventListener('change', updateGlobalList);
                 updateGlobalList(); // 初始检查
 
+                // 监听策论家和监察官数量变化，动态更新席位配置
+                const updateConfigsIfVisible = () => {
+                    const panel = document.getElementById('advanced-settings');
+                    if (panel && !panel.classList.contains('hidden')) {
+                        updateAgentConfigsUI();
+                    }
+                };
+                document.getElementById('planners-input').addEventListener('input', updateConfigsIfVisible);
+                document.getElementById('auditors-input').addEventListener('input', updateConfigsIfVisible);
+
                 // 监听静态 Agent 后端选择 (Leader, Reporter)
                 document.querySelectorAll('.agent-backend').forEach(select => {
                     const agentId = select.dataset.agent;
@@ -1617,34 +1627,39 @@
                 const plannersCount = parseInt(document.getElementById('planners-input').value) || 0;
                 const auditorsCount = parseInt(document.getElementById('auditors-input').value) || 0;
                 
-                // 保留 Leader 和 Reporter，移除旧的 Planner 和 Auditor
-                const staticAgents = ['leader', 'reporter'];
-                const existingConfigs = Array.from(container.children);
-                
-                // 移除动态生成的配置
-                existingConfigs.forEach(child => {
-                    const agentType = child.querySelector('select')?.dataset.agent;
-                    if (agentType && !staticAgents.includes(agentType)) {
-                        container.removeChild(child);
+                // 处理 Planners
+                for (let i = 0; i < 5; i++) {
+                    const id = `planner_${i}`;
+                    let el = container.querySelector(`[data-agent-wrapper="${id}"]`);
+                    if (i < plannersCount) {
+                        if (!el) {
+                            const div = createAgentConfigItem(`策论家 ${i+1}`, id, 'bg-blue-50', 'bg-blue-500');
+                            container.appendChild(div);
+                        }
+                    } else if (el) {
+                        container.removeChild(el);
                     }
-                });
-
-                // 生成 Planner 配置
-                for (let i = 0; i < plannersCount; i++) {
-                    const div = createAgentConfigItem(`策论家 ${i+1}`, `planner_${i}`, 'bg-blue-50', 'bg-blue-500');
-                    container.appendChild(div);
                 }
 
-                // 生成 Auditor 配置
-                for (let i = 0; i < auditorsCount; i++) {
-                    const div = createAgentConfigItem(`监察官 ${i+1}`, `auditor_${i}`, 'bg-amber-50', 'bg-amber-500');
-                    container.appendChild(div);
+                // 处理 Auditors
+                for (let i = 0; i < 5; i++) {
+                    const id = `auditor_${i}`;
+                    let el = container.querySelector(`[data-agent-wrapper="${id}"]`);
+                    if (i < auditorsCount) {
+                        if (!el) {
+                            const div = createAgentConfigItem(`监察官 ${i+1}`, id, 'bg-amber-50', 'bg-amber-500');
+                            container.appendChild(div);
+                        }
+                    } else if (el) {
+                        container.removeChild(el);
+                    }
                 }
             }
 
             function createAgentConfigItem(label, id, bgColor, dotColor) {
                 const div = document.createElement('div');
                 div.className = `p-3 ${bgColor} rounded-lg border border-slate-200`;
+                div.setAttribute('data-agent-wrapper', id);
                 div.innerHTML = `
                     <h4 class="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center">
                         <span class="w-2 h-2 ${dotColor} rounded-full mr-2"></span>${label}

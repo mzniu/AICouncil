@@ -21,14 +21,25 @@
 - **💻 Real-time Monitoring Panel**: A Flask-based web interface that displays agent thinking processes, search progress, and debate flows in real-time.
 - **📄 Deep Report Generation**: Automatically generates structured HTML deliberation reports, supporting one-click copy, HTML download, or export as a long image.
 - **📜 History Management**: Complete session persistence, supporting anytime backtracking, loading, or deletion of historical records.
+- **✋ User Intervention**: Allows users to "intervene" at any time during the deliberation process to guide the direction of the debate.
+- **📊 Progress Visualization**: Real-time display of current round (Round X / Y) and detailed agent status.
 - **🤖 Broad Model Support**: Native support for DeepSeek, OpenAI, Aliyun (Qwen), OpenRouter, and local Ollama models.
-- **💬 User Intervention**: Allows users to "intervene" at any time during the deliberation process to guide the direction of the debate.
 
 ---
 
-## 📸 UI Showcase
+## � UI Showcase
 
 ![AICouncil UI Showcase](assets/demo.png)
+
+---
+
+## 📅 TODOs
+
+- [ ] **Report Export Enhancement**: Support for PDF export.
+- [ ] **Search Capability Upgrade**: Add Google Search support and more precise web content extraction.
+- [ ] **Memory System**: Introduce long-term and short-term memory mechanisms for cross-session context.
+- [ ] **Mobile Optimization**: Improve the user experience on mobile browsers.
+- [ ] **Plugin System**: Support custom tools (e.g., calculator, code executor) for agents to call.
 
 ---
 
