@@ -46,7 +46,8 @@
 ## 🚀 Quick Deployment
 
 ### 1. Prerequisites
-Ensure your system has Python 3.9 or higher installed.
+- **Python**: Ensure your system has Python 3.9 or higher installed.
+- **Browser**: **Google Chrome** or **Microsoft Edge** is highly recommended. The web search feature (Baidu/Bing) requires a browser kernel for automated scraping.
 
 ### 2. Clone the Project
 ```bash

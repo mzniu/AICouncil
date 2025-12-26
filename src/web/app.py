@@ -18,6 +18,11 @@ if str(ROOT) not in sys.path:
 
 from src.agents.langchain_agents import generate_report_from_workspace
 from src import config
+import logging
+
+# 禁用 Werkzeug 默认的访问日志（减少 /api/update 等高频请求的输出）
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
 
 app = Flask(__name__)
 

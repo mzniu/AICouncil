@@ -1,45 +1,83 @@
 import requests
 import time
+import os
+import shutil
+import tempfile
 from bs4 import BeautifulSoup
 from src import config
 from src.utils import logger
 
 def bing_search(query: str, max_results: int = 10, max_retries: int = 3) -> str:
-    """使用 Bing 搜索。支持多页抓取。"""
-    import re
-    import random
-    import urllib.parse
-    from DrissionPage import ChromiumPage, ChromiumOptions
-    
+    """使用 Bing 搜索。优先使用 requests，失败则回退到 DrissionPage。"""
     query = query.strip()
     query = query.replace("内容", "").replace("汇总", "").replace("列表", "")
+    import re
     query = re.sub(r'\s+', ' ', query)
     
     if len(query) > 60:
         query = query[:60]
+        
+    logger.info(f"Attempting Bing search via requests for: {query}")
+    res = bing_search_requests(query, max_results=max_results)
+    
+    if "失败" not in res and "未找到结果" not in res:
+        logger.info("Bing search via requests succeeded.")
+        return res
+        
+    logger.info("Bing search via requests failed or returned no results. Falling back to DrissionPage...")
+    
+    import random
+    import urllib.parse
+    from DrissionPage import ChromiumPage, ChromiumOptions
     
     encoded_query = urllib.parse.quote(query)
     results = []
+    temp_dir = None
 
     try:
-        import random
-        # 增加微小随机延迟，避免并行启动时的资源竞争
-        time.sleep(random.uniform(0.1, 0.5))
+        # 增加随机延迟，避免并行启动时的资源竞争
+        time.sleep(random.uniform(1.0, 3.0))
+        
+        logger.info(f"Performing Bing search via DrissionPage for: {query}")
         
         co = ChromiumOptions()
-        co.set_argument('--headless')
+        co.headless(True)
         co.set_argument('--no-sandbox')
-        co.set_argument('--disable-gpu')
+        co.set_argument('--disable-dev-shm-usage')
+        co.set_argument('--disable-blink-features=AutomationControlled')
+        co.set_argument('--mute-audio')
+        co.set_argument('--disable-extensions')
+        co.set_argument('--disable-infobars')
+        co.set_argument('--no-first-run')
+        co.set_argument('--no-default-browser-check')
+        # 设置超时时间
+        co.set_timeouts(base=30)
+        
+        # 使用临时用户目录，避免多实例冲突
+        temp_dir = tempfile.mkdtemp(prefix='bing_')
+        co.set_user_data_path(temp_dir)
         
         # 如果配置了浏览器路径，则使用它
         browser_path = getattr(config, 'BROWSER_PATH', '')
         if browser_path:
             co.set_browser_path(browser_path)
             
-        browser_port = random.randint(10000, 60000)
-        co.set_local_port(browser_port)
-        
-        page = ChromiumPage(addr_or_opts=co) 
+        # 尝试初始化页面，增加重试机制
+        page = None
+        for attempt in range(2):
+            try:
+                # 强制使用新端口
+                browser_port = random.randint(10000, 60000)
+                co.set_local_port(browser_port)
+                page = ChromiumPage(addr_or_opts=co)
+                break
+            except Exception as e:
+                if attempt == 0:
+                    logger.warning(f"First attempt to start browser for Bing failed, retrying... Error: {e}")
+                    time.sleep(3)
+                else:
+                    raise e
+
         try:
             # 计算需要抓取的页数 (Bing 每页约 10 条)
             pages_to_fetch = (max_results + 9) // 10
@@ -95,29 +133,34 @@ def bing_search(query: str, max_results: int = 10, max_retries: int = 3) -> str:
                 return format_search_results(results)
                 
         finally:
-            page.quit()
+            if page:
+                page.quit()
+            if temp_dir and os.path.exists(temp_dir):
+                try:
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                except:
+                    pass
     except Exception as e:
-        logger.error(f"Bing search failed: {e}")
+        logger.error(f"Bing search via DrissionPage failed: {e}")
+        logger.info("Falling back to Bing search via requests...")
+        return bing_search_requests(query, max_results=max_results)
 
     return "Bing 搜索失败或未找到结果。"
 
-def bing_search_requests(query: str, max_results: int = 5, max_retries: int = 3) -> str:
+def bing_search_requests(query: str, max_results: int = 10, max_retries: int = 3) -> str:
     """使用 requests 进行 Bing 搜索的备选方案。"""
     url = "https://cn.bing.com/search"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
         "Referer": "https://cn.bing.com/",
     }
     
     params = {
         "q": query,
-        "form": "QBRE",
         "mkt": "zh-CN",
         "setlang": "zh-hans",
-        "cc": "CN",
-        "cvid": "9EC267FFF1EF46A6927986217CF9B9E3"
     }
     
     last_exception = None
@@ -131,16 +174,21 @@ def bing_search_requests(query: str, max_results: int = 5, max_retries: int = 3)
             results = []
             items = soup.select('li.b_algo') or soup.select('.b_algo')
             
-            for item in items[:max_results]:
-                title_tag = item.select_one('h2 a')
+            for item in items:
+                if len(results) >= max_results:
+                    break
+                title_tag = item.select_one('h2 a') or item.select_one('h2')
+                link_tag = item.select_one('a')
                 snippet_tag = item.select_one('.b_caption p, .b_linehighlight, .b_algoSlug, .b_content p, .b_algoSnippet')
                 
                 if title_tag:
-                    results.append({
-                        "title": title_tag.get_text(),
-                        "href": title_tag.get('href'),
-                        "body": snippet_tag.get_text() if snippet_tag else "无摘要"
-                    })
+                    href = link_tag.get('href', '') if link_tag else ''
+                    if href.startswith('http'):
+                        results.append({
+                            "title": title_tag.get_text().strip(),
+                            "href": href,
+                            "body": snippet_tag.get_text().strip() if snippet_tag else "无摘要"
+                        })
             
             if results:
                 return format_search_results(results)
@@ -151,6 +199,8 @@ def bing_search_requests(query: str, max_results: int = 5, max_retries: int = 3)
             last_exception = e
             if attempt < max_retries - 1:
                 time.sleep(3)
+                
+    return f"Bing 搜索(Requests)失败: {str(last_exception)}" if last_exception else "Bing 搜索(Requests)未找到结果。"
                 
     return f"Bing 搜索失败: {str(last_exception)}"
 
@@ -268,41 +318,187 @@ def tavily_search(query: str, max_results: int = 5, max_retries: int = 3) -> str
             
     return f"Tavily 搜索失败 (已重试 {max_retries} 次): {str(last_exception)}"
 
+def baidu_search_requests(query: str, max_results: int = 10) -> str:
+    """使用 requests 进行百度搜索的备选方案。"""
+    import urllib.parse
+    import random
+    
+    url = "https://www.baidu.com/s"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+        "Referer": "https://www.baidu.com/",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+    }
+    
+    results = []
+    try:
+        session = requests.Session()
+        # 先访问首页获取基础 Cookie
+        session.get("https://www.baidu.com/", headers=headers, timeout=10)
+        
+        # 百度每页 10 条
+        pages_to_fetch = (max_results + 9) // 10
+        
+        for p in range(pages_to_fetch):
+            pn = p * 10
+            params = {
+                "wd": query,
+                "pn": pn,
+                "ie": "utf-8",
+                "rn": "10", # 每页记录数
+            }
+            
+            logger.info(f"Baidu Requests Page {p+1}: {url}?wd={query}&pn={pn}")
+            response = session.get(url, params=params, headers=headers, timeout=15)
+            
+            if response.status_code != 200:
+                logger.warning(f"Baidu requests failed with status code: {response.status_code}")
+                break
+                
+            # 检查是否被反爬
+            if "安全验证" in response.text or "verify.baidu.com" in response.text:
+                logger.warning("Baidu requests triggered captcha/security check.")
+                break
+                
+            soup = BeautifulSoup(response.text, 'html.parser')
+            # 百度搜索结果的多种可能选择器
+            items = soup.select('.result.c-container')
+            if not items:
+                items = soup.select('div.result-op.xpath-log')
+            if not items:
+                items = soup.select('div[class*="result"]')
+                
+            for item in items:
+                if len(results) >= max_results:
+                    break
+                try:
+                    # 提取标题和链接
+                    title_tag = item.select_one('h3 a') or item.select_one('h3')
+                    link_tag = item.select_one('h3 a') or item.select_one('a')
+                    
+                    if not title_tag:
+                        continue
+                        
+                    title = title_tag.get_text().strip()
+                    href = link_tag.get('href', '') if link_tag else ''
+                    
+                    # 百度链接通常是加密的跳转链接，requests 方式下我们直接存这个链接
+                    if href and href.startswith('/'):
+                        href = "https://www.baidu.com" + href
+                    elif href and not href.startswith('http'):
+                        href = "https://www.baidu.com/s?wd=" + urllib.parse.quote(title)
+                        
+                    # 提取摘要
+                    snippet_tag = item.select_one('.c-abstract') or \
+                                 item.select_one('div[class*="content-"]') or \
+                                 item.select_one('div[class*="c-span"]') or \
+                                 item.select_one('.op-se-it-content')
+                    
+                    body = "无摘要"
+                    if snippet_tag:
+                        body = snippet_tag.get_text().strip()
+                    else:
+                        # 尝试从整个 item 中提取文本并排除标题
+                        full_text = item.get_text(separator=' ', strip=True)
+                        if title in full_text:
+                            body = full_text.replace(title, '', 1).strip()
+                            if len(body) > 200:
+                                body = body[:200] + "..."
+                    
+                    if title and body != "无摘要":
+                        results.append({
+                            "title": title,
+                            "href": href,
+                            "body": body
+                        })
+                except Exception as e:
+                    continue
+            
+            if len(results) >= max_results:
+                break
+            # 避免请求过快
+            time.sleep(random.uniform(1.5, 3.0))
+            
+        if results:
+            logger.info(f"Successfully retrieved {len(results)} results via Baidu requests.")
+            return format_search_results(results)
+    except Exception as e:
+        logger.error(f"Baidu requests search failed: {e}")
+        
+    return "百度搜索(Requests)失败或未找到结果。"
+
 def baidu_search(query: str, max_results: int = 10, max_retries: int = 3) -> str:
-    """使用百度搜索。支持多页抓取。"""
+    """使用百度搜索。优先使用 requests，失败则回退到 DrissionPage。"""
+    query = query.strip()
+    if len(query) > 60:
+        query = query[:60]
+        
+    logger.info(f"Attempting Baidu search via requests for: {query}")
+    res = baidu_search_requests(query, max_results=max_results)
+    
+    if "失败" not in res and "未找到结果" not in res:
+        logger.info("Baidu search via requests succeeded.")
+        return res
+        
+    logger.info("Baidu search via requests failed or returned no results. Falling back to DrissionPage...")
+    
     import re
     import random
     import urllib.parse
     from DrissionPage import ChromiumPage, ChromiumOptions
     
-    query = query.strip()
-    if len(query) > 60:
-        query = query[:60]
-    
     encoded_query = urllib.parse.quote(query)
     results = []
+    temp_dir = None
 
     try:
-        import random
-        # 增加微小随机延迟，避免并行启动时的资源竞争
-        time.sleep(random.uniform(0.1, 0.5))
+        # 增加随机延迟，避免并行启动时的资源竞争
+        time.sleep(random.uniform(1.0, 3.0))
         
         logger.info(f"Performing Baidu search via DrissionPage for: {query}")
         
         co = ChromiumOptions()
-        co.set_argument('--headless')
+        co.headless(True)
         co.set_argument('--no-sandbox')
-        co.set_argument('--disable-gpu')
+        co.set_argument('--disable-dev-shm-usage')
+        co.set_argument('--disable-blink-features=AutomationControlled')
+        co.set_argument('--mute-audio')
+        co.set_argument('--disable-extensions')
+        co.set_argument('--disable-infobars')
+        co.set_argument('--no-first-run')
+        co.set_argument('--no-default-browser-check')
+        co.set_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36')
+        # 设置超时时间
+        co.set_timeouts(base=30)
+        
+        # 使用临时用户目录，避免多实例冲突
+        temp_dir = tempfile.mkdtemp(prefix='baidu_')
+        co.set_user_data_path(temp_dir)
         
         # 如果配置了浏览器路径，则使用它
         browser_path = getattr(config, 'BROWSER_PATH', '')
         if browser_path:
             co.set_browser_path(browser_path)
             
-        browser_port = random.randint(10000, 60000)
-        co.set_local_port(browser_port)
-        
-        page = ChromiumPage(addr_or_opts=co) 
+        # 尝试初始化页面，增加重试机制
+        page = None
+        for attempt in range(2):
+            try:
+                # 强制使用新端口
+                browser_port = random.randint(10000, 60000)
+                co.set_local_port(browser_port)
+                page = ChromiumPage(addr_or_opts=co)
+                break
+            except Exception as e:
+                if attempt == 0:
+                    logger.warning(f"First attempt to start browser for Baidu failed, retrying... Error: {e}")
+                    time.sleep(3)
+                else:
+                    raise e
+
         try:
             # 计算需要抓取的页数 (百度每页 10 条)
             pages_to_fetch = (max_results + 9) // 10
@@ -312,6 +508,8 @@ def baidu_search(query: str, max_results: int = 10, max_retries: int = 3) -> str
                 url = f"https://www.baidu.com/s?wd={encoded_query}&pn={pn}"
                 logger.info(f"Baidu Search Page {p+1}: {url}")
                 
+                # 增加随机延迟
+                time.sleep(random.uniform(1, 3))
                 page.get(url)
                 page.wait.load_start()
                 
@@ -371,9 +569,17 @@ def baidu_search(query: str, max_results: int = 10, max_retries: int = 3) -> str
                 return format_search_results(results)
             
         finally:
-            page.quit()
+            if page:
+                page.quit()
+            if temp_dir and os.path.exists(temp_dir):
+                try:
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                except:
+                    pass
     except Exception as e:
-        logger.error(f"Baidu search failed: {e}")
+        logger.error(f"Baidu search via DrissionPage failed: {e}")
+        logger.info("Falling back to Baidu search via requests...")
+        return baidu_search_requests(query, max_results=max_results)
 
     return "百度搜索失败或未找到结果。"
 

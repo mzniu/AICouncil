@@ -19,3 +19,10 @@ src/config.py
 # OS
 .DS_Store
 Thumbs.db
+
+drission_tmp/
+.venv/
+__pycache__/
+*.pyc
+workspaces/
+reports/

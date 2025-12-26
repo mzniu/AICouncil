@@ -641,7 +641,7 @@
                     msg_unrated: "未评级",
                     msg_undefined: "未定义",
                     msg_none: "无",
-                    msg_browser_missing: "未找到浏览器，Baidu/Bing 搜索功能将不可用。请在设置中手动配置浏览器路径。"
+                    msg_browser_missing: "未找到浏览器可执行文件，联网搜索（Baidu/Bing）可能无法使用。请在设置中手动配置浏览器路径。"
                 },
                 en: {
                     nav_title: "AICouncil",
@@ -765,7 +765,7 @@
                     msg_unrated: "Unrated",
                     msg_undefined: "Undefined",
                     msg_none: "None",
-                    msg_browser_missing: "No browser found. Baidu/Bing search will be unavailable. Please configure the browser path in settings."
+                    msg_browser_missing: "Browser executable not found. Web search (Baidu/Bing) may not work. Please configure the browser path in settings."
                 }
             };
 
@@ -908,23 +908,35 @@
                     const eventsData = await eventsResponse.json();
 
                     if (eventsData.events && eventsData.events.length > lastEventCount) {
+                        // 检查用户是否在底部（允许 100px 的误差）
+                        const isAtBottom = discussionContainer.scrollHeight - discussionContainer.scrollTop <= discussionContainer.clientHeight + 100;
+                        
                         const newEvents = eventsData.events.slice(lastEventCount);
                         newEvents.forEach(event => {
                             appendEvent(event);
                             updateProgress(event);
                         });
                         lastEventCount = eventsData.events.length;
-                        discussionContainer.scrollTo({
-                            top: discussionContainer.scrollHeight,
-                            behavior: 'smooth'
-                        });
+                        
+                        if (isAtBottom) {
+                            discussionContainer.scrollTo({
+                                top: discussionContainer.scrollHeight,
+                                behavior: 'smooth'
+                            });
+                        }
                     }
 
                     if (eventsData.logs && eventsData.logs.length > lastLogCount) {
+                        // 检查日志是否在底部
+                        const isLogAtBottom = logContainer.scrollHeight - logContainer.scrollTop <= logContainer.clientHeight + 50;
+                        
                         const newLogs = eventsData.logs.slice(lastLogCount);
                         newLogs.forEach(log => appendLog(log));
                         lastLogCount = eventsData.logs.length;
-                        logContainer.scrollTop = logContainer.scrollHeight;
+                        
+                        if (isLogAtBottom) {
+                            logContainer.scrollTop = logContainer.scrollHeight;
+                        }
                     }
 
                     if (eventsData.final_report) {
