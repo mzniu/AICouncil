@@ -158,7 +158,8 @@ def stop_discussion():
 def get_status():
     return jsonify({
         "is_running": is_running,
-        "config": current_config
+        "config": current_config,
+        "browser_found": bool(config.BROWSER_PATH and os.path.exists(config.BROWSER_PATH))
     })
 
 @app.route('/api/events', methods=['GET'])
@@ -446,7 +447,8 @@ def handle_config():
                 "OPENROUTER_API_KEY": config.OPENROUTER_API_KEY,
                 "ALIYUN_API_KEY": config.ALIYUN_API_KEY,
                 "TAVILY_API_KEY": config.TAVILY_API_KEY,
-                "SEARCH_PROVIDER": config.SEARCH_PROVIDER
+                "SEARCH_PROVIDER": config.SEARCH_PROVIDER,
+                "BROWSER_PATH": getattr(config, 'BROWSER_PATH', '')
             }
         })
     

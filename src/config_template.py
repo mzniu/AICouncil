@@ -4,6 +4,10 @@ Keep secrets out of source control in production (use environment variables or a
 """
 import os
 
+# Logging configuration
+LOG_FILE = os.getenv('LOG_FILE', 'aicouncil.log')
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+
 # Backend type: 'ollama' (default). Future values: 'openai', 'deepseek'
 MODEL_BACKEND = os.getenv('MODEL_BACKEND', 'ollama')
 
@@ -40,6 +44,7 @@ SEARCH_PROVIDER = os.getenv('SEARCH_PROVIDER', 'baidu')  # Options: 'tavily', 'd
 # Ollama HTTP endpoint (if running local HTTP server)
 OLLAMA_HTTP_URL = os.getenv('OLLAMA_HTTP_URL', 'http://127.0.0.1:11434/api/generate')
 
-# Logging configuration
-LOG_FILE = os.getenv('LOG_FILE', 'aicouncil.log')
-LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+# Browser path for DrissionPage (Baidu search)
+# If empty, DrissionPage will try to find Chrome/Edge automatically
+from src.utils.browser_utils import find_browser_path
+BROWSER_PATH = os.getenv('BROWSER_PATH', find_browser_path() or '')

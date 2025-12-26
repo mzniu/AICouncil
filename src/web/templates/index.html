@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 元老院 - 实时讨论视图</title>
+    <title>AICouncil</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
@@ -130,18 +130,24 @@
 <body class="bg-gray-50 min-h-screen font-sans">
     <nav class="bg-slate-800 text-white p-4 shadow-lg sticky top-0 z-50">
         <div class="px-4 flex justify-between items-center">
-            <h1 class="text-3xl font-black tracking-tighter">🏛️ AI 元老院 <span class="text-lg font-normal text-slate-400 ml-3 tracking-normal">实时监控面板</span></h1>
+            <h1 class="text-3xl font-black tracking-tighter">🏛️ <span data-i18n="nav_title">AI 元老院</span> <span class="text-lg font-normal text-slate-400 ml-3 tracking-normal" data-i18n="nav_subtitle">实时监控面板</span></h1>
             <div class="flex items-center space-x-4">
+                <!-- 语言切换 -->
+                <div class="flex bg-slate-700/50 rounded-lg p-1 border border-slate-600">
+                    <button onclick="setLanguage('zh')" id="lang-zh" class="px-2 py-1 text-xs rounded transition-all duration-200 font-bold">中</button>
+                    <button onclick="setLanguage('en')" id="lang-en" class="px-2 py-1 text-xs rounded transition-all duration-200 font-bold">EN</button>
+                </div>
                 <div id="status-indicator" class="flex items-center space-x-3 bg-slate-700/50 px-4 py-2 rounded-full border border-slate-600">
                     <span id="status-dot" class="w-3 h-3 bg-gray-500 rounded-full"></span>
-                    <span id="status-text" class="text-base">就绪</span>
+                    <span id="status-text" class="text-base" data-i18n="status_ready">就绪</span>
+                    <span id="browser-warning" class="hidden text-amber-400 cursor-help" title="未找到浏览器，搜索功能可能受限" data-i18n-title="msg_browser_missing">⚠️</span>
                 </div>
-                <button onclick="toggleLogs()" class="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg border border-slate-600 transition group" title="切换日志显示">
+                <button onclick="toggleLogs()" class="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg border border-slate-600 transition group" title="切换日志显示" data-i18n-title="nav_toggle_logs">
                     <svg class="w-5 h-5 text-slate-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                     </svg>
                 </button>
-                <button onclick="toggleSettingsModal()" class="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg border border-slate-600 transition group" title="系统设置">
+                <button onclick="toggleSettingsModal()" class="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg border border-slate-600 transition group" title="系统设置" data-i18n-title="nav_settings">
                     <svg class="w-5 h-5 text-slate-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
@@ -156,13 +162,14 @@
         <div class="bg-white rounded-xl shadow-md p-4 mb-4 border border-slate-200 flex-shrink-0">
             <div class="flex flex-col md:flex-row gap-4">
                 <div class="flex-1">
-                    <label class="block text-sm font-bold text-slate-500 uppercase mb-1">议题内容</label>
+                    <label class="block text-sm font-bold text-slate-500 uppercase mb-1" data-i18n="input_issue_label">议题内容</label>
                     <textarea id="issue-input" placeholder="请输入您想要讨论的议题（支持多行输入，Enter 发送，Shift+Enter 换行）..." rows="1"
+                           data-i18n-placeholder="input_issue_placeholder"
                            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition text-base resize-none min-h-[42px] max-h-48 overflow-y-auto"
                            oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"></textarea>
                 </div>
                 <div class="w-full md:w-32">
-                    <label class="block text-sm font-bold text-slate-500 uppercase mb-1">后端</label>
+                    <label class="block text-sm font-bold text-slate-500 uppercase mb-1" data-i18n="input_backend_label">后端</label>
                     <select id="backend-select" 
                             class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-base bg-white">
                         <option value="deepseek">DeepSeek</option>
@@ -173,50 +180,50 @@
                     </select>
                 </div>
                 <div class="w-full md:w-48">
-                    <label class="block text-sm font-bold text-slate-500 uppercase mb-1">全局模型 (可选)</label>
-                    <input type="text" id="global-model-input" placeholder="默认模型"
+                    <label class="block text-sm font-bold text-slate-500 uppercase mb-1" data-i18n="input_model_label">全局模型 (可选)</label>
+                    <input type="text" id="global-model-input" placeholder="默认模型" data-i18n-placeholder="input_model_placeholder"
                            class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-base">
                 </div>
                 <div class="w-full md:w-32 hidden" id="global-reasoning-container">
-                    <label class="block text-sm font-bold text-slate-500 uppercase mb-1">推理强度</label>
+                    <label class="block text-sm font-bold text-slate-500 uppercase mb-1" data-i18n="input_reasoning_label">推理强度</label>
                     <select id="global-reasoning-input" 
                             class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-base bg-white">
-                        <option value="">关闭</option>
+                        <option value="" data-i18n="reasoning_off">关闭</option>
                         <option value="low">Low</option>
                         <option value="medium">Medium</option>
                         <option value="high">High</option>
                     </select>
                 </div>
                 <div class="w-full md:w-20">
-                    <label class="block text-sm font-bold text-slate-500 uppercase mb-1">轮数</label>
+                    <label class="block text-sm font-bold text-slate-500 uppercase mb-1" data-i18n="input_rounds_label">轮数</label>
                     <input type="number" id="rounds-input" value="3" min="1" max="10" 
                            class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-base">
                 </div>
                 <div class="w-full md:w-20">
-                    <label class="block text-sm font-bold text-slate-500 uppercase mb-1">策论家</label>
+                    <label class="block text-sm font-bold text-slate-500 uppercase mb-1" data-i18n="input_planners_label">策论家</label>
                     <input type="number" id="planners-input" value="2" min="1" max="5" 
                            class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-base">
                 </div>
                 <div class="w-full md:w-20">
-                    <label class="block text-sm font-bold text-slate-500 uppercase mb-1">监察官</label>
+                    <label class="block text-sm font-bold text-slate-500 uppercase mb-1" data-i18n="input_auditors_label">监察官</label>
                     <input type="number" id="auditors-input" value="2" min="1" max="5" 
                            class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-base">
                 </div>
                 <div class="flex items-end space-x-2">
                     <button id="start-btn" onclick="startDiscussion()" 
-                            class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-8 rounded-lg transition shadow-lg shadow-blue-200 disabled:bg-gray-400 disabled:shadow-none">
+                            class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-8 rounded-lg transition shadow-lg shadow-blue-200 disabled:bg-gray-400 disabled:shadow-none" data-i18n="btn_start">
                         开始议事
                     </button>
                     <button id="advanced-toggle-btn" onclick="toggleAdvancedSettings()" 
-                            class="w-full md:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg transition border border-slate-300">
+                            class="w-full md:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg transition border border-slate-300" data-i18n="btn_advanced">
                         ⚙️ 高级配置
                     </button>
                     <button id="history-btn" onclick="toggleHistoryModal()" 
-                            class="w-full md:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg transition border border-slate-300">
+                            class="w-full md:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg transition border border-slate-300" data-i18n="btn_history">
                         📜 历史
                     </button>
                     <button id="stop-btn" onclick="stopDiscussion()" 
-                            class="hidden w-full md:w-auto bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-8 rounded-lg transition shadow-lg shadow-red-200">
+                            class="hidden w-full md:w-auto bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-8 rounded-lg transition shadow-lg shadow-red-200" data-i18n="btn_stop">
                         停止
                     </button>
                 </div>
@@ -226,29 +233,29 @@
             <div id="advanced-settings" class="hidden mt-4 pt-4 border-t border-slate-100">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-sm font-bold text-slate-700 flex items-center">
-                        <span class="mr-2">⚙️</span> 席位专家配置
+                        <span class="mr-2">⚙️</span> <span data-i18n="advanced_title">席位专家配置</span>
                     </h3>
-                    <button onclick="resetAgentConfigs()" class="text-xs text-blue-600 hover:text-blue-800 font-medium">重置为默认</button>
+                    <button onclick="resetAgentConfigs()" class="text-xs text-blue-600 hover:text-blue-800 font-medium" data-i18n="advanced_reset">重置为默认</button>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="agent-configs-container">
                     <!-- 动态生成 Agent 配置 -->
                     <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
                         <h4 class="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center">
-                            <span class="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>议长 (Leader)
+                            <span class="w-2 h-2 bg-blue-500 rounded-full mr-2"></span><span data-i18n="role_leader">议长 (Leader)</span>
                         </h4>
                         <div class="flex gap-2">
                             <select class="agent-backend flex-1 text-xs p-1 border rounded" data-agent="leader">
-                                <option value="default">默认后端</option>
+                                <option value="default" data-i18n="backend_default">默认后端</option>
                                 <option value="deepseek">DeepSeek</option>
                                 <option value="openai">OpenAI</option>
                                 <option value="openrouter">OpenRouter</option>
                                 <option value="aliyun">Aliyun</option>
                                 <option value="ollama">Ollama</option>
                             </select>
-                            <input type="text" class="agent-model flex-1 text-xs p-1 border rounded" placeholder="模型名称 (可选)" data-agent="leader">
+                            <input type="text" class="agent-model flex-1 text-xs p-1 border rounded" placeholder="模型名称 (可选)" data-i18n-placeholder="agent_model_placeholder" data-agent="leader">
                         </div>
                         <select class="agent-reasoning hidden text-[10px] p-1 border rounded mt-1 w-full" data-agent="leader">
-                            <option value="">推理: 关闭</option>
+                            <option value="" data-i18n="reasoning_off">推理: 关闭</option>
                             <option value="low">推理: Low</option>
                             <option value="medium">推理: Medium</option>
                             <option value="high">推理: High</option>
@@ -256,21 +263,21 @@
                     </div>
                     <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
                         <h4 class="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center">
-                            <span class="w-2 h-2 bg-purple-500 rounded-full mr-2"></span>记录员 (Reporter)
+                            <span class="w-2 h-2 bg-purple-500 rounded-full mr-2"></span><span data-i18n="role_reporter">记录员 (Reporter)</span>
                         </h4>
                         <div class="flex gap-2">
                             <select class="agent-backend flex-1 text-xs p-1 border rounded" data-agent="reporter">
-                                <option value="default">默认后端</option>
+                                <option value="default" data-i18n="backend_default">默认后端</option>
                                 <option value="deepseek">DeepSeek</option>
                                 <option value="openai">OpenAI</option>
                                 <option value="openrouter">OpenRouter</option>
                                 <option value="aliyun">Aliyun</option>
                                 <option value="ollama">Ollama</option>
                             </select>
-                            <input type="text" class="agent-model flex-1 text-xs p-1 border rounded" placeholder="模型名称 (可选)" data-agent="reporter">
+                            <input type="text" class="agent-model flex-1 text-xs p-1 border rounded" placeholder="模型名称 (可选)" data-i18n-placeholder="agent_model_placeholder" data-agent="reporter">
                         </div>
                         <select class="agent-reasoning hidden text-[10px] p-1 border rounded mt-1 w-full" data-agent="reporter">
-                            <option value="">推理: 关闭</option>
+                            <option value="" data-i18n="reasoning_off">推理: 关闭</option>
                             <option value="low">推理: Low</option>
                             <option value="medium">推理: Medium</option>
                             <option value="high">推理: High</option>
@@ -289,7 +296,7 @@
                     <div class="bg-slate-50 px-4 py-3 border-b border-slate-200">
                         <div class="flex justify-between items-center mb-2">
                             <h3 class="font-bold text-slate-700 flex items-center text-base">
-                                <span class="mr-2">💬</span> 议事过程
+                                <span class="mr-2">💬</span> <span data-i18n="discussion_flow_title">议事过程</span>
                                 <span id="round-info" class="ml-2 text-xs font-normal text-slate-400 hidden">Round 1 / 3</span>
                             </h3>
                             <span id="progress-percentage" class="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">0%</span>
@@ -308,10 +315,11 @@
                         <div class="flex space-x-2">
                             <input type="text" id="intervention-input" 
                                    placeholder="输入干预指令（例如：请更多关注成本问题）..." 
+                                   data-i18n-placeholder="intervention_placeholder"
                                    class="flex-1 px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm focus:border-blue-500 transition"
                                    onkeyup="if(event.keyCode===13) sendIntervention()">
                             <button onclick="sendIntervention()" 
-                                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition shadow-sm">
+                                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition shadow-sm" data-i18n="btn_send_intervention">
                                 发送干预
                             </button>
                         </div>
@@ -324,13 +332,13 @@
                 <div class="bg-white rounded-xl shadow-lg border border-purple-200 flex flex-col flex-1 min-h-0 overflow-hidden">
                     <div class="bg-purple-600 text-white px-4 py-3 flex justify-between items-center">
                         <h3 class="font-bold flex items-center text-base">
-                            <span class="mr-2">📜</span> 最终议事报告
+                            <span class="mr-2">📜</span> <span data-i18n="final_report_title">最终议事报告</span>
                         </h3>
                         <div id="report-actions" class="flex space-x-2">
-                            <button onclick="reReport()" class="text-xs bg-white/20 hover:bg-white/30 px-2 py-1 rounded transition disabled:opacity-50 disabled:cursor-not-allowed">重新生成报告</button>
-                            <button onclick="copyReport()" class="text-xs bg-white/20 hover:bg-white/30 px-2 py-1 rounded transition disabled:opacity-50 disabled:cursor-not-allowed">复制</button>
-                            <button onclick="downloadReport()" class="text-xs bg-white/20 hover:bg-white/30 px-2 py-1 rounded transition disabled:opacity-50 disabled:cursor-not-allowed">下载HTML</button>
-                            <button onclick="downloadImage(event)" class="text-xs bg-white/20 hover:bg-white/30 px-2 py-1 rounded transition disabled:opacity-50 disabled:cursor-not-allowed">下载图片</button>
+                            <button onclick="reReport()" class="text-xs bg-white/20 hover:bg-white/30 px-2 py-1 rounded transition disabled:opacity-50 disabled:cursor-not-allowed" data-i18n="btn_re_report">重新生成报告</button>
+                            <button onclick="copyReport()" class="text-xs bg-white/20 hover:bg-white/30 px-2 py-1 rounded transition disabled:opacity-50 disabled:cursor-not-allowed" data-i18n="btn_copy">复制</button>
+                            <button onclick="downloadReport()" class="text-xs bg-white/20 hover:bg-white/30 px-2 py-1 rounded transition disabled:opacity-50 disabled:cursor-not-allowed" data-i18n="btn_download_html">下载HTML</button>
+                            <button onclick="downloadImage(event)" class="text-xs bg-white/20 hover:bg-white/30 px-2 py-1 rounded transition disabled:opacity-50 disabled:cursor-not-allowed" data-i18n="btn_download_image">下载图片</button>
                         </div>
                     </div>
                     <div id="report-container" class="relative flex-1 min-h-0 overflow-hidden">
@@ -338,8 +346,8 @@
                         <!-- 报告生成遮罩层 -->
                         <div id="report-loader" class="hidden absolute inset-0 bg-white/70 backdrop-blur-[1px] flex flex-col items-center justify-center z-10">
                             <div class="w-12 h-12 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mb-4"></div>
-                            <p id="loader-text" class="text-purple-700 font-bold animate-pulse text-base">正在进行议事讨论...</p>
-                            <p id="loader-subtext" class="text-slate-400 text-sm mt-2">元老们正在激烈辩论中</p>
+                            <p id="loader-text" class="text-purple-700 font-bold animate-pulse text-base" data-i18n="loader_text">正在进行议事讨论...</p>
+                            <p id="loader-subtext" class="text-slate-400 text-sm mt-2" data-i18n="loader_subtext">元老们正在激烈辩论中</p>
                         </div>
                     </div>
                 </div>
@@ -351,9 +359,9 @@
                     <div class="bg-slate-800 px-4 py-3 flex justify-between items-center border-b border-slate-700">
                         <h3 class="text-slate-300 text-sm font-bold flex items-center">
                             <span class="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
-                            系统执行日志
+                            <span data-i18n="log_title">系统执行日志</span>
                         </h3>
-                        <button onclick="clearLogs()" class="text-xs text-slate-500 hover:text-slate-300">清除</button>
+                        <button onclick="clearLogs()" class="text-xs text-slate-500 hover:text-slate-300" data-i18n="btn_clear">清除</button>
                     </div>
                     <div id="log-container" class="p-3 font-mono text-[13px] text-slate-400 overflow-y-auto flex-1 space-y-1">
                         <!-- 日志内容 -->
@@ -366,17 +374,17 @@
         <div id="history-modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[120] flex items-center justify-center">
             <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-2xl w-full mx-4 flex flex-col max-h-[80vh]">
                 <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-xl font-bold text-slate-800">议事历史记录</h3>
+                    <h3 class="text-xl font-bold text-slate-800" data-i18n="history_modal_title">议事历史记录</h3>
                     <button onclick="toggleHistoryModal()" class="text-slate-400 hover:text-slate-600">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>
                 </div>
                 <div id="history-list" class="overflow-y-auto flex-1 space-y-2 pr-2">
                     <!-- 历史项动态插入 -->
-                    <div class="text-center py-8 text-slate-400 italic">正在加载历史记录...</div>
+                    <div class="text-center py-8 text-slate-400 italic" data-i18n="history_loading">正在加载历史记录...</div>
                 </div>
                 <div class="mt-6 pt-4 border-t border-slate-100 flex justify-end">
-                    <button onclick="toggleHistoryModal()" class="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition">
+                    <button onclick="toggleHistoryModal()" class="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition" data-i18n="btn_close">
                         关闭
                     </button>
                 </div>
@@ -392,13 +400,13 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
                     </div>
-                    <h3 id="confirm-title" class="text-xl font-bold text-slate-800 mb-2">确认</h3>
+                    <h3 id="confirm-title" class="text-xl font-bold text-slate-800 mb-2" data-i18n="confirm_title">确认</h3>
                     <p id="confirm-message" class="text-slate-600 mb-8 text-base"></p>
                     <div class="flex space-x-4">
-                        <button id="confirm-cancel-btn" class="flex-1 px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition">
+                        <button id="confirm-cancel-btn" class="flex-1 px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition" data-i18n="btn_cancel">
                             取消
                         </button>
-                        <button id="confirm-ok-btn" class="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-lg shadow-blue-200">
+                        <button id="confirm-ok-btn" class="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-lg shadow-blue-200" data-i18n="btn_confirm">
                             确认
                         </button>
                     </div>
@@ -413,10 +421,10 @@
                     <div id="alert-icon" class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
                         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     </div>
-                    <h3 id="alert-title" class="text-xl font-bold text-slate-800 mb-2">提示</h3>
+                    <h3 id="alert-title" class="text-xl font-bold text-slate-800 mb-2" data-i18n="alert_title">提示</h3>
                     <p id="alert-message" class="text-slate-600 mb-8 text-base"></p>
                     <div class="flex">
-                        <button onclick="closeAlertModal()" class="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-lg shadow-blue-200">
+                        <button onclick="closeAlertModal()" class="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-lg shadow-blue-200" data-i18n="btn_ok">
                             确定
                         </button>
                     </div>
@@ -429,7 +437,7 @@
             <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-xl w-full mx-4 flex flex-col">
                 <div class="flex justify-between items-center mb-6">
                     <h3 class="text-xl font-bold text-slate-800 flex items-center">
-                        <span class="mr-2 text-2xl">⚙️</span> 系统全局设置
+                        <span class="mr-2 text-2xl">⚙️</span> <span data-i18n="settings_modal_title">系统全局设置</span>
                     </h3>
                     <button onclick="toggleSettingsModal()" class="text-slate-400 hover:text-slate-600">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -439,7 +447,7 @@
                 <div class="space-y-6 overflow-y-auto max-h-[60vh] pr-2">
                     <section>
                         <h4 class="text-sm font-bold text-slate-700 mb-3 flex items-center">
-                            <span class="w-1.5 h-4 bg-blue-500 rounded-full mr-2"></span> API 密钥配置
+                            <span class="w-1.5 h-4 bg-blue-500 rounded-full mr-2"></span> <span data-i18n="settings_api_keys">API 密钥配置</span>
                         </h4>
                         <div class="grid grid-cols-1 gap-4">
                             <div class="space-y-1">
@@ -463,15 +471,15 @@
                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
                             </div>
                             <div class="space-y-2">
-                                <label class="text-xs font-bold text-slate-500 uppercase">搜索增强引擎 (可多选)</label>
+                                <label class="text-xs font-bold text-slate-500 uppercase" data-i18n="settings_search_engines">搜索增强引擎 (可多选)</label>
                                 <div id="settings-search-providers" class="grid grid-cols-2 gap-2">
                                     <label class="flex items-center space-x-2 p-2 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition">
                                         <input type="checkbox" value="bing" class="search-provider-checkbox w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
-                                        <span class="text-sm text-slate-700">Bing (稳定)</span>
+                                        <span class="text-sm text-slate-700">Bing (<span data-i18n="search_stable">稳定</span>)</span>
                                     </label>
                                     <label class="flex items-center space-x-2 p-2 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition">
                                         <input type="checkbox" value="baidu" class="search-provider-checkbox w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
-                                        <span class="text-sm text-slate-700">Baidu (中文)</span>
+                                        <span class="text-sm text-slate-700">Baidu (<span data-i18n="search_chinese">中文</span>)</span>
                                     </label>
                                     <label class="flex items-center space-x-2 p-2 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition">
                                         <input type="checkbox" value="duckduckgo" class="search-provider-checkbox w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
@@ -488,15 +496,21 @@
                                 <input type="password" id="settings-key-tavily" placeholder="tvly-..." 
                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
                             </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-slate-500 uppercase" data-i18n="settings_browser_path">浏览器可执行文件路径 (Baidu/Bing 搜索)</label>
+                                <input type="text" id="settings-browser-path" placeholder="例如: C:\Program Files\Google\Chrome\Application\chrome.exe" 
+                                       data-i18n-placeholder="settings_browser_path_placeholder"
+                                       class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
+                            </div>
                         </div>
                     </section>
                 </div>
 
                 <div class="mt-8 pt-4 border-t border-slate-100 flex justify-end space-x-3">
-                    <button onclick="toggleSettingsModal()" class="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition">
+                    <button onclick="toggleSettingsModal()" class="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition" data-i18n="btn_cancel">
                         取消
                     </button>
-                    <button onclick="saveSettings()" class="px-8 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-lg shadow-blue-200">
+                    <button onclick="saveSettings()" class="px-8 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-lg shadow-blue-200" data-i18n="btn_save_apply">
                         保存并应用
                     </button>
                 </div>
@@ -504,6 +518,442 @@
         </div>
 
         <script>
+            const translations = {
+                zh: {
+                    nav_title: "AICouncil",
+                    nav_subtitle: "元老院计划",
+                    nav_toggle_logs: "切换日志显示",
+                    nav_settings: "系统设置",
+                    input_issue_label: "议题内容",
+                    input_issue_placeholder: "请输入您想要讨论的议题（支持多行输入，Enter 发送，Shift+Enter 换行）...",
+                    input_backend_label: "后端",
+                    input_model_label: "全局模型 (可选)",
+                    input_model_placeholder: "默认模型",
+                    input_reasoning_label: "推理强度",
+                    reasoning_off: "关闭",
+                    reasoning_low: "推理: Low",
+                    reasoning_medium: "推理: Medium",
+                    reasoning_high: "推理: High",
+                    input_rounds_label: "轮数",
+                    input_planners_label: "策论家",
+                    input_auditors_label: "监察官",
+                    btn_start: "开始议事",
+                    btn_advanced: "高级配置",
+                    btn_history: "历史",
+                    btn_stop: "停止",
+                    advanced_title: "席位专家配置",
+                    advanced_reset: "重置为默认",
+                    role_leader: "议长 (Leader)",
+                    role_reporter: "记录员 (Reporter)",
+                    role_planner: "策论家 (Planner)",
+                    role_auditor: "监察官 (Auditor)",
+                    backend_default: "默认后端",
+                    agent_model_placeholder: "模型名称 (可选)",
+                    discussion_flow_title: "议事过程",
+                    intervention_placeholder: "输入干预指令（例如：请更多关注成本问题）...",
+                    btn_send_intervention: "发送干预",
+                    final_report_title: "最终议事报告",
+                    btn_re_report: "重新生成报告",
+                    btn_copy: "复制",
+                    btn_download_html: "下载HTML",
+                    btn_download_image: "下载图片",
+                    loader_text: "正在进行议事讨论...",
+                    loader_subtext: "元老们正在激烈辩论中",
+                    log_title: "系统执行日志",
+                    btn_clear: "清除",
+                    history_modal_title: "议事历史记录",
+                    history_loading: "正在加载历史记录...",
+                    btn_close: "关闭",
+                    confirm_title: "确认",
+                    btn_cancel: "取消",
+                    btn_confirm: "确认",
+                    alert_title: "提示",
+                    btn_ok: "确定",
+                    settings_modal_title: "系统全局设置",
+                    settings_api_keys: "API 密钥配置",
+                    settings_search_engines: "搜索增强引擎 (可多选)",
+                    settings_browser_path: "浏览器可执行文件路径 (Baidu/Bing 搜索)",
+                    settings_browser_path_placeholder: "例如: C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+                    search_stable: "稳定",
+                    search_chinese: "中文",
+                    btn_save_apply: "保存并应用",
+                    status_processing: "正在议事...",
+                    empty_discussion_hint: "请输入议题并开始议事",
+                    empty_report_hint: "议事完成后将在此生成报告",
+                    msg_input_issue: "请输入议题内容",
+                    msg_stop_confirm: "停止后，当前的讨论进度将会丢失，且无法生成最终报告。",
+                    msg_stop_title: "确认停止议事？",
+                    msg_save_success: "设置已保存并应用",
+                    msg_save_failed: "保存失败",
+                    msg_copy_success: "报告已复制到剪贴板",
+                    msg_copy_failed: "复制失败",
+                    msg_download_failed: "下载失败",
+                    msg_history_empty: "暂无历史记录",
+                    msg_intervention_sent: "干预指令已发送",
+                    msg_intervention_failed: "发送失败",
+                    msg_start_failed: "启动失败",
+                    msg_request_failed: "请求发送失败",
+                    msg_report_not_ready: "报告尚未生成，无法下载",
+                    msg_image_failed: "图片转换失败，请尝试下载 HTML 格式",
+                    msg_delete_success: "历史记录已成功删除",
+                    msg_delete_failed: "删除失败",
+                    msg_load_success: "历史记录加载成功，正在同步讨论流...",
+                    msg_load_failed: "加载失败",
+                    msg_confirm_delete: "确定要删除这条历史记录及其相关文件吗？此操作不可撤销。",
+                    msg_confirm_load: "加载历史记录将清除当前讨论内容，是否继续？",
+                    title_success: "成功",
+                    title_error: "错误",
+                    title_hint: "提示",
+                    title_confirm_delete: "确认删除",
+                    title_confirm_load: "确认加载",
+                    msg_initializing_hall: "正在初始化议事厅...",
+                    msg_connecting_backend: "正在连接后端引擎...",
+                    status_running: "正在讨论",
+                    status_ready: "就绪",
+                    msg_restoring_progress: "正在恢复议事进度...",
+                    msg_consensus_reached: "📜 议事达成共识，正在生成最终报告...",
+                    msg_writing_report: "正在撰写最终议事报告...",
+                    msg_thinking_process: "思考过程",
+                    msg_search_progress: "搜索进度",
+                    msg_details: "详情",
+                    msg_auditor_review: "审计总结",
+                    msg_target: "针对",
+                    msg_issues: "⚠️ 质疑点",
+                    msg_suggestions: "💡 改进建议",
+                    msg_audit_summary: "📝 审计总结",
+                    msg_core_goal: "🎯 核心目标",
+                    msg_key_questions: "❓ 关键问题",
+                    msg_boundaries: "🚧 讨论边界",
+                    msg_report_outline: "📋 报告大纲设计",
+                    msg_instructions: "📢 本轮指令",
+                    msg_core_idea: "💡 核心思路",
+                    msg_execution_steps: "🚀 执行步骤",
+                    msg_advantages: "✅ 优势",
+                    msg_resource_requirements: "🛠️ 资源需求",
+                    msg_converting: "转换中...",
+                    msg_re_reporting: "正在重新生成报告...",
+                    msg_re_reporting_sub: "正在使用 {backend} 重新撰写报告",
+                    msg_writing_report_sub: "请耐心等待元老院达成共识",
+                    msg_consensus_reached_sub: "请稍候，正在整理元老们的智慧结晶",
+                    msg_untitled_issue: "未命名议题",
+                    btn_delete_record: "删除记录",
+                    msg_unknown_plan: "未知方案",
+                    msg_unrated: "未评级",
+                    msg_undefined: "未定义",
+                    msg_none: "无",
+                    msg_browser_missing: "未找到浏览器，Baidu/Bing 搜索功能将不可用。请在设置中手动配置浏览器路径。"
+                },
+                en: {
+                    nav_title: "AICouncil",
+                    nav_subtitle: "Senate Project",
+                    nav_toggle_logs: "Toggle Logs",
+                    nav_settings: "System Settings",
+                    input_issue_label: "Issue Content",
+                    input_issue_placeholder: "Enter the issue you want to discuss (supports multi-line, Enter to send, Shift+Enter for new line)...",
+                    input_backend_label: "Backend",
+                    input_model_label: "Global Model (Optional)",
+                    input_model_placeholder: "Default Model",
+                    input_reasoning_label: "Reasoning",
+                    reasoning_off: "Off",
+                    reasoning_low: "Reasoning: Low",
+                    reasoning_medium: "Reasoning: Medium",
+                    reasoning_high: "Reasoning: High",
+                    input_rounds_label: "Rounds",
+                    input_planners_label: "Planners",
+                    input_auditors_label: "Auditors",
+                    btn_start: "Start Discussion",
+                    btn_advanced: "Advanced",
+                    btn_history: "History",
+                    btn_stop: "Stop",
+                    advanced_title: "Seat Expert Configuration",
+                    advanced_reset: "Reset to Default",
+                    role_leader: "Leader",
+                    role_reporter: "Reporter",
+                    role_planner: "Planner",
+                    role_auditor: "Auditor",
+                    backend_default: "Default Backend",
+                    agent_model_placeholder: "Model Name (Optional)",
+                    discussion_flow_title: "Discussion Process",
+                    intervention_placeholder: "Enter intervention (e.g., focus more on costs)...",
+                    btn_send_intervention: "Send",
+                    final_report_title: "Final Report",
+                    btn_re_report: "Regenerate",
+                    btn_copy: "Copy",
+                    btn_download_html: "HTML",
+                    btn_download_image: "Image",
+                    loader_text: "Discussion in progress...",
+                    loader_subtext: "The elders are debating fiercely",
+                    log_title: "System Logs",
+                    btn_clear: "Clear",
+                    history_modal_title: "Discussion History",
+                    history_loading: "Loading history...",
+                    btn_close: "Close",
+                    confirm_title: "Confirm",
+                    btn_cancel: "Cancel",
+                    btn_confirm: "Confirm",
+                    alert_title: "Alert",
+                    btn_ok: "OK",
+                    settings_modal_title: "Global Settings",
+                    settings_api_keys: "API Key Configuration",
+                    settings_search_engines: "Search Engines (Multi-select)",
+                    settings_browser_path: "Browser Executable Path (Baidu/Bing Search)",
+                    settings_browser_path_placeholder: "e.g., C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+                    search_stable: "Stable",
+                    search_chinese: "Chinese",
+                    btn_save_apply: "Save & Apply",
+                    status_processing: "Processing...",
+                    empty_discussion_hint: "Enter an issue to start the discussion",
+                    empty_report_hint: "Report will be generated here after discussion",
+                    msg_input_issue: "Please enter the issue content",
+                    msg_stop_confirm: "Stopping will lose current progress and no report will be generated.",
+                    msg_stop_title: "Confirm Stop?",
+                    msg_save_success: "Settings saved and applied",
+                    msg_save_failed: "Save failed",
+                    msg_copy_success: "Report copied to clipboard",
+                    msg_copy_failed: "Copy failed",
+                    msg_download_failed: "Download failed",
+                    msg_history_empty: "No history records",
+                    msg_intervention_sent: "Intervention sent",
+                    msg_intervention_failed: "Send failed",
+                    msg_start_failed: "Start failed",
+                    msg_request_failed: "Request failed",
+                    msg_report_not_ready: "Report not ready, cannot download",
+                    msg_image_failed: "Image conversion failed, please try HTML",
+                    msg_delete_success: "History deleted successfully",
+                    msg_delete_failed: "Delete failed",
+                    msg_load_success: "History loaded successfully, syncing flow...",
+                    msg_load_failed: "Load failed",
+                    msg_confirm_delete: "Are you sure you want to delete this record? This cannot be undone.",
+                    msg_confirm_load: "Loading history will clear current discussion. Continue?",
+                    title_success: "Success",
+                    title_error: "Error",
+                    title_hint: "Hint",
+                    title_confirm_delete: "Confirm Delete",
+                    title_confirm_load: "Confirm Load",
+                    msg_initializing_hall: "Initializing discussion hall...",
+                    msg_connecting_backend: "Connecting to backend engine...",
+                    status_running: "Running",
+                    status_ready: "Ready",
+                    msg_restoring_progress: "Restoring progress...",
+                    msg_consensus_reached: "📜 Consensus reached, generating final report...",
+                    msg_writing_report: "Writing final report...",
+                    msg_thinking_process: "Thinking Process",
+                    msg_search_progress: "SEARCH PROGRESS",
+                    msg_details: "Details",
+                    msg_auditor_review: "Auditor Review",
+                    msg_target: "Target",
+                    msg_issues: "⚠️ Issues",
+                    msg_suggestions: "💡 Suggestions",
+                    msg_audit_summary: "📝 Audit Summary",
+                    msg_core_goal: "🎯 Core Goal",
+                    msg_key_questions: "❓ Key Questions",
+                    msg_boundaries: "🚧 Boundaries",
+                    msg_report_outline: "📋 Report Outline",
+                    msg_instructions: "📢 Instructions",
+                    msg_core_idea: "💡 Core Idea",
+                    msg_execution_steps: "🚀 Execution Steps",
+                    msg_advantages: "✅ Advantages",
+                    msg_resource_requirements: "🛠️ Requirements",
+                    msg_converting: "Converting...",
+                    msg_re_reporting: "Regenerating report...",
+                    msg_re_reporting_sub: "Rewriting report using {backend}",
+                    msg_writing_report_sub: "Please wait for the Senate to reach a consensus",
+                    msg_consensus_reached_sub: "Please wait, gathering the wisdom of the elders",
+                    msg_untitled_issue: "Untitled Issue",
+                    btn_delete_record: "Delete Record",
+                    msg_unknown_plan: "Unknown Plan",
+                    msg_unrated: "Unrated",
+                    msg_undefined: "Undefined",
+                    msg_none: "None",
+                    msg_browser_missing: "No browser found. Baidu/Bing search will be unavailable. Please configure the browser path in settings."
+                }
+            };
+
+            let currentLang = localStorage.getItem('language') || 'zh';
+
+            function setLanguage(lang) {
+                currentLang = lang;
+                localStorage.setItem('language', lang);
+                
+                // 更新文档标题
+                document.title = lang === 'zh' ? 'AICouncil - 实时讨论视图' : 'AICouncil - Real-time Discussion';
+
+                // 更新按钮状态
+                const zhBtn = document.getElementById('lang-zh');
+                const enBtn = document.getElementById('lang-en');
+                if (zhBtn && enBtn) {
+                    zhBtn.className = lang === 'zh' 
+                        ? 'px-3 py-1 text-xs font-bold bg-blue-600 text-white rounded-md shadow-sm transition-all'
+                        : 'px-3 py-1 text-xs font-medium text-slate-400 hover:text-slate-200 transition-all';
+                    enBtn.className = lang === 'en'
+                        ? 'px-3 py-1 text-xs font-bold bg-blue-600 text-white rounded-md shadow-sm transition-all'
+                        : 'px-3 py-1 text-xs font-medium text-slate-400 hover:text-slate-200 transition-all';
+                }
+
+                // 更新所有带有 data-i18n 的元素
+                document.querySelectorAll('[data-i18n]').forEach(el => {
+                    const key = el.getAttribute('data-i18n');
+                    if (translations[lang][key]) {
+                        // 如果元素包含图标（如 ⚙️），保留图标
+                        const iconMatch = el.innerHTML.match(/^([\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u27BF]|💬|📜|⚙️|⚠️|💡|📝|🎯|❓|🚧|📋|📢|🚀|✅|🛠️)\s*/);
+                        if (iconMatch) {
+                            const translatedText = translations[lang][key];
+                            // 如果翻译后的文本已经包含了相同的图标，则不再重复添加
+                            if (translatedText.startsWith(iconMatch[0].trim())) {
+                                el.innerHTML = translatedText;
+                            } else {
+                                el.innerHTML = iconMatch[0] + translatedText;
+                            }
+                        } else {
+                            el.innerText = translations[lang][key];
+                        }
+                    }
+                });
+
+                // 更新所有带有 data-i18n-placeholder 的元素
+                document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                    const key = el.getAttribute('data-i18n-placeholder');
+                    if (translations[lang][key]) {
+                        el.placeholder = translations[lang][key];
+                    }
+                });
+
+                // 更新所有带有 data-i18n-title 的元素
+                document.querySelectorAll('[data-i18n-title]').forEach(el => {
+                    const key = el.getAttribute('data-i18n-title');
+                    if (translations[lang][key]) {
+                        el.title = translations[lang][key];
+                    }
+                });
+
+                // 重新渲染动态生成的 Agent 配置
+                updateAgentConfigsUI();
+            }
+
+            function t(key) {
+                return translations[currentLang][key] || key;
+            }
+
+            // 通用提示框
+            function showAlert(message, title = '', type = 'info') {
+                const modal = document.getElementById('alert-modal');
+                const titleEl = document.getElementById('alert-title');
+                const messageEl = document.getElementById('alert-message');
+                const iconEl = document.getElementById('alert-icon');
+                
+                titleEl.innerText = title || t('alert_title');
+                messageEl.innerText = message;
+                
+                if (type === 'error') {
+                    iconEl.className = 'w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4';
+                    iconEl.innerHTML = '<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+                } else if (type === 'warning') {
+                    iconEl.className = 'w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4';
+                    iconEl.innerHTML = '<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>';
+                } else {
+                    iconEl.className = 'w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4';
+                    iconEl.innerHTML = '<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+                }
+                
+                modal.classList.remove('hidden');
+            }
+
+            function closeAlertModal() {
+                document.getElementById('alert-modal').classList.add('hidden');
+            }
+
+            // 通用确认框
+            function showConfirm(message, title = '') {
+                return new Promise((resolve) => {
+                    const modal = document.getElementById('confirm-modal');
+                    const titleEl = document.getElementById('confirm-title');
+                    const messageEl = document.getElementById('confirm-message');
+                    const okBtn = document.getElementById('confirm-ok-btn');
+                    const cancelBtn = document.getElementById('confirm-cancel-btn');
+                    
+                    titleEl.innerText = title || t('confirm_title');
+                    messageEl.innerText = message;
+                    
+                    const handleOk = () => {
+                        modal.classList.add('hidden');
+                        cleanup();
+                        resolve(true);
+                    };
+                    
+                    const handleCancel = () => {
+                        modal.classList.add('hidden');
+                        cleanup();
+                        resolve(false);
+                    };
+                    
+                    const cleanup = () => {
+                        okBtn.removeEventListener('click', handleOk);
+                        cancelBtn.removeEventListener('click', handleCancel);
+                    };
+                    
+                    okBtn.addEventListener('click', handleOk);
+                    cancelBtn.addEventListener('click', handleCancel);
+                    
+                    modal.classList.remove('hidden');
+                });
+            }
+
+            async function fetchUpdates() {
+                try {
+                    const statusResponse = await fetch('/api/status');
+                    const statusData = await statusResponse.json();
+                    updateStatusUI(statusData);
+
+                    const eventsResponse = await fetch('/api/events');
+                    const eventsData = await eventsResponse.json();
+
+                    if (eventsData.events && eventsData.events.length > lastEventCount) {
+                        const newEvents = eventsData.events.slice(lastEventCount);
+                        newEvents.forEach(event => {
+                            appendEvent(event);
+                            updateProgress(event);
+                        });
+                        lastEventCount = eventsData.events.length;
+                        discussionContainer.scrollTo({
+                            top: discussionContainer.scrollHeight,
+                            behavior: 'smooth'
+                        });
+                    }
+
+                    if (eventsData.logs && eventsData.logs.length > lastLogCount) {
+                        const newLogs = eventsData.logs.slice(lastLogCount);
+                        newLogs.forEach(log => appendLog(log));
+                        lastLogCount = eventsData.logs.length;
+                        logContainer.scrollTop = logContainer.scrollHeight;
+                    }
+
+                    if (eventsData.final_report) {
+                        handleFinalReport(eventsData.final_report);
+                    }
+                } catch (error) {
+                    console.error('Fetch updates error:', error);
+                }
+            }
+
+            function handleFinalReport(reportHtml) {
+                if (reportIframe && reportIframe.srcdoc !== reportHtml) {
+                    if (reportHtml && !reportHtml.includes('italic') && !reportHtml.includes('text-align:center')) {
+                        reportIframe.srcdoc = reportHtml;
+                        toggleReportLoading(false);
+                    } else {
+                        reportIframe.srcdoc = reportHtml;
+                    }
+                }
+            }
+
+            function resetAgentConfigs() {
+                document.querySelectorAll('.agent-backend').forEach(select => select.value = 'default');
+                document.querySelectorAll('.agent-model').forEach(input => input.value = '');
+                document.querySelectorAll('.agent-reasoning').forEach(select => select.value = '');
+                document.querySelectorAll('.agent-reasoning').forEach(select => select.classList.add('hidden'));
+                showAlert(t('msg_save_success'), t('title_success'));
+            }
+
             function toggleReportLoading(isLoading, text = '', subtext = '') {
                 const loader = document.getElementById('report-loader');
                 const loaderText = document.getElementById('loader-text');
@@ -574,7 +1024,7 @@
                 });
 
                 if (!issue) {
-                    showAlert('请输入议题内容', '提示');
+                    showAlert(t('msg_input_issue'), t('title_hint'));
                     return;
                 }
 
@@ -583,8 +1033,8 @@
                 issueInput.style.height = 'auto';
 
                 // 清空旧内容并显示初始化状态
-                flowContainer.innerHTML = '<div class="flex justify-center my-4 animate-pulse"><span class="bg-blue-100 text-blue-600 px-4 py-1 rounded-full text-sm font-medium">正在初始化议事厅...</span></div>';
-                logContainer.innerHTML = '<div class="text-slate-500 italic">正在连接后端引擎...</div>';
+                flowContainer.innerHTML = `<div class="flex justify-center my-4 animate-pulse"><span class="bg-blue-100 text-blue-600 px-4 py-1 rounded-full text-sm font-medium">${t('msg_initializing_hall')}</span></div>`;
+                logContainer.innerHTML = `<div class="text-slate-500 italic">${t('msg_connecting_backend')}</div>`;
                 if (reportIframe) {
                     reportIframe.srcdoc = '<div style="color:#94a3b8; font-style:italic; text-align:center; margin-top:100px; font-family:sans-serif;"></div>';
                 }
@@ -613,11 +1063,29 @@
                     if (data.status === 'ok') {
                         console.log('讨论已启动');
                     } else {
-                        showAlert('启动失败: ' + data.message, '错误', 'error');
+                        showAlert(t('msg_start_failed') + ': ' + data.message, t('title_error'), 'error');
                     }
                 } catch (error) {
                     console.error('Start error:', error);
-                    showAlert('启动请求发送失败', '错误', 'error');
+                    showAlert(t('msg_request_failed'), t('title_error'), 'error');
+                }
+            }
+
+            async function stopDiscussion() {
+                if (!isRunning) return;
+                
+                const confirmed = await showConfirm(t('msg_stop_confirm'), t('msg_stop_title'));
+                if (!confirmed) return;
+                
+                try {
+                    const response = await fetch('/api/stop', { method: 'POST' });
+                    const data = await response.json();
+                    if (data.status === 'ok') {
+                        isRunning = false;
+                        updateStatusUI({ is_running: false });
+                    }
+                } catch (error) {
+                    console.error('Stop error:', error);
                 }
             }
 
@@ -625,7 +1093,7 @@
                 if (isRunning) return;
                 
                 const backend = document.getElementById('backend-select').value;
-                toggleReportLoading(true, '正在重新生成报告...', `正在使用 ${backend} 重新撰写报告`);
+                toggleReportLoading(true, t('msg_re_reporting'), t('msg_re_reporting_sub').replace('{backend}', backend));
                 
                 try {
                     const response = await fetch('/api/rereport', {
@@ -634,187 +1102,37 @@
                         body: JSON.stringify({ backend: backend })
                     });
                     const data = await response.json();
-                    if (data.status === 'ok') {
-                        console.log('重新生成报告请求已发送');
-                    } else {
-                        showAlert('重新生成失败: ' + data.message, '错误', 'error');
-                        toggleReportLoading(false);
+                    if (data.status !== 'ok') {
+                        showAlert(t('msg_request_failed'), t('title_error'), 'error');
                     }
                 } catch (error) {
                     console.error('Re-report error:', error);
-                    showAlert('重新生成请求发送失败', '错误', 'error');
-                    toggleReportLoading(false);
-                }
-            }
-
-            async function fetchUpdates() {
-                try {
-                    // 检查状态
-                    const statusResponse = await fetch('/api/status');
-                    const statusData = await statusResponse.json();
-                    updateStatusUI(statusData);
-
-                    const response = await fetch('/api/events');
-                    const data = await response.json();
-
-                    // 更新讨论流
-                    if (data.events.length > lastEventCount) {
-                        // 检查是否在底部 (允许 50px 误差)
-                        const isAtBottom = discussionContainer.scrollHeight - discussionContainer.scrollTop <= discussionContainer.clientHeight + 50;
-                        
-                        for (let i = lastEventCount; i < data.events.length; i++) {
-                            appendEvent(data.events[i]);
-                            updateProgress(data.events[i]);
-                        }
-                        lastEventCount = data.events.length;
-                        
-                        if (isAtBottom) {
-                            discussionContainer.scrollTo({
-                                top: discussionContainer.scrollHeight,
-                                behavior: 'smooth'
-                            });
-                        }
-                    }
-
-                    // 更新日志
-                    if (data.logs) {
-                        // 如果后端日志长度减少，说明可能被重置或轮转了
-                        if (data.logs.length < lastLogCount) {
-                            lastLogCount = 0;
-                            logContainer.innerHTML = '';
-                        }
-
-                        if (data.logs.length > lastLogCount) {
-                            const isAtBottom = logContainer.scrollHeight - logContainer.scrollTop <= logContainer.clientHeight + 50;
-                            
-                            for (let i = lastLogCount; i < data.logs.length; i++) {
-                                appendLog(data.logs[i]);
-                            }
-                            lastLogCount = data.logs.length;
-                            
-                            if (isAtBottom) {
-                                logContainer.scrollTop = logContainer.scrollHeight;
-                            }
-                        }
-                    }
-
-                    // 更新最终报告
-                    if (data.final_report) {
-                        if (reportIframe && reportIframe.srcdoc !== data.final_report) {
-                            reportIframe.srcdoc = data.final_report;
-                            // 只要开始有报告内容，就隐藏加载遮罩
-                            toggleReportLoading(false);
-                        }
-                    }
-                } catch (error) {
-                    console.error('Fetch error:', error);
-                }
-            }
-
-            async function stopDiscussion() {
-                const confirmed = await showConfirm('停止后，当前的讨论进度将会丢失，且无法生成最终报告。', '确认停止议事？');
-                if (confirmed) {
-                    try {
-                        const response = await fetch('/api/stop', { method: 'POST' });
-                        const data = await response.json();
-                        if (data.status === 'ok') {
-                            console.log('已发送停止请求');
-                        } else {
-                            showAlert('停止失败: ' + data.message, '错误', 'error');
-                        }
-                    } catch (error) {
-                        console.error('Stop error:', error);
-                        showAlert('停止请求发送失败', '错误', 'error');
-                    }
+                    showAlert(t('msg_request_failed'), t('title_error'), 'error');
                 }
             }
 
             async function sendIntervention() {
                 const input = document.getElementById('intervention-input');
                 const content = input.value.trim();
-                if (!content || !isRunning) return;
+                if (!content) return;
 
                 try {
-                    const response = await fetch('/api/intervene', {
+                    const response = await fetch('/api/intervention', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ content: content })
+                        body: JSON.stringify({ content })
                     });
                     const data = await response.json();
                     if (data.status === 'ok') {
                         input.value = '';
-                        // 立即滚动到底部
-                        discussionContainer.scrollTo({
-                            top: discussionContainer.scrollHeight,
-                            behavior: 'smooth'
-                        });
+                        showAlert(t('msg_intervention_sent'), t('title_success'));
                     } else {
-                        showAlert('发送失败: ' + data.message, '错误', 'error');
+                        showAlert(t('msg_intervention_failed') + ': ' + data.message, t('title_error'), 'error');
                     }
                 } catch (error) {
                     console.error('Intervention error:', error);
-                    showAlert('发送请求失败', '错误', 'error');
+                    showAlert(t('msg_intervention_failed'), t('title_error'), 'error');
                 }
-            }
-
-            function showAlert(message, title = '提示', type = 'info') {
-                const modal = document.getElementById('alert-modal');
-                const titleEl = document.getElementById('alert-title');
-                const messageEl = document.getElementById('alert-message');
-                const iconEl = document.getElementById('alert-icon');
-                
-                titleEl.innerText = title;
-                messageEl.innerText = message;
-                
-                // 设置图标和颜色
-                if (type === 'error') {
-                    iconEl.className = 'w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4';
-                    iconEl.innerHTML = '<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
-                } else {
-                    iconEl.className = 'w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4';
-                    iconEl.innerHTML = '<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
-                }
-                
-                modal.classList.remove('hidden');
-            }
-
-            function closeAlertModal() {
-                document.getElementById('alert-modal').classList.add('hidden');
-            }
-
-            function showConfirm(message, title = '确认') {
-                return new Promise((resolve) => {
-                    const modal = document.getElementById('confirm-modal');
-                    const titleEl = document.getElementById('confirm-title');
-                    const messageEl = document.getElementById('confirm-message');
-                    const okBtn = document.getElementById('confirm-ok-btn');
-                    const cancelBtn = document.getElementById('confirm-cancel-btn');
-                    
-                    titleEl.innerText = title;
-                    messageEl.innerText = message;
-                    
-                    const handleOk = () => {
-                        modal.classList.add('hidden');
-                        cleanup();
-                        resolve(true);
-                    };
-                    
-                    const handleCancel = () => {
-                        modal.classList.add('hidden');
-                        cleanup();
-                        resolve(false);
-                    };
-                    
-                    const cleanup = () => {
-                        okBtn.removeEventListener('click', handleOk);
-                        cancelBtn.removeEventListener('click', handleCancel);
-                    };
-                    
-                    okBtn.addEventListener('click', handleOk);
-                    cancelBtn.addEventListener('click', handleCancel);
-                    
-                    modal.classList.remove('hidden');
-                });
             }
 
             function updateStatusUI(statusData) {
@@ -825,6 +1143,14 @@
                 const loaderText = document.getElementById('loader-text');
                 const loaderSubtext = document.getElementById('loader-subtext');
                 const interventionArea = document.getElementById('intervention-area');
+                const browserWarning = document.getElementById('browser-warning');
+                
+                // 更新浏览器状态警告
+                if (statusData.browser_found === false) {
+                    browserWarning.classList.remove('hidden');
+                } else {
+                    browserWarning.classList.add('hidden');
+                }
                 
                 // 如果正在运行且输入框为空（说明是刷新页面），则填充配置
                 if (running && config) {
@@ -843,25 +1169,25 @@
 
                 if (running) {
                     startBtn.disabled = true;
-                    startBtn.innerText = '议事中...';
+                    startBtn.innerText = t('status_processing');
                     stopBtn.classList.remove('hidden');
                     statusDot.className = 'w-3 h-3 bg-green-500 rounded-full animate-pulse';
-                    statusText.innerText = '正在讨论';
+                    statusText.innerText = t('status_running');
                     interventionArea.classList.remove('hidden');
 
                     // 如果是刷新页面且还没有加载出事件，显示恢复状态
                     if (lastEventCount === 0 && flowContainer.innerHTML.trim() === '') {
-                        flowContainer.innerHTML = '<div class="flex justify-center my-4 animate-pulse"><span class="bg-blue-100 text-blue-600 px-4 py-1 rounded-full text-sm font-medium">正在恢复议事进度...</span></div>';
+                        flowContainer.innerHTML = `<div class="flex justify-center my-4 animate-pulse"><span class="bg-blue-100 text-blue-600 px-4 py-1 rounded-full text-sm font-medium">${t('msg_restoring_progress')}</span></div>`;
                     }
 
                     // 显示报告加载遮罩，初始设为讨论状态
                     // 修复闪烁：如果已经有报告内容在显示，则不再强制显示蒙版
                     if (reportLoader && (!reportIframe.srcdoc || reportIframe.srcdoc.includes('italic'))) {
                         const currentText = loaderText.innerText;
-                        let targetText = '正在进行议事讨论...';
-                        let targetSub = '元老们正在激烈辩论中';
+                        let targetText = t('loader_text');
+                        let targetSub = t('loader_subtext');
                         
-                        if (currentText.includes('报告') || currentText.includes('撰写')) {
+                        if (currentText.includes('报告') || currentText.includes('撰写') || currentText.includes('Report') || currentText.includes('Writing')) {
                             targetText = currentText;
                             targetSub = loaderSubtext.innerText;
                         }
@@ -869,10 +1195,10 @@
                     }
                 } else {
                     startBtn.disabled = false;
-                    startBtn.innerText = '开始议事';
+                    startBtn.innerText = t('btn_start');
                     stopBtn.classList.add('hidden');
                     statusDot.className = 'w-3 h-3 bg-blue-500 rounded-full';
-                    statusText.innerText = '就绪';
+                    statusText.innerText = t('status_ready');
                     interventionArea.classList.add('hidden');
                     // 隐藏报告加载遮罩
                     if (reportLoader) reportLoader.classList.add('hidden');
@@ -975,10 +1301,13 @@
 
                             // 2. 自动收缩搜索 (Search)
                             // 如果当前内容包含 SEARCH PROGRESS，且已经显示了结束标记，则收缩
-                            if (newRaw.includes('重新生成最终方案')) {
+                            if (newRaw.includes('重新生成最终方案') || newRaw.includes('Regenerating final plan')) {
                                 const hasEndMarker = newRaw.includes('搜索完成') || 
                                                    newRaw.includes('搜索已完成') || 
-                                                   newRaw.includes('重新生成最终方案');
+                                                   newRaw.includes('重新生成最终方案') ||
+                                                   newRaw.includes('Search completed') ||
+                                                   newRaw.includes('Search finished') ||
+                                                   newRaw.includes('Regenerating final plan');
                                 
                                 if (hasEndMarker) {
                                     const searchCard = existing.querySelector('.search-progress-card');
@@ -1018,9 +1347,9 @@
                         <div class="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-5 shadow-xl border border-slate-700 text-white">
                             <div class="flex items-center mb-3">
                                 <span class="text-xl mr-2">🎯</span>
-                                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">当前议事主题</h4>
+                                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">${t('input_issue_label')}</h4>
                             </div>
-                            <p class="text-lg font-medium leading-relaxed">${event.issue || '未指定议题'}</p>
+                            <p class="text-lg font-medium leading-relaxed">${event.issue || t('msg_history_empty')}</p>
                             <div class="mt-4 pt-4 border-t border-slate-700/50 flex justify-between items-center text-[10px] text-slate-500 uppercase tracking-widest">
                                 <span>AICouncil Protocol v1.0</span>
                                 <span>${new Date().toLocaleTimeString()}</span>
@@ -1039,7 +1368,7 @@
                         <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 max-w-[80%] shadow-sm">
                             <div class="flex items-center mb-1">
                                 <span class="text-sm mr-1">👤</span>
-                                <h4 class="text-[10px] font-bold text-blue-600 uppercase tracking-wider">用户干预指令</h4>
+                                <h4 class="text-[10px] font-bold text-blue-600 uppercase tracking-wider">${t('btn_send_intervention')}</h4>
                             </div>
                             <p class="text-sm text-blue-800 leading-relaxed">${event.content}</p>
                             <div class="text-[9px] text-blue-400 mt-1 text-right">${event.timestamp || ''}</div>
@@ -1047,7 +1376,7 @@
                     `;
                 } else if (event.type === 'final_report') {
                     // 进入报告生成阶段，更新状态文字
-                    toggleReportLoading(true, '📜 议事达成共识，正在生成最终报告...', '请稍候，正在整理元老们的智慧结晶');
+                    toggleReportLoading(true, t('msg_consensus_reached'), t('msg_consensus_reached_sub'));
                     return; // 报告内容由 handleFinalReport 处理
                 } else if (event.type === 'agent_action') {
                     const roleClass = `role-${event.role_type.toLowerCase()}`;
@@ -1055,7 +1384,7 @@
                     
                     // 如果是记录员（Reporter）开始行动，更新报告窗口的加载文字
                     if (event.role_type === 'Reporter') {
-                        toggleReportLoading(true, '正在撰写最终议事报告...', '请耐心等待元老院达成共识');
+                        toggleReportLoading(true, t('msg_writing_report'), t('msg_writing_report_sub'));
                     }
 
                     const hasReasoning = !!event.reasoning;
@@ -1073,7 +1402,7 @@
                         <div class="reasoning-wrapper mb-2 ${hasReasoning ? '' : 'hidden'}">
                             <div class="flex items-center justify-between px-2 py-1 bg-amber-100/50 rounded-t-lg border-l-2 border-amber-200 cursor-pointer hover:bg-amber-200/50 transition-colors" onclick="toggleReasoning(this)">
                                 <span class="text-[10px] text-amber-700 font-bold uppercase tracking-wider flex items-center">
-                                    <span class="toggle-icon mr-1">▼</span> Thinking Process
+                                    <span class="toggle-icon mr-1">▼</span> ${t('msg_thinking_process')}
                                 </span>
                             </div>
                             <div class="event-reasoning p-3 bg-amber-50/40 border-l-2 border-amber-200 text-[13px] leading-relaxed text-slate-600 italic whitespace-pre-wrap relative rounded-b-lg">
@@ -1135,7 +1464,7 @@
                 let jsonStartIndex = -1;
                 
                 // 寻找最后一个搜索相关的标记，JSON 通常在这些标记之后
-                const searchMarkers = ["重新生成", "搜索完成", "搜索已完成", "系统正在搜索", "SEARCH PROGRESS"];
+                const searchMarkers = ["重新生成", "搜索完成", "搜索已完成", "系统正在搜索", "SEARCH PROGRESS", "Regenerating", "Search completed", "Search finished", "System searching"];
                 let lastMarkerIndex = -1;
                 searchMarkers.forEach(marker => {
                     const idx = text.lastIndexOf(marker);
@@ -1192,9 +1521,9 @@
                                 <div class="search-header" onclick="toggleSearchCard(this)">
                                     <h5>
                                         <span class="toggle-icon mr-1">▼</span>
-                                        <span class="mr-1">🌐</span> SEARCH PROGRESS
+                                        <span class="mr-1">🌐</span> ${t('msg_search_progress')}
                                     </h5>
-                                    <span class="text-[10px] text-blue-400 uppercase font-bold tracking-widest">Details</span>
+                                    <span class="text-[10px] text-blue-400 uppercase font-bold tracking-widest">${t('msg_details')}</span>
                                 </div>
                                 <div class="search-content markdown-body">
                                     ${prefixHtml}
@@ -1230,24 +1559,28 @@
                             '优秀': 'bg-green-100 text-green-700',
                             '合格': 'bg-blue-100 text-blue-700',
                             '需重构': 'bg-amber-100 text-amber-700',
-                            '不可行': 'bg-red-100 text-red-700'
+                            '不可行': 'bg-red-100 text-red-700',
+                            'Excellent': 'bg-green-100 text-green-700',
+                            'Pass': 'bg-blue-100 text-blue-700',
+                            'Needs Refactor': 'bg-amber-100 text-amber-700',
+                            'Infeasible': 'bg-red-100 text-red-700'
                         }[review.rating] || 'bg-slate-100 text-slate-700';
 
                         html += `
                             <div class="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
                                 <div class="bg-slate-50 px-3 py-2 border-b border-slate-200 flex justify-between items-center">
-                                    <span class="font-bold text-slate-700 text-sm">🎯 针对: ${review.plan_id || '未知方案'}</span>
-                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold ${ratingClass}">${review.rating || '未评级'}</span>
+                                    <span class="font-bold text-slate-700 text-sm">🎯 ${t('msg_target')}: ${review.plan_id || t('msg_unknown_plan')}</span>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold ${ratingClass}">${review.rating || t('msg_unrated')}</span>
                                 </div>
                                 <div class="p-3 space-y-3">
                                     <div>
-                                        <div class="text-[11px] font-bold text-red-500 uppercase mb-1">⚠️ 质疑点</div>
+                                        <div class="text-[11px] font-bold text-red-500 uppercase mb-1">${t('msg_issues')}</div>
                                         <ul class="list-disc ml-4 text-sm text-slate-600 space-y-1">
                                             ${(review.issues || []).map(i => `<li>${i}</li>`).join('')}
                                         </ul>
                                     </div>
                                     <div>
-                                        <div class="text-[11px] font-bold text-green-600 uppercase mb-1">💡 改进建议</div>
+                                        <div class="text-[11px] font-bold text-green-600 uppercase mb-1">${t('msg_suggestions')}</div>
                                         <ul class="list-disc ml-4 text-sm text-slate-600 space-y-1">
                                             ${(review.suggestions || []).map(s => `<li>${s}</li>`).join('')}
                                         </ul>
@@ -1259,7 +1592,7 @@
                     if (data.summary) {
                         html += `
                             <div class="bg-indigo-50 p-3 rounded-lg border border-indigo-100">
-                                <div class="text-[11px] font-bold text-indigo-600 uppercase mb-1">📝 审计总结</div>
+                                <div class="text-[11px] font-bold text-indigo-600 uppercase mb-1">${t('msg_audit_summary')}</div>
                                 <div class="text-sm text-slate-700 leading-relaxed">${data.summary}</div>
                             </div>
                         `;
@@ -1271,24 +1604,24 @@
                     html += `
                         <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 space-y-4">
                             <div>
-                                <div class="text-[11px] font-bold text-blue-600 uppercase mb-1">🎯 核心目标</div>
-                                <div class="text-base font-bold text-slate-800">${d.core_goal || '未定义'}</div>
+                                <div class="text-[11px] font-bold text-blue-600 uppercase mb-1">${t('msg_core_goal')}</div>
+                                <div class="text-base font-bold text-slate-800">${d.core_goal || t('msg_undefined')}</div>
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <div class="text-[11px] font-bold text-blue-600 uppercase mb-1">❓ 关键问题</div>
+                                    <div class="text-[11px] font-bold text-blue-600 uppercase mb-1">${t('msg_key_questions')}</div>
                                     <ul class="list-decimal ml-4 text-sm text-slate-700 space-y-1">
                                         ${(d.key_questions || []).map(q => `<li>${q}</li>`).join('')}
                                     </ul>
                                 </div>
                                 <div>
-                                    <div class="text-[11px] font-bold text-blue-600 uppercase mb-1">🚧 讨论边界</div>
-                                    <div class="text-sm text-slate-700">${d.boundaries || '无'}</div>
+                                    <div class="text-[11px] font-bold text-blue-600 uppercase mb-1">${t('msg_boundaries')}</div>
+                                    <div class="text-sm text-slate-700">${d.boundaries || t('msg_none')}</div>
                                 </div>
                             </div>
                             ${d.report_design ? `
                                 <div>
-                                    <div class="text-[11px] font-bold text-blue-600 uppercase mb-1">📋 报告大纲设计</div>
+                                    <div class="text-[11px] font-bold text-blue-600 uppercase mb-1">${t('msg_report_outline')}</div>
                                     <div class="grid grid-cols-1 gap-2 mt-2">
                                         ${Object.entries(d.report_design).map(([name, desc]) => `
                                             <div class="bg-white/60 p-2 rounded border border-blue-200/50">
@@ -1304,7 +1637,7 @@
                     if (data.instructions) {
                         html += `
                             <div class="bg-amber-50 p-3 rounded-lg border border-amber-100">
-                                <div class="text-[11px] font-bold text-amber-600 uppercase mb-1">📢 本轮指令</div>
+                                <div class="text-[11px] font-bold text-amber-600 uppercase mb-1">${t('msg_instructions')}</div>
                                 <div class="text-sm text-slate-700 font-medium">${data.instructions}</div>
                             </div>
                         `;
@@ -1315,11 +1648,11 @@
                     html += `
                         <div class="bg-emerald-50 p-4 rounded-xl border border-emerald-100 space-y-4">
                             <div>
-                                <div class="text-[11px] font-bold text-emerald-600 uppercase mb-1">💡 核心思路</div>
-                                <div class="text-base font-bold text-slate-800">${data.core_idea || '未定义'}</div>
+                                <div class="text-[11px] font-bold text-emerald-600 uppercase mb-1">${t('msg_core_idea')}</div>
+                                <div class="text-base font-bold text-slate-800">${data.core_idea || t('msg_undefined')}</div>
                             </div>
                             <div>
-                                <div class="text-[11px] font-bold text-emerald-600 uppercase mb-1">🚀 执行步骤</div>
+                                <div class="text-[11px] font-bold text-emerald-600 uppercase mb-1">${t('msg_execution_steps')}</div>
                                 <div class="space-y-2 mt-2">
                                     ${(data.steps || []).map((step, i) => `
                                         <div class="flex items-start">
@@ -1332,13 +1665,13 @@
                             ${data.feasibility ? `
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-emerald-200/50">
                                     <div>
-                                        <div class="text-[11px] font-bold text-emerald-600 uppercase mb-1">✅ 优势</div>
+                                        <div class="text-[11px] font-bold text-emerald-600 uppercase mb-1">${t('msg_advantages')}</div>
                                         <ul class="list-disc ml-4 text-sm text-slate-600">
                                             ${(data.feasibility.advantages || []).map(a => `<li>${a}</li>`).join('')}
                                         </ul>
                                     </div>
                                     <div>
-                                        <div class="text-[11px] font-bold text-emerald-600 uppercase mb-1">🛠️ 资源需求</div>
+                                        <div class="text-[11px] font-bold text-emerald-600 uppercase mb-1">${t('msg_resource_requirements')}</div>
                                         <ul class="list-disc ml-4 text-sm text-slate-600">
                                             ${(data.feasibility.requirements || []).map(r => `<li>${r}</li>`).join('')}
                                         </ul>
@@ -1375,7 +1708,7 @@
             function copyReport() {
                 if (reportIframe && reportIframe.contentDocument) {
                     const text = reportIframe.contentDocument.body.innerText;
-                    navigator.clipboard.writeText(text).then(() => showAlert('报告内容已复制到剪贴板', '成功'));
+                    navigator.clipboard.writeText(text).then(() => showAlert(t('msg_copy_success'), t('title_success')));
                 }
             }
 
@@ -1392,7 +1725,7 @@
                     document.body.removeChild(a);
                     URL.revokeObjectURL(url);
                 } else {
-                    showAlert('报告尚未生成，无法下载', '提示');
+                    showAlert(t('msg_report_not_ready'), t('title_hint'));
                 }
             }
 
@@ -1417,19 +1750,19 @@
                         const a = document.createElement('a');
                         a.href = url;
                         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-                        a.download = `议事报告_${timestamp}.png`;
+                        a.download = `Council_Report_${timestamp}.png`;
                         document.body.appendChild(a);
                         a.click();
                         document.body.removeChild(a);
                     } catch (error) {
                         console.error('Image conversion error:', error);
-                        showAlert('图片转换失败，请尝试下载 HTML 格式', '错误', 'error');
+                        showAlert(t('msg_image_failed'), t('title_error'), 'error');
                     } finally {
                         btn.innerText = originalText;
                         btn.disabled = false;
                     }
                 } else {
-                    showAlert('报告尚未生成，无法下载图片', '提示');
+                    showAlert(t('msg_report_not_ready'), t('title_hint'));
                 }
             }
 
@@ -1437,7 +1770,7 @@
             async function deleteWorkspace(event, sessionId) {
                 event.stopPropagation(); // 阻止触发 loadWorkspace
                 
-                const confirmed = await showConfirm('确定要删除这条历史记录及其相关文件吗？此操作不可撤销。', '确认删除');
+                const confirmed = await showConfirm(t('msg_confirm_delete'), t('title_confirm_delete'));
                 if (!confirmed) return;
                 
                 try {
@@ -1451,12 +1784,12 @@
                         const modal = document.getElementById('history-modal');
                         modal.classList.add('hidden'); // 先关闭
                         toggleHistoryModal(); // 再打开以触发刷新
-                        showAlert('历史记录已成功删除', '成功');
+                        showAlert(t('msg_delete_success'), t('title_success'));
                     } else {
-                        showAlert('删除失败: ' + (data.message || '未知错误'), '错误', 'error');
+                        showAlert(t('msg_delete_failed') + ': ' + (data.message || 'unknown'), t('title_error'), 'error');
                     }
                 } catch (error) {
-                    showAlert('删除出错: ' + error.message, '错误', 'error');
+                    showAlert(t('msg_delete_failed') + ': ' + error.message, t('title_error'), 'error');
                 }
             }
 
@@ -1466,7 +1799,7 @@
                 
                 if (modal.classList.contains('hidden')) {
                     modal.classList.remove('hidden');
-                    list.innerHTML = '<div class="text-center py-8 text-slate-400 italic">正在加载历史记录...</div>';
+                    list.innerHTML = `<div class="text-center py-8 text-slate-400 italic">${t('history_loading')}</div>`;
                     
                     try {
                         const response = await fetch('/api/workspaces');
@@ -1481,14 +1814,14 @@
                                 item.innerHTML = `
                                     <div class="flex justify-between items-start">
                                         <div class="flex-1">
-                                            <h4 class="font-bold text-slate-800 group-hover:text-indigo-700">${ws.issue || '未命名议题'}</h4>
+                                            <h4 class="font-bold text-slate-800 group-hover:text-indigo-700">${ws.issue || t('msg_untitled_issue')}</h4>
                                             <p class="text-xs text-slate-400 mt-1">ID: ${ws.id}</p>
                                         </div>
                                         <div class="flex flex-col items-end space-y-2">
                                             <span class="text-xs font-mono text-slate-400 bg-slate-50 px-2 py-1 rounded">${ws.timestamp}</span>
                                             <button onclick="deleteWorkspace(event, '${ws.id}')" 
                                                     class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition opacity-0 group-hover:opacity-100"
-                                                    title="删除记录">
+                                                    title="${t('btn_delete_record')}">
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                                                 </svg>
@@ -1499,7 +1832,7 @@
                                 list.appendChild(item);
                             });
                         } else {
-                            list.innerHTML = '<div class="text-center py-8 text-slate-400 italic">暂无历史记录</div>';
+                            list.innerHTML = `<div class="text-center py-8 text-slate-400 italic">${t('msg_history_empty')}</div>`;
                         }
                     } catch (error) {
                         list.innerHTML = `<div class="text-center py-8 text-red-400 italic">加载失败: ${error.message}</div>`;
@@ -1515,7 +1848,7 @@
             }
 
             async function loadWorkspace(sessionId) {
-                const confirmed = await showConfirm('加载历史记录将清除当前讨论内容，是否继续？', '确认加载');
+                const confirmed = await showConfirm(t('msg_confirm_load'), t('title_confirm_load'));
                 if (!confirmed) return;
                 
                 try {
@@ -1544,7 +1877,7 @@
                         toggleHistoryModal();
                         
                         // 提示成功
-                        showAlert('历史记录加载成功，正在同步讨论流...', '成功');
+                        showAlert(t('msg_load_success'), t('title_success'));
                         
                         // 重置计数器以强制全量拉取
                         lastEventCount = 0;
@@ -1553,17 +1886,27 @@
                         // 触发一次更新以拉取所有历史事件
                         fetchUpdates();
                     } else {
-                        showAlert('加载失败: ' + (data.message || '未知错误'), '错误', 'error');
+                        showAlert(t('msg_load_failed') + ': ' + (data.message || 'unknown'), t('title_error'), 'error');
                     }
                 } catch (error) {
-                    showAlert('加载出错: ' + error.message, '错误', 'error');
+                    showAlert(t('msg_load_failed') + ': ' + error.message, t('title_error'), 'error');
                 }
             }
 
             // 初始化
             document.addEventListener('DOMContentLoaded', () => {
+                // 初始化语言
+                setLanguage(currentLang);
+
                 // 启动定时轮询
                 setInterval(fetchUpdates, 1000);
+                
+                // 初始检查浏览器状态
+                fetch('/api/status').then(r => r.json()).then(data => {
+                    if (data.browser_found === false) {
+                        showAlert(t('msg_browser_missing'), t('title_hint'), 'warning');
+                    }
+                });
                 
                 // 监听全局后端选择
                 const globalBackend = document.getElementById('backend-select');
@@ -1633,8 +1976,14 @@
                     let el = container.querySelector(`[data-agent-wrapper="${id}"]`);
                     if (i < plannersCount) {
                         if (!el) {
-                            const div = createAgentConfigItem(`策论家 ${i+1}`, id, 'bg-blue-50', 'bg-blue-500');
+                            const div = createAgentConfigItem(`${t('role_planner')} ${i+1}`, id, 'bg-blue-50', 'bg-blue-500');
                             container.appendChild(div);
+                        } else {
+                            // 更新标签语言
+                            const label = el.querySelector('h4');
+                            if (label) {
+                                label.innerHTML = `<span class="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>${t('role_planner')} ${i+1}`;
+                            }
                         }
                     } else if (el) {
                         container.removeChild(el);
@@ -1647,8 +1996,14 @@
                     let el = container.querySelector(`[data-agent-wrapper="${id}"]`);
                     if (i < auditorsCount) {
                         if (!el) {
-                            const div = createAgentConfigItem(`监察官 ${i+1}`, id, 'bg-amber-50', 'bg-amber-500');
+                            const div = createAgentConfigItem(`${t('role_auditor')} ${i+1}`, id, 'bg-amber-50', 'bg-amber-500');
                             container.appendChild(div);
+                        } else {
+                            // 更新标签语言
+                            const label = el.querySelector('h4');
+                            if (label) {
+                                label.innerHTML = `<span class="w-2 h-2 bg-amber-500 rounded-full mr-2"></span>${t('role_auditor')} ${i+1}`;
+                            }
                         }
                     } else if (el) {
                         container.removeChild(el);
@@ -1666,17 +2021,17 @@
                     </h4>
                     <div class="flex gap-2">
                         <select class="agent-backend flex-1 text-xs p-1 border rounded" data-agent="${id}">
-                            <option value="default">默认后端</option>
+                            <option value="default">${t('backend_default')}</option>
                             <option value="deepseek">DeepSeek</option>
                             <option value="openai">OpenAI</option>
                             <option value="openrouter">OpenRouter</option>
                             <option value="aliyun">Aliyun</option>
                             <option value="ollama">Ollama</option>
                         </select>
-                        <input type="text" class="agent-model flex-1 text-xs p-1 border rounded" placeholder="模型名称 (可选)" data-agent="${id}">
+                        <input type="text" class="agent-model flex-1 text-xs p-1 border rounded" placeholder="${t('agent_model_placeholder')}" data-agent="${id}">
                     </div>
                     <select class="agent-reasoning hidden text-[10px] p-1 border rounded mt-1 w-full" data-agent="${id}">
-                        <option value="">推理: 关闭</option>
+                        <option value="">${t('reasoning_off')}</option>
                         <option value="low">推理: Low</option>
                         <option value="medium">推理: Medium</option>
                         <option value="high">推理: High</option>
@@ -1796,6 +2151,7 @@
                             document.getElementById('settings-key-openrouter').value = cfg.OPENROUTER_API_KEY || '';
                             document.getElementById('settings-key-aliyun').value = cfg.ALIYUN_API_KEY || '';
                             document.getElementById('settings-key-tavily').value = cfg.TAVILY_API_KEY || '';
+                            document.getElementById('settings-browser-path').value = cfg.BROWSER_PATH || '';
                             
                             // 处理多选搜索供应商
                             if (cfg.SEARCH_PROVIDER) {
@@ -1825,6 +2181,7 @@
                     OPENROUTER_API_KEY: document.getElementById('settings-key-openrouter').value.trim(),
                     ALIYUN_API_KEY: document.getElementById('settings-key-aliyun').value.trim(),
                     TAVILY_API_KEY: document.getElementById('settings-key-tavily').value.trim(),
+                    BROWSER_PATH: document.getElementById('settings-browser-path').value.trim(),
                     SEARCH_PROVIDER: selectedProviders
                 };
 
@@ -1836,13 +2193,13 @@
                     });
                     const data = await response.json();
                     if (data.status === 'success') {
-                        showAlert('设置已保存并应用', '成功');
+                        showAlert(t('msg_save_success'), t('title_success'));
                         toggleSettingsModal();
                     } else {
-                        showAlert('保存失败: ' + data.message, '错误', 'error');
+                        showAlert(t('msg_save_failed') + ': ' + data.message, t('title_error'), 'error');
                     }
                 } catch (error) {
-                    showAlert('保存请求失败: ' + error.message, '错误', 'error');
+                    showAlert(t('msg_save_failed') + ': ' + error.message, t('title_error'), 'error');
                 }
             }
         </script>

@@ -30,6 +30,12 @@ def bing_search(query: str, max_results: int = 10, max_retries: int = 3) -> str:
         co.set_argument('--headless')
         co.set_argument('--no-sandbox')
         co.set_argument('--disable-gpu')
+        
+        # 如果配置了浏览器路径，则使用它
+        browser_path = getattr(config, 'BROWSER_PATH', '')
+        if browser_path:
+            co.set_browser_path(browser_path)
+            
         browser_port = random.randint(10000, 60000)
         co.set_local_port(browser_port)
         
@@ -287,6 +293,12 @@ def baidu_search(query: str, max_results: int = 10, max_retries: int = 3) -> str
         co.set_argument('--headless')
         co.set_argument('--no-sandbox')
         co.set_argument('--disable-gpu')
+        
+        # 如果配置了浏览器路径，则使用它
+        browser_path = getattr(config, 'BROWSER_PATH', '')
+        if browser_path:
+            co.set_browser_path(browser_path)
+            
         browser_port = random.randint(10000, 60000)
         co.set_local_port(browser_port)
         
