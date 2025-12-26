@@ -52,7 +52,10 @@ cd AICouncil
 python -m venv .venv
 
 # 激活虚拟环境 (Windows)
-.\.venv\Scripts\activate
+.\venv\Scripts\activate
+
+## 如出现Windows PowerShell 的执行策略（Execution Policy） 限制了脚本运行，请执行以下命令，并选择Y
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 # 激活虚拟环境 (Linux/macOS)
 source .venv/bin/activate
@@ -73,7 +76,8 @@ pip install -r requirements.txt
    # ... 其他配置
    ```
 或者您也可以在项目根目录下创建 `.env` 文件，程序会自动读取环境变量。
-或者您也可以在页面右上角的设置中进行配置。
+
+**【建议】或者您也可以在页面右上角的设置中进行配置。**
 
 ### 5. 启动应用
 ```bash
