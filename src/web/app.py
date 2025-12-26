@@ -463,19 +463,37 @@ def handle_config():
             with open(config_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             
-            # 替换文件中的 Key 定义
             import re
+            def escape_for_quote(s, quote):
+                # Escape backslashes and the quote character so the resulting Python string literal is safe
+                return s.replace('\\', '\\\\').replace(quote, '\\' + quote)
+
             for key, value in new_keys.items():
+                # Normalize value to string
+                if value is None:
+                    value = ''
+                value = str(value)
+
                 # 匹配如 DEEPSEEK_API_KEY = os.getenv('...', '...') 或 DEEPSEEK_API_KEY = '...'
-                # 这里的正则比较简单，假设格式是 KEY = os.getenv(..., 'VALUE')
-                pattern = rf"({key}\s*=\s*os\.getenv\([^,]+,\s*['\"])([^'\"]*)(['\"]\))"
-                if re.search(pattern, content):
-                    content = re.sub(pattern, rf"\1{value}\3", content)
+                # 构造安全的正则，转义 key，修复括号不平衡问题
+                pattern = rf"({re.escape(key)}\s*=\s*os\.getenv\([^,]+,\s*['\"])([^'\"]*)(['\"])"
+                m = re.search(pattern, content)
+                if m:
+                    quote = m.group(1)[-1]
+                    # Use a callable replacement to avoid backreference/template parsing in replacement string
+                    content = re.sub(pattern, lambda mo, v=value, q=quote: mo.group(1) + escape_for_quote(v, q) + mo.group(3), content)
                 else:
                     # 如果没匹配到 os.getenv 格式，尝试匹配直接赋值格式 KEY = 'VALUE'
-                    pattern_direct = rf"({key}\s*=\s*['\"])([^'\"]*)(['\"])"
-                    content = re.sub(pattern_direct, rf"\1{value}\3", content)
-                
+                    pattern_direct = rf"({re.escape(key)}\s*=\s*['\"])([^'\"]*)(['\"])"
+                    m2 = re.search(pattern_direct, content)
+                    if m2:
+                        quote = m2.group(1)[-1]
+                        content = re.sub(pattern_direct, lambda mo, v=value, q=quote: mo.group(1) + escape_for_quote(v, q) + mo.group(3), content)
+                    else:
+                        # 如果文件中不存在该 key，则追加一行（使用单引号），并对 value 做转义
+                        esc = escape_for_quote(value, "'")
+                        content += f"\n{key} = '{esc}'\n"
+
                 # 同时更新当前运行环境中的配置
                 setattr(config, key, value)
             
