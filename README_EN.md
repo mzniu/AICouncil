@@ -17,17 +17,17 @@
   - **Planner**: Provides professional solutions and deep insights based on Retrieval-Augmented Generation (RAG).
   - **Auditor**: Conducts critical reviews of the Planner's solutions, pointing out potential risks and loopholes.
   - **Reporter**: Records the deliberation process in real-time to ensure no information is missed.
-- **🔍 Enhanced Search**: Integrates multi-engine parallel search (Bing, Baidu, DuckDuckGo), supporting multi-page scraping to ensure AI gets the latest and most comprehensive information.
-- **💻 Real-time Monitoring Panel**: A Flask-based web interface that displays agent thinking processes, search progress, and debate flows in real-time.
-- **📄 Deep Report Generation**: Automatically generates structured HTML deliberation reports, supporting one-click copy, HTML download, or export as a long image.
+- **🔍 Enhanced Search**: Integrates multi-engine parallel search (Bing, Baidu, DuckDuckGo). Features a **Requests-First** architecture for high performance, with **intelligent relevance validation** and **query optimization** (automatically bypassing irrelevant search engine noise).
+- **💻 Real-time Monitoring Panel**: A Flask-based web interface that displays agent thinking processes, search progress, and debate flows in real-time. Supports **Maximize/Restore** for better readability.
+- **📄 Deep Report Generation**: Automatically generates structured HTML deliberation reports, supporting one-click copy and a **consolidated download menu** (HTML or long image).
 - **📜 History Management**: Complete session persistence, supporting anytime backtracking, loading, or deletion of historical records.
 - **✋ User Intervention**: Allows users to "intervene" at any time during the deliberation process to guide the direction of the debate.
-- **📊 Progress Visualization**: Real-time display of current round (Round X / Y) and detailed agent status.
+- **📊 Progress Visualization**: Real-time display of current round and detailed agent status. Optimized progress logic reaches 100% immediately after the discussion ends.
 - **🤖 Broad Model Support**: Native support for DeepSeek, OpenAI, Aliyun (Qwen), OpenRouter, and local Ollama models.
 
 ---
 
-## � UI Showcase
+## 📸 UI Showcase
 
 ![AICouncil UI Showcase](assets/demo.png)
 

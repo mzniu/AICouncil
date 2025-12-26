@@ -10,21 +10,41 @@ from src.utils import logger
 def bing_search(query: str, max_results: int = 10, max_retries: int = 3) -> str:
     """使用 Bing 搜索。优先使用 requests，失败则回退到 DrissionPage。"""
     query = query.strip()
-    query = query.replace("内容", "").replace("汇总", "").replace("列表", "")
+    # 清理 LLM 可能生成的冗余词汇
+    clean_query = query.replace("内容", "").replace("汇总", "").replace("列表", "")
     import re
-    query = re.sub(r'\s+', ' ', query)
+    clean_query = re.sub(r'\s+', ' ', clean_query)
     
-    if len(query) > 60:
-        query = query[:60]
+    if len(clean_query) > 100:
+        clean_query = clean_query[:100]
         
-    logger.info(f"Attempting Bing search via requests for: {query}")
-    res = bing_search_requests(query, max_results=max_results)
+    logger.info(f"Attempting Bing search via requests for: {clean_query}")
+    res = bing_search_requests(clean_query, max_results=max_results)
     
-    if "失败" not in res and "未找到结果" not in res:
+    # 检查结果相关性
+    is_irrelevant = "失败" in res or "未找到结果" in res
+    if not is_irrelevant:
+        # 简单的相关性检查：如果结果中包含大量 World Economic Forum 且查询不是关于它的
+        if "World Economic Forum" in res and "World Economic Forum" not in clean_query:
+            logger.warning("Detected potentially irrelevant World Economic Forum results.")
+            is_irrelevant = True
+            
+    if is_irrelevant:
+        # 尝试优化查询：如果包含年份，尝试去掉年份再搜一次
+        if re.search(r'202[45]', clean_query):
+            optimized_query = re.sub(r'202[45]年?', '', clean_query).strip()
+            logger.info(f"Retrying Bing search with optimized query: {optimized_query}")
+            res = bing_search_requests(optimized_query, max_results=max_results)
+            if "失败" not in res and "未找到结果" not in res:
+                return res
+
+    else:
+        # 结果相关，直接返回
         logger.info("Bing search via requests succeeded.")
         return res
-        
-    logger.info("Bing search via requests failed or returned no results. Falling back to DrissionPage...")
+
+    logger.info("Bing search via requests failed or returned irrelevant results. Falling back to DrissionPage...")
+        # ... (rest of the function)
     
     import random
     import urllib.parse
@@ -149,16 +169,28 @@ def bing_search(query: str, max_results: int = 10, max_retries: int = 3) -> str:
 
 def bing_search_requests(query: str, max_results: int = 10, max_retries: int = 3) -> str:
     """使用 requests 进行 Bing 搜索的备选方案。"""
+    # 使用 cn.bing.com 并配合特定的参数，通常在境内访问更稳定
     url = "https://cn.bing.com/search"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8,en-US;q=0.7",
         "Referer": "https://cn.bing.com/",
+        "Connection": "keep-alive",
+        "Cache-Control": "max-age=0",
+        "Upgrade-Insecure-Requests": "1",
     }
     
+    # 增加一些 Bing 搜索常用的参数，提高相关性
     params = {
         "q": query,
+        "qs": "n",
+        "form": "QBRE",
+        "sp": "-1",
+        "pq": query,
+        "sc": "10-0",
+        "sk": "",
+        "cvid": "7B8B8B8B8B8B8B8B8B8B8B8B8B8B8B8B", # 随机 ID
         "mkt": "zh-CN",
         "setlang": "zh-hans",
     }
@@ -167,30 +199,75 @@ def bing_search_requests(query: str, max_results: int = 10, max_retries: int = 3
     for attempt in range(max_retries):
         try:
             logger.info(f"Performing Bing search (requests) (attempt {attempt+1}/{max_retries}) for: {query}")
-            response = requests.get(url, params=params, headers=headers, timeout=10)
+            session = requests.Session()
+            # 先访问首页获取基础 Cookie，这对于 Bing 非常重要
+            try:
+                session.get("https://cn.bing.com/", headers=headers, timeout=5)
+            except:
+                pass
+                
+            response = session.get(url, params=params, headers=headers, timeout=10)
             response.raise_for_status()
+            
+            logger.info(f"Bing response length: {len(response.text)}")
+            if "在此处找不到任何结果" in response.text or "No results found" in response.text:
+                logger.warning("Bing returned 'No results found' page.")
             
             soup = BeautifulSoup(response.text, 'html.parser')
             results = []
-            items = soup.select('li.b_algo') or soup.select('.b_algo')
+            
+            # 核心改进：更精确的选择器，并排除干扰项
+            # Bing 的主结果通常在 ol#b_results 下的 li.b_algo
+            items = soup.select('ol#b_results > li.b_algo')
+            if not items:
+                items = soup.select('li.b_algo')
+            if not items:
+                items = soup.select('.b_algo')
+            
+            logger.info(f"Found {len(items)} potential items in Bing response.")
             
             for item in items:
                 if len(results) >= max_results:
                     break
+                
+                # 排除广告、相关搜索等干扰
+                if item.select_one('.b_ad') or "b_ans" in item.get('class', []):
+                    continue
+
                 title_tag = item.select_one('h2 a') or item.select_one('h2')
                 link_tag = item.select_one('a')
-                snippet_tag = item.select_one('.b_caption p, .b_linehighlight, .b_algoSlug, .b_content p, .b_algoSnippet')
+                # 摘要的选择器需要更精确
+                snippet_tag = item.select_one('.b_caption p') or \
+                             item.select_one('.b_algoSnippet') or \
+                             item.select_one('.b_content p') or \
+                             item.select_one('.b_caption')
                 
                 if title_tag:
                     href = link_tag.get('href', '') if link_tag else ''
-                    if href.startswith('http'):
+                    # 过滤掉 Bing 内部链接
+                    if href.startswith('http') and "bing.com/ck/ms" not in href and "microsoft.com" not in href:
+                        title_text = title_tag.get_text().strip()
+                        body_text = snippet_tag.get_text().strip() if snippet_tag else "无摘要"
+                        
+                        # 简单的相关性校验：如果标题太短或者包含明显的广告词，可以过滤
+                        if len(title_text) < 2:
+                            continue
+                            
                         results.append({
-                            "title": title_tag.get_text().strip(),
+                            "title": title_text,
                             "href": href,
-                            "body": snippet_tag.get_text().strip() if snippet_tag else "无摘要"
+                            "body": body_text
                         })
             
             if results:
+                # 再次检查相关性：如果第一条结果完全不包含查询中的关键词，可能搜索被劫持或重定向了
+                # 这里我们至少返回结果，但记录警告
+                first_title = results[0]['title'].lower()
+                keywords = [k for k in query.split() if len(k) > 1]
+                match_count = sum(1 for k in keywords if k.lower() in first_title)
+                if keywords and match_count == 0:
+                    logger.warning(f"First result title '{first_title}' does not match any keywords from '{query}'")
+
                 return format_search_results(results)
             
             if attempt < max_retries - 1:
@@ -439,7 +516,21 @@ def baidu_search(query: str, max_results: int = 10, max_retries: int = 3) -> str
     logger.info(f"Attempting Baidu search via requests for: {query}")
     res = baidu_search_requests(query, max_results=max_results)
     
+    # 检查相关性：如果第一条结果完全不包含查询中的关键词，或者包含明显的干扰项
+    # 百度有时会返回大量广告或无关的热搜
     if "失败" not in res and "未找到结果" not in res:
+        # 简单的相关性检查
+        clean_query = query.strip()
+        # 如果查询包含年份，且结果中出现了明显的无关内容（如百度热搜、广告等）
+        if "202" in clean_query and ("百度热搜" in res or "广告" in res):
+            # 尝试优化查询
+            optimized_query = re.sub(r'202[45]年?', '', clean_query).strip()
+            if optimized_query != clean_query:
+                logger.info(f"Detected potential noise in Baidu results. Retrying with optimized query: {optimized_query}")
+                res_opt = baidu_search_requests(optimized_query, max_results=max_results)
+                if "失败" not in res_opt and "未找到结果" not in res_opt:
+                    res = res_opt
+
         logger.info("Baidu search via requests succeeded.")
         return res
         

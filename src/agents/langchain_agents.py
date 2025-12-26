@@ -697,6 +697,7 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
             logger.info(f"[round {r}] 判定结论：进入下一轮。")
 
     # 5. Final Reporting
+    send_web_event("discussion_complete")
     logger.info("[cycle] 报告者正在生成最终 HTML 报告...")
     
     simplified_history = []
