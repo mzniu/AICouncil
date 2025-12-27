@@ -1647,30 +1647,35 @@
 
                 let html = '';
                 if (prefix) {
-                    // 清理 prefix：移除 [SEARCH: ...] 标签和重复的 SEARCH PROGRESS 标题
-                    let cleanPrefix = prefix.replace(/\[SEARCH:.*?\]/g, '').trim();
+                    // 清理 prefix：移除 [SEARCH: ...] 标签、重复的 SEARCH PROGRESS 标题以及末尾的 Markdown 代码块起始标签
+                    let cleanPrefix = prefix.replace(/\[SEARCH:.*?\]/g, '')
+                                            .replace(/```(json)?\s*$/, '')
+                                            .trim();
                     
-                    let prefixHtml = marked.parse(cleanPrefix);
-                    // 检查是否包含 SEARCH PROGRESS，如果是则包装成可折叠卡片
-                    if (prefix.includes('SEARCH PROGRESS')) {
-                        // 移除所有生成的 <h3>SEARCH PROGRESS</h3> 标签
-                        prefixHtml = prefixHtml.replace(/<h3[^>]*>SEARCH PROGRESS<\/h3>/gi, '');
-                        html += `
-                            <div class="search-progress-card mb-2">
-                                <div class="search-header" onclick="toggleSearchCard(this)">
-                                    <h5>
-                                        <span class="toggle-icon mr-1">▼</span>
-                                        <span class="mr-1">🌐</span> ${t('msg_search_progress')}
-                                    </h5>
-                                    <span class="text-[10px] text-blue-400 uppercase font-bold tracking-widest">${t('msg_details')}</span>
+                    // 只有当清理后的 prefix 不为空，或者包含搜索进度时才渲染
+                    if (cleanPrefix || prefix.includes('SEARCH PROGRESS')) {
+                        let prefixHtml = marked.parse(cleanPrefix);
+                        // 检查是否包含 SEARCH PROGRESS，如果是则包装成可折叠卡片
+                        if (prefix.includes('SEARCH PROGRESS')) {
+                            // 移除所有生成的 <h3>SEARCH PROGRESS</h3> 标签
+                            prefixHtml = prefixHtml.replace(/<h3[^>]*>SEARCH PROGRESS<\/h3>/gi, '');
+                            html += `
+                                <div class="search-progress-card mb-2">
+                                    <div class="search-header" onclick="toggleSearchCard(this)">
+                                        <h5>
+                                            <span class="toggle-icon mr-1">▼</span>
+                                            <span class="mr-1">🌐</span> ${t('msg_search_progress')}
+                                        </h5>
+                                        <span class="text-[10px] text-blue-400 uppercase font-bold tracking-widest">${t('msg_details')}</span>
+                                    </div>
+                                    <div class="search-content markdown-body">
+                                        ${prefixHtml}
+                                    </div>
                                 </div>
-                                <div class="search-content markdown-body">
-                                    ${prefixHtml}
-                                </div>
-                            </div>
-                        `;
-                    } else {
-                        html += `<div class="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600 italic shadow-sm">${prefixHtml}</div>`;
+                            `;
+                        } else {
+                            html += `<div class="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600 italic shadow-sm">${prefixHtml}</div>`;
+                        }
                     }
                 }
 
@@ -1679,8 +1684,11 @@
                 } else {
                     // 如果没有解析出 JSON，渲染剩余部分
                     const remainingText = jsonStartIndex !== -1 ? text.substring(jsonStartIndex) : text;
-                    // 如果已经作为 prefix 渲染过了（即包含 SEARCH PROGRESS 且没有 JSON），则不再重复渲染
-                    if (jsonStartIndex !== -1 || !text.includes('SEARCH PROGRESS')) {
+                    
+                    if (jsonStartIndex !== -1) {
+                        // 如果看起来像 JSON 但解析失败（可能是流式输出未完成），使用 pre 标签包裹以保持格式，避免 marked 误伤（如将下划线解析为斜体）
+                        html += `<pre class="bg-slate-50 p-3 rounded-lg text-xs overflow-x-auto border border-slate-200 text-slate-600"><code>${remainingText}</code></pre>`;
+                    } else if (!text.includes('SEARCH PROGRESS')) {
                         html += marked.parse(remainingText);
                     }
                 }
