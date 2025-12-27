@@ -128,12 +128,12 @@ AICouncil/
 - [x] **Model Adaptation**: Supported DeepSeek, OpenAI, OpenRouter, Ollama, etc.
 - [x] **Report Export**: Supported HTML report generation and long image export.
 - [x] **User Intervention Mode**: Allows users to guide the debate direction at any time.
+- [x] **Multi-language Support**: Implement internationalization (i18n) for the frontend interface.
 - [x] **Multi-language Documentation**: Provided bilingual README in Chinese and English.
 
 ### Planned
 - [ ] **More Agent Types**: Add vertical domain agents like Economists, Legal Advisors, Technical Experts, etc.
 - [ ] **Local Knowledge Base (RAG)**: Support uploading PDF/Word/Markdown documents as references.
-- [ ] **Multi-language Support**: Implement internationalization (i18n) for the frontend interface.
 - [ ] **Export Format Extension**: Support exporting to PDF, Markdown, or Word documents.
 - [ ] **Search Source Expansion**: Integrate professional search services like Google Search API.
 
