@@ -239,12 +239,15 @@ def intervene():
 
 @app.route('/api/rereport', methods=['POST'])
 def rereport():
-    global is_running, current_session_id, current_config
+    global is_running, current_session_id, current_config, final_report
     if is_running:
         return jsonify({"status": "error", "message": "讨论正在进行中，请稍后再试"}), 400
     
     if not current_session_id:
         return jsonify({"status": "error", "message": "未找到当前会话 ID"}), 400
+    
+    # 清空旧报告，确保前端显示加载状态
+    final_report = ""
     
     data = request.json or {}
     selected_backend = data.get('backend') or current_config.get('backend', 'deepseek')
@@ -406,6 +409,13 @@ def load_workspace(session_id):
                             "content": json.dumps(h["summary"], ensure_ascii=False),
                             "chunk_id": f"load_{session_id}_r{round_num}_l"
                         })
+        
+        # 如果存在最终报告，添加一个事件以更新进度条到 100%
+        if final_report:
+            discussion_events.append({
+                "type": "final_report",
+                "content": "" 
+            })
         
         backend_logs.append(f"成功从工作区加载会话: {session_id}")
         return jsonify({
