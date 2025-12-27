@@ -564,7 +564,7 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
             
             for attempt in range(max_retries):
                 try:
-                    out, search_res = stream_agent_output(auditor_chains[i-1], prompt_vars, f"监察官 {i}", "Auditor")
+                    out, search_res = stream_agent_output(auditor_chains[j-1], prompt_vars, f"监察官 {j}", "Auditor")
                     if search_res:
                         all_search_references.append(search_res)
                     
