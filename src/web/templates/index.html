@@ -233,6 +233,11 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                     </svg>
                 </button>
+                <button onclick="togglePresetsModal()" class="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg border border-slate-600 transition group" title="元老院编制" data-i18n-title="nav_presets">
+                    <svg class="w-5 h-5 text-slate-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                </button>
             </div>
         </div>
     </nav>
@@ -291,16 +296,40 @@
                 </div>
                 <div class="flex items-end space-x-2">
                     <button id="start-btn" onclick="startDiscussion()" 
-                            class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-8 rounded-lg transition shadow-lg shadow-blue-200 disabled:bg-gray-400 disabled:shadow-none" data-i18n="btn_start">
-                        开始议事
+                            class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-8 rounded-lg transition shadow-lg shadow-blue-200 disabled:bg-gray-400 disabled:shadow-none flex items-center justify-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <span data-i18n="btn_start">开始议事</span>
                     </button>
                     <button id="advanced-toggle-btn" onclick="toggleAdvancedSettings()" 
-                            class="w-full md:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg transition border border-slate-300" data-i18n="btn_advanced">
-                        ⚙️ 高级配置
+                            class="w-full md:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg transition border border-slate-300 flex items-center justify-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        <span data-i18n="btn_advanced">高级配置</span>
                     </button>
+                    
+                    <!-- 快速加载编制下拉菜单 -->
+                    <div class="relative inline-block text-left w-full md:w-auto">
+                        <button onclick="togglePresetsDropdown()" class="w-full md:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg transition border border-slate-300 flex items-center justify-center" id="presets-dropdown-btn" title="快速加载编制" data-i18n-title="btn_load_preset">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                            <span data-i18n="btn_load_preset">加载编制</span>
+                            <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </button>
+                        <div id="presets-dropdown" class="dropdown-content w-72 absolute right-0 mt-2 bg-white shadow-xl z-50">
+                            <div id="presets-list-container" class="max-h-80 overflow-y-auto">
+                                <!-- 动态插入编制列表 -->
+                                <div class="px-4 py-2 text-xs text-gray-400 text-center">暂无存档</div>
+                            </div>
+                            <div class="border-t border-slate-100">
+                                <button onclick="saveCurrentAsPreset(); togglePresetsDropdown()" class="text-blue-600 hover:text-blue-800 w-full text-left px-4 py-2 text-sm font-bold hover:bg-slate-50 transition flex items-center">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                                    <span data-i18n="btn_save_current">保存当前配置</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                     <button id="history-btn" onclick="toggleHistoryModal()" 
-                            class="w-full md:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg transition border border-slate-300" data-i18n="btn_history">
-                        📜 历史
+                            class="w-full md:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg transition border border-slate-300 flex items-center justify-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <span data-i18n="btn_history">历史</span>
                     </button>
                     <button id="stop-btn" onclick="stopDiscussion()" 
                             class="hidden w-full md:w-auto bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-8 rounded-lg transition shadow-lg shadow-red-200" data-i18n="btn_stop">
@@ -626,6 +655,53 @@
             </div>
         </div>
 
+        <!-- 编制管理模态框 -->
+        <div id="presets-modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[150] flex items-center justify-center">
+            <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl p-8 m-4 max-h-[90vh] overflow-y-auto transform transition-all scale-100">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-black text-slate-800 flex items-center">
+                        <span class="mr-3 text-3xl">📂</span> <span data-i18n="presets_title">元老院编制管理</span>
+                    </h2>
+                    <button onclick="togglePresetsModal()" class="text-slate-400 hover:text-slate-600 transition">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+
+                <div class="space-y-6">
+                    <!-- 保存当前配置 -->
+                    <section class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <h3 class="font-bold text-slate-700 mb-3 flex items-center">
+                            <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span> <span data-i18n="presets_save_new">保存当前配置为新编制</span>
+                        </h3>
+                        <div class="flex gap-2">
+                            <input type="text" id="new-preset-name" placeholder="输入编制名称 (例如: 3人-DeepSeek-高强度)" 
+                                   class="flex-1 px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
+                            <button onclick="saveCurrentAsPreset()" class="bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-2 rounded-lg transition shadow-sm" data-i18n="btn_save">
+                                保存
+                            </button>
+                        </div>
+                    </section>
+
+                    <!-- 编制列表 -->
+                    <section>
+                        <h3 class="font-bold text-slate-700 mb-3 flex items-center">
+                            <span class="w-2 h-2 bg-blue-500 rounded-full mr-2"></span> <span data-i18n="presets_list">已保存的编制</span>
+                        </h3>
+                        <div id="presets-management-list" class="space-y-2 max-h-60 overflow-y-auto pr-2">
+                            <!-- 动态插入 -->
+                            <div class="text-center text-gray-400 py-4">加载中...</div>
+                        </div>
+                    </section>
+                </div>
+
+                <div class="mt-8 pt-4 border-t border-slate-100 flex justify-end">
+                    <button onclick="togglePresetsModal()" class="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition" data-i18n="btn_close">
+                        关闭
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <script>
             const translations = {
                 zh: {
@@ -633,6 +709,7 @@
                     nav_subtitle: "元老院议事厅",
                     nav_toggle_logs: "切换日志显示",
                     nav_settings: "系统设置",
+                    nav_presets: "元老院编制",
                     input_issue_label: "议题内容",
                     input_issue_placeholder: "请输入您想要讨论的议题（支持多行输入，Enter 发送，Shift+Enter 换行）...",
                     input_backend_label: "后端",
@@ -648,6 +725,8 @@
                     input_auditors_label: "监察官",
                     btn_start: "开始议事",
                     btn_advanced: "高级配置",
+                    btn_load_preset: "加载编制",
+                    btn_save_current: "保存当前配置",
                     btn_history: "历史",
                     btn_stop: "停止",
                     advanced_title: "席位专家配置",
@@ -673,6 +752,16 @@
                     loader_subtext: "元老们正在激烈辩论中",
                     log_title: "系统执行日志",
                     btn_clear: "清除",
+                    presets_title: "元老院编制管理",
+                    presets_save_new: "保存当前配置为新编制",
+                    presets_list: "已保存的编制",
+                    btn_save: "保存",
+                    btn_close: "关闭",
+                    msg_preset_saved: "编制已保存",
+                    msg_preset_deleted: "编制已删除",
+                    msg_preset_loaded: "编制已加载",
+                    msg_preset_name_empty: "请输入编制名称",
+                    confirm_delete_preset: "确定要删除该编制吗？",
                     history_modal_title: "议事历史记录",
                     history_loading: "正在加载历史记录...",
                     btn_close: "关闭",
@@ -880,7 +969,19 @@
                     msg_unrated: "Unrated",
                     msg_undefined: "Undefined",
                     msg_none: "None",
-                    msg_browser_missing: "Browser executable not found. Web search (Baidu/Bing) may not work. Please configure the browser path in settings."
+                    msg_browser_missing: "Browser executable not found. Web search (Baidu/Bing) may not work. Please configure the browser path in settings.",
+                    nav_presets: "Council Formations",
+                    btn_load_preset: "Load Formation",
+                    btn_save_current: "Save Current",
+                    presets_title: "Council Formations",
+                    presets_save_new: "Save Current as New Formation",
+                    presets_list: "Saved Formations",
+                    btn_save: "Save",
+                    msg_preset_saved: "Formation saved",
+                    msg_preset_deleted: "Formation deleted",
+                    msg_preset_loaded: "Formation loaded",
+                    msg_preset_name_empty: "Please enter a formation name",
+                    confirm_delete_preset: "Are you sure you want to delete this formation?"
                 }
             };
 
@@ -1141,13 +1242,21 @@
 
             // 点击外部关闭下拉菜单
             window.onclick = function(event) {
-                if (!event.target.closest('#download-dropdown-btn')) {
-                    const dropdowns = document.getElementsByClassName("dropdown-content");
-                    for (let i = 0; i < dropdowns.length; i++) {
-                        const openDropdown = dropdowns[i];
-                        if (openDropdown.classList.contains('show')) {
-                            openDropdown.classList.remove('show');
-                        }
+                // 处理下载下拉菜单
+                if (!event.target.closest('#download-dropdown-btn') && 
+                    !event.target.closest('#download-dropdown')) {
+                    const dd = document.getElementById('download-dropdown');
+                    if (dd && dd.classList.contains('show')) {
+                        dd.classList.remove('show');
+                    }
+                }
+
+                // 处理编制下拉菜单
+                if (!event.target.closest('#presets-dropdown-btn') && 
+                    !event.target.closest('#presets-dropdown')) {
+                    const pd = document.getElementById('presets-dropdown');
+                    if (pd && pd.classList.contains('show')) {
+                        pd.classList.remove('show');
                     }
                 }
             }
@@ -2454,6 +2563,203 @@
                 } catch (error) {
                     showAlert(t('msg_save_failed') + ': ' + error.message, t('title_error'), 'error');
                 }
+            }
+            // --- 编制管理功能 ---
+
+            function togglePresetsModal() {
+                const modal = document.getElementById('presets-modal');
+                if (modal.classList.contains('hidden')) {
+                    modal.classList.remove('hidden');
+                    loadPresets();
+                } else {
+                    modal.classList.add('hidden');
+                }
+            }
+
+            function togglePresetsDropdown() {
+                const dropdown = document.getElementById("presets-dropdown");
+                dropdown.classList.toggle("show");
+                if (dropdown.classList.contains("show")) {
+                    loadPresets();
+                }
+            }
+
+            async function loadPresets() {
+                try {
+                    const response = await fetch('/api/presets');
+                    const data = await response.json();
+                    
+                    if (data.status === 'success') {
+                        renderPresetsList(data.presets);
+                    }
+                } catch (error) {
+                    console.error('Failed to load presets:', error);
+                }
+            }
+
+            function renderPresetsList(presets) {
+                const listContainer = document.getElementById('presets-management-list');
+                const dropdownContainer = document.getElementById('presets-list-container');
+                
+                if (!listContainer || !dropdownContainer) return;
+
+                listContainer.innerHTML = '';
+                dropdownContainer.innerHTML = '';
+
+                if (Object.keys(presets).length === 0) {
+                    const emptyHtml = `<div class="text-center text-gray-400 py-4 text-xs">暂无存档</div>`;
+                    listContainer.innerHTML = emptyHtml;
+                    dropdownContainer.innerHTML = emptyHtml;
+                    return;
+                }
+
+                for (const [name, config] of Object.entries(presets)) {
+                    // 渲染管理列表项
+                    const item = document.createElement('div');
+                    item.className = 'flex justify-between items-center p-3 bg-white border border-slate-200 rounded-lg hover:shadow-sm transition';
+                    item.innerHTML = `
+                        <div>
+                            <div class="font-bold text-slate-700 text-sm">${name}</div>
+                            <div class="text-xs text-slate-500 mt-1">
+                                ${config.backend} / ${config.rounds}轮 / ${config.planners}策 / ${config.auditors}监
+                            </div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="applyPreset('${name}')" class="text-blue-600 hover:text-blue-800 text-xs font-bold px-2 py-1 bg-blue-50 rounded hover:bg-blue-100 transition">
+                                加载
+                            </button>
+                            <button onclick="deletePreset('${name}')" class="text-red-600 hover:text-red-800 text-xs font-bold px-2 py-1 bg-red-50 rounded hover:bg-red-100 transition">
+                                删除
+                            </button>
+                        </div>
+                    `;
+                    listContainer.appendChild(item);
+
+                    // 渲染下拉菜单项
+                    const dropdownItem = document.createElement('button');
+                    dropdownItem.onclick = () => { applyPreset(name); togglePresetsDropdown(); };
+                    dropdownItem.className = 'w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition group border-b border-slate-100 last:border-0';
+                    dropdownItem.innerHTML = `
+                        <div class="font-bold text-slate-700 mb-1 truncate">${name}</div>
+                        <div class="text-xs text-slate-500 group-hover:text-slate-600 flex items-center space-x-2">
+                            <span class="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded text-[10px] border border-blue-100 font-medium">${config.backend}</span>
+                            <span class="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] border border-slate-200">R${config.rounds}</span>
+                            <span class="flex items-center space-x-1">
+                                <span title="策论家">🧠 ${config.planners}</span>
+                                <span class="text-slate-300">|</span>
+                                <span title="监察官">👁️ ${config.auditors}</span>
+                            </span>
+                        </div>
+                    `;
+                    dropdownContainer.appendChild(dropdownItem);
+                }
+            }
+
+            async function saveCurrentAsPreset() {
+                const nameInput = document.getElementById('new-preset-name');
+                let name = nameInput.value.trim();
+                
+                if (!name) {
+                    name = prompt(t('msg_preset_name_empty'));
+                    if (!name) return;
+                }
+
+                // 收集当前配置
+                const config = {
+                    backend: document.getElementById('backend-select').value,
+                    global_model: document.getElementById('global-model-input').value,
+                    global_reasoning: document.getElementById('global-reasoning-input').value,
+                    rounds: parseInt(document.getElementById('rounds-input').value),
+                    planners: parseInt(document.getElementById('planners-input').value),
+                    auditors: parseInt(document.getElementById('auditors-input').value),
+                    agents: {}
+                };
+
+                // 收集 Agent 配置
+                document.querySelectorAll('.agent-backend').forEach(select => {
+                    const agentId = select.dataset.agent;
+                    config.agents[agentId] = {
+                        backend: select.value,
+                        model: document.querySelector(`.agent-model[data-agent="${agentId}"]`).value,
+                        reasoning: document.querySelector(`.agent-reasoning[data-agent="${agentId}"]`).value
+                    };
+                });
+
+                try {
+                    const response = await fetch('/api/presets', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, config })
+                    });
+                    const data = await response.json();
+                    
+                    if (data.status === 'success') {
+                        showAlert(t('msg_preset_saved'), t('title_success'));
+                        nameInput.value = ''; 
+                        loadPresets(); 
+                    } else {
+                        showAlert(data.message, t('title_error'), 'error');
+                    }
+                } catch (error) {
+                    showAlert(error.message, t('title_error'), 'error');
+                }
+            }
+
+            async function deletePreset(name) {
+                if (!confirm(t('confirm_delete_preset'))) return;
+
+                try {
+                    const response = await fetch(`/api/presets/${encodeURIComponent(name)}`, {
+                        method: 'DELETE'
+                    });
+                    const data = await response.json();
+                    
+                    if (data.status === 'success') {
+                        showAlert(t('msg_preset_deleted'), t('title_success'));
+                        loadPresets();
+                    } else {
+                        showAlert(data.message, t('title_error'), 'error');
+                    }
+                } catch (error) {
+                    showAlert(error.message, t('title_error'), 'error');
+                }
+            }
+
+            function applyPreset(name) {
+                fetch('/api/presets')
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.status === 'success' && data.presets[name]) {
+                            const config = data.presets[name];
+                            
+                            document.getElementById('backend-select').value = config.backend;
+                            document.getElementById('global-model-input').value = config.global_model || '';
+                            document.getElementById('global-reasoning-input').value = config.global_reasoning || '';
+                            document.getElementById('rounds-input').value = config.rounds;
+                            document.getElementById('planners-input').value = config.planners;
+                            document.getElementById('auditors-input').value = config.auditors;
+
+                            document.getElementById('backend-select').dispatchEvent(new Event('change'));
+
+                            if (config.agents) {
+                                for (const [agentId, agentConfig] of Object.entries(config.agents)) {
+                                    const backendSelect = document.querySelector(`.agent-backend[data-agent="${agentId}"]`);
+                                    const modelInput = document.querySelector(`.agent-model[data-agent="${agentId}"]`);
+                                    const reasoningSelect = document.querySelector(`.agent-reasoning[data-agent="${agentId}"]`);
+                                    
+                                    if (backendSelect) {
+                                        backendSelect.value = agentConfig.backend;
+                                        backendSelect.dispatchEvent(new Event('change'));
+                                    }
+                                    if (modelInput) modelInput.value = agentConfig.model || '';
+                                    if (reasoningSelect) reasoningSelect.value = agentConfig.reasoning || '';
+                                }
+                            }
+
+                            showAlert(t('msg_preset_loaded'), t('title_success'));
+                            document.getElementById('presets-modal').classList.add('hidden');
+                        }
+                    });
             }
         </script>
     </main>
