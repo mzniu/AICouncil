@@ -34,6 +34,20 @@ is_running = False
 current_process = None
 current_config = {}
 current_session_id = None
+PRESETS_FILE = os.path.join(ROOT, "council_presets.json")
+
+def load_presets_data():
+    if not os.path.exists(PRESETS_FILE):
+        return {}
+    try:
+        with open(PRESETS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except:
+        return {}
+
+def save_presets_data(data):
+    with open(PRESETS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
 
 def cleanup():
     global current_process
@@ -514,6 +528,33 @@ def handle_config():
         except Exception as e:
             traceback.print_exc()
             return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/presets', methods=['GET', 'POST'])
+def handle_presets():
+    if request.method == 'GET':
+        return jsonify({"status": "success", "presets": load_presets_data()})
+    
+    if request.method == 'POST':
+        data = request.json
+        name = data.get('name')
+        config_data = data.get('config')
+        
+        if not name or not config_data:
+            return jsonify({"status": "error", "message": "名称和配置不能为空"}), 400
+            
+        presets = load_presets_data()
+        presets[name] = config_data
+        save_presets_data(presets)
+        return jsonify({"status": "success"})
+
+@app.route('/api/presets/<name>', methods=['DELETE'])
+def delete_preset(name):
+    presets = load_presets_data()
+    if name in presets:
+        del presets[name]
+        save_presets_data(presets)
+        return jsonify({"status": "success"})
+    return jsonify({"status": "error", "message": "未找到该配置"}), 404
 
 @app.route('/api/delete_workspace/<session_id>', methods=['DELETE'])
 def delete_workspace(session_id):
