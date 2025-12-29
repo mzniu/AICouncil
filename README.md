@@ -20,6 +20,7 @@
 - **🔍 增强型搜索**：集成 Bing、Baidu、DuckDuckGo、Yahoo、Mojeek 等多引擎并行搜索。采用 **Requests-First** 架构，优先通过轻量级请求获取数据，并具备**智能相关性校验**与**查询优化**功能（自动识别并规避搜索引擎的无关热点干扰）。其中 Yahoo 和 Mojeek 为纯 Requests 实现，无需浏览器依赖，运行更稳定。
 - **💻 实时监控面板**：基于 Flask 的 Web 界面，实时展示智能体思考过程、搜索进度及辩论流。支持窗口**最大化/还原**，方便深度阅读。
 - **📄 深度报告生成**：自动生成结构化的 HTML 议事报告，支持一键复制、**整合式下载菜单**（支持 HTML 或导出为长图）。
+- **📊 本地图表渲染**：报告内置 ECharts（/static/vendor/echarts.min.js），避免 CDN/跟踪防护阻断，iframe 内可直接使用。
 - **📜 历史管理**：完整的会话持久化，支持随时回溯、加载或删除历史议事记录。
 - **💾 阵型预设**：支持保存、加载和管理常用的元老院配置（包括后端模型、议事轮数、智能体数量等），方便快速启动不同场景的议事。
 - **✋ 用户介入**：支持在议事过程中随时输入指令，实时引导智能体的讨论方向。
@@ -85,6 +86,10 @@ pip install -r requirements.txt
 python src/web/app.py
 ```
 启动后，在浏览器访问 `http://127.0.0.1:5000` 即可开始议事。
+
+### 6. 报告图表（ECharts）
+- 已内置 ECharts 5.4.3：文件位于 `src/web/static/vendor/echarts.min.js`，报告中通过 `<script src="/static/vendor/echarts.min.js"></script>` 加载，离线和 iframe 场景均可用。
+- 若文件缺失，可从 https://registry.npmmirror.com/echarts/5.4.3/files/dist/echarts.min.js 下载后保存到上述路径（也可使用 unpkg/cdnjs 备用源）。
 
 ---
 

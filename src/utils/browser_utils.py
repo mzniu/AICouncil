@@ -8,7 +8,6 @@ def find_browser_path():
     优先级：Chrome > Edge > Brave > Chromium
     """
     system = platform.system()
-    
     if system == "Windows":
         paths = [
             # Chrome
