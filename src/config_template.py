@@ -39,7 +39,11 @@ OPENROUTER_MODEL = os.getenv('OPENROUTER_MODEL', 'google/gemini-3-flash-preview'
 
 # Search API configuration (Tavily is recommended for LLM search)
 TAVILY_API_KEY = os.getenv('TAVILY_API_KEY', '')
-SEARCH_PROVIDER = os.getenv('SEARCH_PROVIDER', 'baidu')  # Options: 'tavily', 'duckduckgo', 'bing', 'baidu' (comma separated for multiple)
+# 搜索引擎选项: 'tavily', 'duckduckgo', 'bing', 'baidu', 'yahoo', 'mojeek'
+# 支持多选，用逗号分隔，例如: 'yahoo,bing,baidu'
+# yahoo: 底层使用Bing引擎，无需API key，支持中英文
+# mojeek: 独立搜索引擎，无需API key，英文效果较好
+SEARCH_PROVIDER = os.getenv('SEARCH_PROVIDER', 'baidu')  # Options: 'tavily', 'duckduckgo', 'bing', 'baidu', 'yahoo', 'mojeek' (comma separated for multiple)
 
 # Ollama HTTP endpoint (if running local HTTP server)
 OLLAMA_HTTP_URL = os.getenv('OLLAMA_HTTP_URL', 'http://127.0.0.1:11434/api/generate')

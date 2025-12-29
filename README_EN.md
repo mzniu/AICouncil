@@ -17,7 +17,7 @@
   - **Planner**: Provides professional solutions and deep insights based on Retrieval-Augmented Generation (RAG).
   - **Auditor**: Conducts critical reviews of the Planner's solutions, pointing out potential risks and loopholes.
   - **Reporter**: Records the deliberation process in real-time to ensure no information is missed.
-- **🔍 Enhanced Search**: Integrates multi-engine parallel search (Bing, Baidu, DuckDuckGo). Features a **Requests-First** architecture for high performance, with **intelligent relevance validation** and **query optimization** (automatically bypassing irrelevant search engine noise).
+- **🔍 Enhanced Search**: Integrates multi-engine parallel search (Bing, Baidu, DuckDuckGo, Yahoo, Mojeek). Features a **Requests-First** architecture for high performance, with **intelligent relevance validation** and **query optimization** (automatically bypassing irrelevant search engine noise). Yahoo and Mojeek are pure Requests-based implementations that require no browser dependencies and run more stably.
 - **💻 Real-time Monitoring Panel**: A Flask-based web interface that displays agent thinking processes, search progress, and debate flows in real-time. Supports **Maximize/Restore** for better readability.
 - **📄 Deep Report Generation**: Automatically generates structured HTML deliberation reports, supporting one-click copy and a **consolidated download menu** (HTML or long image).
 - **📜 History Management**: Complete session persistence, supporting anytime backtracking, loading, or deletion of historical records.
@@ -48,7 +48,7 @@
 
 ### 1. Prerequisites
 - **Python**: Ensure your system has Python 3.9 or higher installed.
-- **Browser**: **Google Chrome** or **Microsoft Edge** is highly recommended. The web search feature (Baidu/Bing) requires a browser kernel for automated scraping.
+- **Browser**: **Google Chrome** or **Microsoft Edge** is recommended. Some search engines (Baidu/Bing) require a browser kernel for automated scraping. If no browser is installed, you can still use Yahoo, Mojeek, or DuckDuckGo for web search.
 
 ### 2. Clone the Project
 ```bash
@@ -97,7 +97,7 @@ After starting, visit `http://127.0.0.1:5000` in your browser to start deliberat
 
 - **Backend**: Python, Flask, LangChain
 - **Frontend**: Tailwind CSS, JavaScript (ES6+)
-- **Search**: DrissionPage (Automation), BeautifulSoup4
+- **Search**: DrissionPage (Automation), Requests + BeautifulSoup4 (Lightweight Scraping)
 - **Models**: OpenAI API compatible interfaces, Ollama (Local)
 
 ---
@@ -123,7 +123,7 @@ AICouncil/
 
 ### Completed
 - [x] **Multi-Agent Architecture**: Implemented collaborative workflow for Leader, Planner, Auditor, and Reporter.
-- [x] **Enhanced Search**: Integrated DrissionPage to support multi-engine (Baidu, Bing, DuckDuckGo) parallel search.
+- [x] **Enhanced Search**: Integrated DrissionPage to support multi-engine (Baidu, Bing, DuckDuckGo, Yahoo, Mojeek) parallel search.
 - [x] **UI Interaction Upgrade**: Replaced native alerts with Tailwind CSS custom modals.
 - [x] **History Management**: Supported persistence, backtracking, and physical deletion of records.
 - [x] **Model Adaptation**: Supported DeepSeek, OpenAI, OpenRouter, Ollama, etc.

@@ -17,7 +17,7 @@
   - **策论家 (Planner)**：基于搜索增强（RAG）提供专业方案与深度见解。
   - **监察官 (Auditor)**：对策论家的方案进行批判性审查，指出潜在风险与漏洞。
   - **记录员 (Reporter)**：实时记录议事过程，确保信息不遗漏。
-- **🔍 增强型搜索**：集成 Bing、Baidu、DuckDuckGo 等多引擎并行搜索。采用 **Requests-First** 架构，优先通过轻量级请求获取数据，并具备**智能相关性校验**与**查询优化**功能（自动识别并规避搜索引擎的无关热点干扰）。
+- **🔍 增强型搜索**：集成 Bing、Baidu、DuckDuckGo、Yahoo、Mojeek 等多引擎并行搜索。采用 **Requests-First** 架构，优先通过轻量级请求获取数据，并具备**智能相关性校验**与**查询优化**功能（自动识别并规避搜索引擎的无关热点干扰）。其中 Yahoo 和 Mojeek 为纯 Requests 实现，无需浏览器依赖，运行更稳定。
 - **💻 实时监控面板**：基于 Flask 的 Web 界面，实时展示智能体思考过程、搜索进度及辩论流。支持窗口**最大化/还原**，方便深度阅读。
 - **📄 深度报告生成**：自动生成结构化的 HTML 议事报告，支持一键复制、**整合式下载菜单**（支持 HTML 或导出为长图）。
 - **📜 历史管理**：完整的会话持久化，支持随时回溯、加载或删除历史议事记录。
@@ -38,7 +38,7 @@
 
 ### 1. 环境准备
 - **Python**: 确保您的系统已安装 Python 3.9 或更高版本。
-- **浏览器**: 建议安装 **Google Chrome** 或 **Microsoft Edge**。联网搜索功能（Baidu/Bing）需要调用浏览器内核进行自动化抓取。
+- **浏览器**: 建议安装 **Google Chrome** 或 **Microsoft Edge**。部分搜索引擎（Baidu/Bing）需要调用浏览器内核进行自动化抓取。如果不安装浏览器，您仍可使用 Yahoo、Mojeek 或 DuckDuckGo 进行联网搜索。
 
 ### 2. 克隆项目
 ```bash
@@ -92,7 +92,7 @@ python src/web/app.py
 
 - **后端**: Python, Flask, LangChain
 - **前端**: Tailwind CSS, JavaScript (ES6+)
-- **搜索**: DrissionPage (自动化抓取), BeautifulSoup4
+- **搜索**: DrissionPage (自动化抓取), Requests + BeautifulSoup4 (轻量级抓取)
 - **模型**: OpenAI API 兼容接口, Ollama (本地)
 
 ---
@@ -118,7 +118,7 @@ AICouncil/
 
 ### 已完成
 - [x] **多智能体架构**：实现议长、策论家、监察官、记录员的协同工作流。
-- [x] **增强型搜索**：集成 DrissionPage 支持多引擎（Baidu, Bing, DuckDuckGo）并行搜索。
+- [x] **增强型搜索**：集成 DrissionPage 支持多引擎（Baidu, Bing, DuckDuckGo, Yahoo, Mojeek）并行搜索。
 - [x] **UI 交互升级**：全站移除原生弹窗，采用 Tailwind CSS 自定义模态框。
 - [x] **历史记录管理**：支持议事记录的持久化存储、回溯及物理删除。
 - [x] **模型适配**：支持 DeepSeek, OpenAI, OpenRouter, Ollama 等主流模型。
