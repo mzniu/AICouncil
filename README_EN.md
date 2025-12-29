@@ -20,6 +20,7 @@
 - **🔍 Enhanced Search**: Integrates multi-engine parallel search (Bing, Baidu, DuckDuckGo, Yahoo, Mojeek). Features a **Requests-First** architecture for high performance, with **intelligent relevance validation** and **query optimization** (automatically bypassing irrelevant search engine noise). Yahoo and Mojeek are pure Requests-based implementations that require no browser dependencies and run more stably.
 - **💻 Real-time Monitoring Panel**: A Flask-based web interface that displays agent thinking processes, search progress, and debate flows in real-time. Supports **Maximize/Restore** for better readability.
 - **📄 Deep Report Generation**: Automatically generates structured HTML deliberation reports, supporting one-click copy and a **consolidated download menu** (HTML or long image).
+- **📊 Local Chart Rendering**: Reports load ECharts from `/static/vendor/echarts.min.js`, avoiding CDN/tracking prevention blocks; works inside iframes.
 - **📜 History Management**: Complete session persistence, supporting anytime backtracking, loading, or deletion of historical records.
 - **💾 Council Formations**: Supports saving, loading, and managing common council configurations (including backend models, rounds, agent counts) for quick startup in different scenarios.
 - **✋ User Intervention**: Allows users to "intervene" at any time during the deliberation process to guide the direction of the debate.
@@ -90,6 +91,10 @@ Alternatively, you can create a `.env` file in the project root, and the program
 python src/web/app.py
 ```
 After starting, visit `http://127.0.0.1:5000` in your browser to start deliberating.
+
+### 6. Report Charts (ECharts)
+- ECharts 5.4.3 is bundled at `src/web/static/vendor/echarts.min.js` and loaded via `<script src="/static/vendor/echarts.min.js"></script>`, so it works offline and inside iframes.
+- If the file is missing, download it from https://registry.npmmirror.com/echarts/5.4.3/files/dist/echarts.min.js and place it at the path above (unpkg/cdnjs are optional mirrors).
 
 ---
 

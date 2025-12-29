@@ -1,0 +1,162 @@
+{
+    "元老院-001": {
+        "backend": "deepseek",
+        "global_model": "",
+        "global_reasoning": "",
+        "rounds": 3,
+        "planners": 2,
+        "auditors": 2,
+        "agents": {
+            "leader": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            },
+            "reporter": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            },
+            "planner_0": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            },
+            "planner_1": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            },
+            "auditor_0": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            },
+            "auditor_1": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            }
+        }
+    },
+    "001": {
+        "backend": "deepseek",
+        "global_model": "",
+        "global_reasoning": "",
+        "rounds": 3,
+        "planners": 2,
+        "auditors": 2,
+        "agents": {
+            "leader": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            },
+            "reporter": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            },
+            "planner_0": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            },
+            "planner_1": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            },
+            "auditor_0": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            },
+            "auditor_1": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            }
+        }
+    },
+    "002": {
+        "backend": "deepseek",
+        "global_model": "",
+        "global_reasoning": "",
+        "rounds": 3,
+        "planners": 2,
+        "auditors": 2,
+        "agents": {
+            "leader": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            },
+            "reporter": {
+                "backend": "deepseek",
+                "model": "deepseek-reasoner",
+                "reasoning": ""
+            },
+            "planner_0": {
+                "backend": "deepseek",
+                "model": "deepseek-reasoner",
+                "reasoning": ""
+            },
+            "planner_1": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            },
+            "auditor_0": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            },
+            "auditor_1": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            }
+        }
+    },
+    "003": {
+        "backend": "deepseek",
+        "global_model": "",
+        "global_reasoning": "",
+        "rounds": 3,
+        "planners": 4,
+        "auditors": 2,
+        "agents": {
+            "leader": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            },
+            "reporter": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            },
+            "planner_0": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            },
+            "planner_1": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            },
+            "auditor_0": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            },
+            "auditor_1": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            }
+        }
+    }
+}
