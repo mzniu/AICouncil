@@ -339,6 +339,161 @@ def duckduckgo_search(query: str, max_results: int = 5, max_retries: int = 3) ->
             
     return f"DuckDuckGo 搜索失败 (已重试 {max_retries} 次): {str(last_exception)}"
 
+def yahoo_search(query: str, max_results: int = 10, max_retries: int = 3) -> str:
+    """使用 Yahoo 搜索（底层使用 Bing 引擎）。"""
+    import urllib.parse
+    import re
+    
+    query = query.strip()
+    if len(query) > 200:
+        query = query[:200]
+    
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+        "Connection": "keep-alive",
+        "DNT": "1",
+    }
+    
+    url = f"https://search.yahoo.com/search?p={urllib.parse.quote(query)}&n={max_results}"
+    
+    last_exception = None
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"Performing Yahoo search (attempt {attempt+1}/{max_retries}) for: {query}")
+            response = requests.get(url, headers=headers, timeout=15)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            results = []
+            
+            # 遍历搜索结果div
+            for algo in soup.select('div.algo-sr'):
+                if len(results) >= max_results:
+                    break
+                    
+                # 获取标题
+                h3 = algo.find('h3')
+                if not h3:
+                    continue
+                
+                title = h3.get_text().strip()
+                if not title:
+                    continue
+                
+                # 获取URL (从第一个有效的外部链接)
+                result_url = None
+                for a in algo.find_all('a', href=True):
+                    href = a.get('href', '')
+                    
+                    # Yahoo重定向链接
+                    if 'r.search.yahoo.com' in href:
+                        match = re.search(r'/RU=([^/]+)/', href)
+                        if match:
+                            result_url = urllib.parse.unquote(match.group(1))
+                            break
+                    # 直接外部链接
+                    elif href.startswith('http') and 'yahoo.com' not in href:
+                        result_url = href
+                        break
+                
+                if not result_url:
+                    continue
+                
+                # 获取摘要
+                snippet = "无摘要"
+                for selector in ['span.fc-falcon', 'p.fz-ms', 'p', 'span.d-b']:
+                    snippet_elem = algo.select_one(selector)
+                    if snippet_elem:
+                        text = snippet_elem.get_text().strip()
+                        if len(text) > 20:
+                            snippet = text
+                            break
+                
+                results.append({
+                    "title": title,
+                    "href": result_url,
+                    "body": snippet
+                })
+            
+            if results:
+                logger.info(f"Successfully retrieved {len(results)} results via Yahoo.")
+                return format_search_results(results)
+            
+            if attempt < max_retries - 1:
+                time.sleep(2)
+                
+        except Exception as e:
+            last_exception = e
+            logger.error(f"Yahoo search attempt {attempt+1} failed: {e}")
+            if attempt < max_retries - 1:
+                time.sleep(3)
+    
+    return f"Yahoo 搜索失败 (已重试 {max_retries} 次): {str(last_exception)}" if last_exception else "Yahoo 搜索未找到结果。"
+
+
+def mojeek_search(query: str, max_results: int = 10, max_retries: int = 3) -> str:
+    """使用 Mojeek 搜索（独立搜索引擎，不依赖 Google/Bing）。"""
+    import urllib.parse
+    
+    query = query.strip()
+    if len(query) > 200:
+        query = query[:200]
+    
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
+    
+    url = f"https://www.mojeek.com/search?q={urllib.parse.quote(query)}"
+    
+    last_exception = None
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"Performing Mojeek search (attempt {attempt+1}/{max_retries}) for: {query}")
+            response = requests.get(url, headers=headers, timeout=15)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            results = []
+            
+            for item in soup.select('.results-standard li'):
+                if len(results) >= max_results:
+                    break
+                    
+                title_elem = item.find('a', class_='title')
+                snippet_elem = item.find('p', class_='s')
+                
+                if title_elem:
+                    title = title_elem.get_text().strip()
+                    result_url = title_elem.get('href', '')
+                    snippet = snippet_elem.get_text().strip() if snippet_elem else "无摘要"
+                    
+                    if title and result_url:
+                        results.append({
+                            "title": title,
+                            "href": result_url,
+                            "body": snippet
+                        })
+            
+            if results:
+                logger.info(f"Successfully retrieved {len(results)} results via Mojeek.")
+                return format_search_results(results)
+            
+            if attempt < max_retries - 1:
+                time.sleep(2)
+                
+        except Exception as e:
+            last_exception = e
+            logger.error(f"Mojeek search attempt {attempt+1} failed: {e}")
+            if attempt < max_retries - 1:
+                time.sleep(3)
+    
+    return f"Mojeek 搜索失败 (已重试 {max_retries} 次): {str(last_exception)}" if last_exception else "Mojeek 搜索未找到结果。"
+
+
 def tavily_search(query: str, max_results: int = 5, max_retries: int = 3) -> str:
     """使用 Tavily API 进行联网搜索，带重试机制。"""
     if not config.TAVILY_API_KEY:
@@ -705,6 +860,10 @@ def search_if_needed(text: str) -> str:
                 return bing_search(query, max_results=max_res), provider
             elif provider == "baidu":
                 return baidu_search(query, max_results=max_res), provider
+            elif provider == "yahoo":
+                return yahoo_search(query, max_results=max_res), provider
+            elif provider == "mojeek":
+                return mojeek_search(query, max_results=max_res), provider
             elif provider == "duckduckgo":
                 res = duckduckgo_search(query, max_results=max_res)
                 if "搜索失败" in res:
