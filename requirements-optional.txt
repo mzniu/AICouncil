@@ -1,0 +1,17 @@
+# AICouncil 可选依赖
+# 这些依赖提供增强功能，但不是必需的
+
+# PDF 高质量导出（强烈推荐）
+playwright>=1.40.0
+# 安装后需运行: playwright install chromium
+
+# 浏览器自动化搜索增强（Baidu/Bing）
+DrissionPage>=4.0.0
+
+# 开发测试
+pytest>=7.0.0
+
+# 安装说明：
+# 1. 全部安装: pip install -r requirements.txt
+# 2. 最小安装: pip install -r requirements-minimal.txt
+# 3. 按需添加: pip install -r requirements-optional.txt

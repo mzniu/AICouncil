@@ -62,9 +62,20 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 # 激活虚拟环境 (Linux/macOS)
 source .venv/bin/activate
 
-# 安装依赖
+# 安装依赖（推荐方式）
 pip install -r requirements.txt
+
+# 或者精简安装（适用于内存/磁盘受限环境）
+pip install -r requirements-minimal.txt
+# 可选：按需安装增强功能
+pip install -r requirements-optional.txt
+# 如安装playwright，需额外运行: playwright install chromium
 ```
+
+**依赖说明**：
+- `requirements.txt`: 完整依赖（包含所有功能）
+- `requirements-minimal.txt`: 核心依赖（基本功能，体积更小）
+- `requirements-optional.txt`: 可选增强（PDF导出、浏览器搜索）
 
 ### 4. 配置 API 密钥
 1. 复制配置模板文件：
