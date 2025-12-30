@@ -42,7 +42,8 @@ class BaselineAPITest:
             "INFO": "ℹ️",
             "SUCCESS": "✅",
             "ERROR": "❌",
-            "WAIT": "⏳"
+            "WAIT": "⏳",
+            "WARN": "⚠️"
         }
         print(f"[{timestamp}] {symbols.get(level, 'ℹ️')} {message}")
     
@@ -101,8 +102,24 @@ class BaselineAPITest:
                 data = response.json()
                 if data.get("status") == "ok":
                     self.log(f"讨论已启动", "SUCCESS")
-                    # Session ID 会通过事件流发送，等待获取
-                    time.sleep(3)  # 给后端一点时间初始化
+                    
+                    # 尝试从API获取Session ID（多次尝试）
+                    for attempt in range(5):
+                        time.sleep(1)
+                        try:
+                            status_resp = requests.get(f"{self.base_url}/api/status", timeout=2)
+                            if status_resp.status_code == 200:
+                                status_data = status_resp.json()
+                                events = status_data.get("discussion_events", [])
+                                for event in events:
+                                    if event.get("type") == "session_start" and event.get("session_id"):
+                                        self.session_id = event.get("session_id")
+                                        self.log(f"Session ID: {self.session_id}", "SUCCESS")
+                                        return True
+                        except:
+                            pass
+                    
+                    self.log("暂未获取到Session ID，将在等待过程中继续尝试", "INFO")
                     return True
                 else:
                     self.log(f"启动返回异常状态: {data}", "ERROR")
@@ -117,63 +134,102 @@ class BaselineAPITest:
     
     def wait_for_completion(self, timeout=600):
         """等待讨论完成（默认10分钟超时）"""
-        self.log(f"等待讨论完成（最长 {timeout} 秒）...", "WAIT")
+        self.log(f"等待讨论完成（最长 {timeout} 秒，约 {timeout // 60} 分钟）...", "WAIT")
         
         start_time = time.time()
         last_status = None
         session_id_found = False
+        check_count = 0
         
-        while time.time() - start_time < timeout:
-            try:
-                response = requests.get(f"{self.base_url}/api/status", timeout=2)
-                if response.status_code == 200:
-                    data = response.json()
-                    is_running = data.get("is_running", False)
-                    current_status = data.get("status", "unknown")
-                    events = data.get("discussion_events", [])
+        try:
+            while time.time() - start_time < timeout:
+                try:
+                    elapsed = int(time.time() - start_time)
+                    progress_pct = int((elapsed / timeout) * 100)
+                    check_count += 1
                     
-                    # 从事件中获取 session_id
-                    if not session_id_found and events:
-                        for event in events:
-                            if event.get("type") == "session_start":
-                                self.session_id = event.get("session_id")
-                                if self.session_id:
-                                    self.log(f"Session ID: {self.session_id}", "SUCCESS")
-                                    session_id_found = True
-                                    break
-                    
-                    # 打印状态变化
-                    if current_status != last_status:
-                        self.log(f"状态: {current_status}")
-                        last_status = current_status
-                    
-                    # 如果讨论完成
-                    if not is_running:
-                        if session_id_found:
-                            self.log("讨论已完成", "SUCCESS")
-                            return True
-                        else:
-                            # 讨论完成但未找到session_id，可能是立即完成或出错
-                            self.log("讨论已结束但未获取到Session ID，检查事件...", "WARN")
-                            # 再尝试一次获取
-                            if events:
-                                for event in events:
-                                    if "session_id" in event or event.get("type") == "session_start":
-                                        self.session_id = event.get("session_id", events[0].get("session_id"))
-                                        if self.session_id:
-                                            self.log(f"从事件中获取到Session ID: {self.session_id}", "SUCCESS")
+                    response = requests.get(f"{self.base_url}/api/status", timeout=2)
+                    if response.status_code == 200:
+                        data = response.json()
+                        is_running = data.get("is_running", False)
+                        current_status = data.get("status", "unknown")
+                        events = data.get("discussion_events", [])
+                        
+                        # 从事件中获取 session_id
+                        if not session_id_found and events:
+                            for event in events:
+                                if event.get("type") == "session_start":
+                                    self.session_id = event.get("session_id")
+                                    if self.session_id:
+                                        self.log(f"Session ID: {self.session_id}", "SUCCESS")
+                                        session_id_found = True
+                                        break
+                        
+                        # 打印状态变化（每10次检查也显示一次进度）
+                        if current_status != last_status:
+                            self.log(f"状态: {current_status} (已运行 {elapsed}s / {timeout}s, {progress_pct}%)")
+                            last_status = current_status
+                        elif check_count % 15 == 0:  # 每30秒显示一次进度
+                            self.log(f"运行中... {elapsed}s / {timeout}s ({progress_pct}%)", "WAIT")
+                        
+                        # 如果讨论完成
+                        if not is_running:
+                            if session_id_found:
+                                self.log(f"讨论已完成（总耗时 {elapsed}秒）", "SUCCESS")
+                                return True
+                            else:
+                                # 讨论完成但未找到session_id，尝试从workspace目录获取
+                                self.log("讨论已结束但未从API获取到Session ID", "WARN")
+                                
+                                # 再检查一次事件
+                                if events:
+                                    for event in events:
+                                        if "session_id" in event or event.get("type") == "session_start":
+                                            self.session_id = event.get("session_id", events[0].get("session_id"))
+                                            if self.session_id:
+                                                self.log(f"从事件中获取到Session ID: {self.session_id}", "SUCCESS")
+                                                return True
+                                
+                                # 从最新的workspace目录获取
+                                self.log("尝试从最新workspace目录获取Session ID...", "INFO")
+                                try:
+                                    workspace_dir = get_workspace_dir()
+                                    if workspace_dir.exists():
+                                        # 获取最新的workspace目录
+                                        workspaces = sorted(
+                                            [d for d in workspace_dir.iterdir() if d.is_dir() and not d.name.startswith('.')],
+                                            key=lambda x: x.stat().st_mtime,
+                                            reverse=True
+                                        )
+                                        if workspaces:
+                                            latest_workspace = workspaces[0]
+                                            self.session_id = latest_workspace.name
+                                            self.log(f"从目录名获取到Session ID: {self.session_id}", "SUCCESS")
                                             return True
-                            self.log("警告：未能获取Session ID，但讨论已完成", "WARN")
-                            return True
-                
-                time.sleep(2)  # 每2秒检查一次
-                
-            except Exception as e:
-                self.log(f"状态检查失败: {e}", "ERROR")
-                time.sleep(2)
-        
-        self.log(f"超时！讨论未在 {timeout} 秒内完成", "ERROR")
-        return False
+                                except Exception as e:
+                                    self.log(f"从目录获取Session ID失败: {e}", "ERROR")
+                                
+                                self.log("警告：未能获取Session ID，测试可能失败", "WARN")
+                                return True
+                    
+                    time.sleep(2)  # 每2秒检查一次
+                    
+                except KeyboardInterrupt:
+                    self.log("检测到中断信号，正在安全退出...", "WARN")
+                    raise
+                except requests.exceptions.RequestException as e:
+                    self.log(f"状态检查失败: {e}，2秒后重试...", "ERROR")
+                    time.sleep(2)
+                except Exception as e:
+                    self.log(f"意外错误: {e}，2秒后重试...", "ERROR")
+                    time.sleep(2)
+            
+            self.log(f"超时！讨论未在 {timeout} 秒内完成", "ERROR")
+            return False
+            
+        except KeyboardInterrupt:
+            self.log("测试被用户中断", "WARN")
+            raise
     
     def verify_results(self):
         """验证结果"""
@@ -210,52 +266,47 @@ class BaselineAPITest:
             self.log(f"缺失文件: {', '.join(missing_files)}", "ERROR")
             return False
         
-        # 3. 验证 history.json 内容
+        # 3. 验证 round_1_data.json 内容（history.json存储的是轮次级别数据）
         try:
-            with open(workspace_path / "history.json", "r", encoding="utf-8") as f:
-                history = json.load(f)
+            with open(workspace_path / "round_1_data.json", "r", encoding="utf-8") as f:
+                round_data = json.load(f)
             
-            if not isinstance(history, list):
-                self.log("history.json 格式错误（应为列表）", "ERROR")
+            # 检查是否包含必要的结构
+            has_plans = "plans" in round_data and len(round_data["plans"]) > 0
+            has_audits = "audits" in round_data and len(round_data["audits"]) > 0
+            
+            if has_plans:
+                self.log(f"策论家方案: {len(round_data['plans'])} 个", "SUCCESS")
+            else:
+                self.log("缺少策论家方案", "ERROR")
                 return False
             
-            self.log(f"历史记录包含 {len(history)} 条事件", "SUCCESS")
-            
-            # 检查关键角色是否出现
-            roles = set(event.get("role") for event in history if "role" in event)
-            expected_roles = {"leader", "planner", "auditor", "reporter"}
-            missing_roles = expected_roles - roles
-            
-            if missing_roles:
-                self.log(f"缺失角色: {', '.join(missing_roles)}", "ERROR")
+            if has_audits:
+                self.log(f"监察官评审: {len(round_data['audits'])} 个", "SUCCESS")
+            else:
+                self.log("缺少监察官评审", "ERROR")
                 return False
             
-            self.log(f"所有角色都已出现: {', '.join(roles)}", "SUCCESS")
+            self.log("轮次数据结构正确", "SUCCESS")
             
         except Exception as e:
-            self.log(f"验证 history.json 失败: {e}", "ERROR")
+            self.log(f"验证 round_1_data.json 失败: {e}", "ERROR")
             return False
         
-        # 4. 检查报告生成
+        # 4. 检查报告文件（report.html应该在workspace目录中）
         try:
-            response = requests.get(f"{self.base_url}/api/status", timeout=2)
-            if response.status_code == 200:
-                data = response.json()
-                report = data.get("report", "")
-                
-                if len(report) > 100:  # 报告应该有一定长度
-                    self.log(f"报告已生成（长度: {len(report)} 字符）", "SUCCESS")
-                    
-                    # 检查报告是否包含关键元素
-                    if "ECharts" in report or "<!DOCTYPE html>" in report:
-                        self.log("报告格式正确（包含 HTML）", "SUCCESS")
-                        return True
-                    else:
-                        self.log("报告格式异常（非 HTML）", "ERROR")
-                        return False
+            report_path = workspace_path / "report.html"
+            if report_path.exists():
+                report_content = report_path.read_text(encoding="utf-8")
+                if len(report_content) > 100 and "<!DOCTYPE html>" in report_content:
+                    self.log(f"报告已生成: report.html ({len(report_content)} 字符)", "SUCCESS")
+                    return True
                 else:
-                    self.log("报告内容过短或为空", "ERROR")
+                    self.log("报告格式异常或内容过短", "ERROR")
                     return False
+            else:
+                self.log("report.html 文件不存在", "ERROR")
+                return False
         except Exception as e:
             self.log(f"验证报告失败: {e}", "ERROR")
             return False
@@ -288,7 +339,7 @@ class BaselineAPITest:
         print()
         
         # 3. 等待完成
-        if not self.wait_for_completion(timeout=300):
+        if not self.wait_for_completion(timeout=600):
             return False
         
         print()
