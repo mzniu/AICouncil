@@ -6,7 +6,7 @@ import json
 import traceback
 from src.agents import model_adapter
 from src.utils import logger
-from src import config
+from src import config_manager as config
 
 
 class ModelConfig(BaseModel):

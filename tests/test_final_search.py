@@ -6,7 +6,7 @@ import time
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.utils import search_utils
-from src import config
+from src import config_manager as config
 
 def test_multi_page_search():
     # 模拟用户多选供应商
