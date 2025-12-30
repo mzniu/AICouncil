@@ -17,7 +17,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.agents.langchain_agents import generate_report_from_workspace
-from src import config
+from src import config_manager as config
 from src.utils.pdf_exporter import generate_pdf_from_html, PLAYWRIGHT_AVAILABLE
 from src.utils.path_manager import get_workspace_dir
 import logging

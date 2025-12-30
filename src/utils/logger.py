@@ -2,7 +2,7 @@ import logging
 import sys
 import requests
 import threading
-from src import config
+from src import config_manager as config
 
 class WebLogHandler(logging.Handler):
     """自定义日志处理器，将日志发送到 Web 监控面板。"""
@@ -32,8 +32,17 @@ def setup_logger(name: str = "AICouncil"):
             '%(asctime)s - %(levelname)s - %(message)s'
         )
 
+        # 安全地获取配置值，避免循环导入问题
+        try:
+            log_file = config.LOG_FILE
+            log_level_str = config.LOG_LEVEL
+        except (AttributeError, ImportError):
+            # 循环导入时使用默认值
+            log_file = 'aicouncil.log'
+            log_level_str = 'INFO'
+        
         # File handler: Always record everything (DEBUG and above)
-        file_handler = logging.FileHandler(config.LOG_FILE, encoding='utf-8')
+        file_handler = logging.FileHandler(log_file, encoding='utf-8')
         file_handler.setFormatter(formatter)
         file_handler.setLevel(logging.DEBUG)
         logger.addHandler(file_handler)
@@ -41,7 +50,7 @@ def setup_logger(name: str = "AICouncil"):
         # Console handler: Follow the configured LOG_LEVEL (default INFO)
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setFormatter(formatter)
-        console_handler.setLevel(config.LOG_LEVEL)
+        console_handler.setLevel(log_level_str)
         logger.addHandler(console_handler)
 
         # Web handler: 发送到 Flask 服务器

@@ -9,7 +9,7 @@ import subprocess
 import requests
 from requests.exceptions import RequestException
 import traceback
-from src import config
+from src import config_manager as config
 from src.utils import logger
 
 

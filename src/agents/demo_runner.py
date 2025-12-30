@@ -19,7 +19,7 @@ import time
 import argparse
 import json
 from src.agents.langchain_agents import run_full_cycle
-from src import config
+from src import config_manager as config
 
 
 def parse_args():
