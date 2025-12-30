@@ -69,9 +69,20 @@ python -m venv .venv
 # Activate virtual environment (Linux/macOS)
 source .venv/bin/activate
 
-# Install dependencies
+# Install dependencies (recommended)
 pip install -r requirements.txt
+
+# Or minimal installation (for limited memory/disk environments)
+pip install -r requirements-minimal.txt
+# Optional: install enhancements as needed
+pip install -r requirements-optional.txt
+# If installing playwright, run: playwright install chromium
 ```
+
+**Dependency Guide**:
+- `requirements.txt`: Full dependencies (all features)
+- `requirements-minimal.txt`: Core dependencies (basic features, smaller size)
+- `requirements-optional.txt`: Optional enhancements (PDF export, browser search)
 
 ### 4. Configure API Keys
 1. Copy the configuration template file:
