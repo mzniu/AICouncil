@@ -19,8 +19,8 @@ from build.build_config import *
 block_cipher = None
 
 a = Analysis(
-    # 入口脚本（未来会创建 launcher.py）
-    ['src/web/app.py'],
+    # 入口脚本（launcher.py 提供友好启动体验）
+    ['launcher.py'],
     
     # 搜索路径
     pathex=[str(PROJECT_ROOT), str(SRC_DIR)],
