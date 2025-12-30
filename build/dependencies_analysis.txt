@@ -1,0 +1,156 @@
+═══════════════════════════════════════════════════════════
+AICouncil 依赖审计报告
+生成时间: 2025-12-30
+目标：为 EXE 打包优化依赖结构
+═══════════════════════════════════════════════════════════
+
+📦 当前依赖清单 (requirements.txt)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+langchain>=0.1.0
+langchain-core>=0.1.0
+pydantic>=2.0.0
+flask>=3.0.0
+requests>=2.28.0
+beautifulsoup4>=4.12.0
+DrissionPage>=4.0.0
+pytest>=7.0.0
+python-dotenv>=1.0.0
+playwright>=1.40.0
+
+
+🔍 依赖分类与使用情况
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+【核心运行时依赖 - 必须打包】
+────────────────────────────────────────────────────────
+✅ langchain>=0.1.0
+   用途：LangChain 核心框架
+   文件：langchain_agents.py, langchain_llm.py
+   引用：PromptTemplate, LLM基类
+   状态：必需 | 体积：~15MB
+
+✅ langchain-core>=0.1.0
+   用途：LangChain 核心组件
+   文件：langchain_agents.py, langchain_llm.py
+   引用：PromptTemplate, GenerationChunk
+   状态：必需 | 体积：~8MB
+
+✅ pydantic>=2.0.0
+   用途：数据验证和Schema定义
+   文件：schemas.py, langchain_llm.py, demo_runner.py
+   引用：BaseModel, ValidationError
+   状态：必需 | 体积：~5MB
+
+✅ flask>=3.0.0
+   用途：Web服务器框架
+   文件：app.py (主入口)
+   引用：Flask, render_template, jsonify等
+   状态：必需 | 体积：~3MB
+
+✅ requests>=2.28.0
+   用途：HTTP请求（LLM API调用、搜索引擎）
+   文件：model_adapter.py, langchain_agents.py, search_utils.py
+   引用：requests.post(), requests.get()
+   状态：必需 | 体积：~2MB
+
+✅ beautifulsoup4>=4.12.0
+   用途：HTML解析（搜索结果提取）
+   文件：search_utils.py
+   引用：BeautifulSoup
+   状态：必需（如果保留搜索功能）| 体积：~1MB
+
+
+【可选运行时依赖 - 可延迟安装】
+────────────────────────────────────────────────────────
+⚠️ playwright>=1.40.0
+   用途：PDF导出（浏览器自动化）
+   文件：pdf_exporter.py
+   引用：async_playwright
+   特点：已有降级机制（jsPDF备用）
+   建议：首次使用时提示安装，或打包Chromium二进制
+   体积：核心~20MB + Chromium ~150MB
+
+⚠️ DrissionPage>=4.0.0
+   用途：百度/Bing搜索（需浏览器渲染）
+   文件：search_utils.py, browser_utils.py
+   引用：ChromiumPage, ChromiumOptions
+   替代：可改用纯Requests实现或仅使用Yahoo/Mojeek
+   体积：~8MB（不含浏览器）
+
+
+【开发/测试依赖 - 可移除】
+────────────────────────────────────────────────────────
+❌ pytest>=7.0.0
+   用途：单元测试
+   文件：tests/ 目录
+   状态：仅开发环境需要
+   体积：~3MB
+   操作：可移除
+
+⚠️ python-dotenv>=1.0.0
+   用途：加载.env环境变量
+   文件：config.py (可能使用)
+   状态：如果config.py不用.env则可移除
+   体积：<1MB
+   操作：需检查config.py是否使用load_dotenv()
+
+
+🎯 打包优化建议
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+方案A【轻量级版本 ~100MB】
+──────────────────────────
+移除依赖：
+  - pytest（开发工具）
+  - python-dotenv（如果未使用）
+  
+延迟安装：
+  - playwright（首次PDF导出时提示）
+  - DrissionPage（简化搜索引擎）
+
+保留功能：
+  ✅ 核心讨论流程
+  ✅ 多模型支持
+  ✅ HTML报告生成
+  ⚠️ PDF导出（降级到jsPDF或提示安装）
+  ⚠️ 搜索（仅Yahoo/Mojeek/DuckDuckGo）
+
+
+方案B【完整功能版本 ~250MB】
+──────────────────────────
+移除依赖：
+  - pytest（开发工具）
+  
+内嵌打包：
+  - playwright + Chromium（~170MB）
+  - DrissionPage（保留浏览器搜索）
+
+保留功能：
+  ✅ 所有功能完整可用
+  ✅ 离线PDF导出
+  ✅ 完整搜索引擎支持
+
+
+📋 待确认事项
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. [ ] 检查 config.py 是否使用 load_dotenv()
+2. [ ] 确认 PDF 导出是否必须（影响150MB体积）
+3. [ ] 确认是否需要 Baidu/Bing 搜索（影响浏览器依赖）
+4. [ ] 测试移除 pytest 后功能是否正常
+
+
+📦 推荐依赖配置
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+创建两个依赖文件：
+
+requirements.txt（开发环境-保持不变）
+├── 所有依赖（含pytest等开发工具）
+└── 供开发人员使用
+
+requirements-runtime.txt（打包专用-新建）
+├── 仅运行时依赖
+├── 移除pytest
+└── 根据方案A/B调整playwright/DrissionPage
+
