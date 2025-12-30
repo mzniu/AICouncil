@@ -343,8 +343,13 @@ def print_environment_info():
 # ═══════════════════════════════════════════════════════════
 
 # 模块加载时输出环境信息（调试用）
+# 注意：延迟日志记录，避免循环导入
 if __name__ != "__main__":
-    logger.debug(f"[path_manager] 加载完成，运行模式: {get_running_mode()}")
+    try:
+        logger.debug(f"[path_manager] 加载完成，运行模式: {get_running_mode()}")
+    except (AttributeError, NameError):
+        # logger 未完全初始化，静默跳过
+        pass
 
 
 # ═══════════════════════════════════════════════════════════
