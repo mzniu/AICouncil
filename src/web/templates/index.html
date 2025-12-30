@@ -6,7 +6,8 @@
     <title>AICouncil</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <script src="/static/vendor/html2canvas.min.js"></script>
+    <script src="/static/vendor/jspdf.umd.min.js"></script>
     <style>
         .role-leader { border-left: 4px solid #3b82f6; }
         .role-planner { border-left: 4px solid #10b981; }
@@ -465,6 +466,10 @@
                                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                                         <span data-i18n="btn_download_html">HTML 格式</span>
                                     </button>
+                                    <button onclick="downloadPDF(event); toggleDownloadDropdown()" class="flex items-center">
+                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                        <span data-i18n="btn_download_pdf">PDF 格式</span>
+                                    </button>
                                     <button onclick="downloadImage(event); toggleDownloadDropdown()" class="flex items-center">
                                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                                         <span data-i18n="btn_download_image">图片格式</span>
@@ -753,6 +758,7 @@
                     btn_copy: "复制",
                     btn_download: "下载报告",
                     btn_download_html: "HTML 格式",
+                    btn_download_pdf: "PDF 格式",
                     btn_download_image: "图片格式",
                     btn_maximize: "最大化",
                     btn_restore: "还原",
@@ -799,6 +805,7 @@
                     msg_copy_success: "报告已复制到剪贴板",
                     msg_copy_failed: "复制失败",
                     msg_download_failed: "下载失败",
+                    msg_pdf_failed: "PDF 导出失败，请尝试下载 HTML 或图片",
                     msg_history_empty: "暂无历史记录",
                     msg_intervention_sent: "干预指令已发送",
                     msg_intervention_failed: "发送失败",
@@ -892,6 +899,7 @@
                     btn_copy: "Copy",
                     btn_download: "Download",
                     btn_download_html: "HTML Format",
+                    btn_download_pdf: "PDF Format",
                     btn_download_image: "Image Format",
                     btn_maximize: "Maximize",
                     btn_restore: "Restore",
@@ -928,6 +936,7 @@
                     msg_copy_success: "Report copied to clipboard",
                     msg_copy_failed: "Copy failed",
                     msg_download_failed: "Download failed",
+                    msg_pdf_failed: "PDF export failed, please try HTML or Image",
                     msg_history_empty: "No history records",
                     msg_intervention_sent: "Intervention sent",
                     msg_intervention_failed: "Send failed",
@@ -2102,6 +2111,194 @@
                 }
             }
 
+            async function downloadPDF(e) {
+                if (!(reportIframe && reportIframe.contentDocument && reportIframe.contentDocument.body)) {
+                    showAlert(t('msg_report_not_ready'), t('title_hint'));
+                    return;
+                }
+
+                const btn = e?.currentTarget;
+                const originalText = btn ? btn.innerText : '';
+                if (btn) {
+                    btn.innerText = '生成中...';
+                    btn.disabled = true;
+                }
+
+                // 保存折叠状态并全部展开
+                const collapsedElements = [];
+                try {
+                    const doc = reportIframe.contentDocument;
+                    
+                    // 查找所有带 'collapsed' 类的元素
+                    const collapsedItems = doc.querySelectorAll('.collapsed');
+                    collapsedItems.forEach(elem => {
+                        collapsedElements.push(elem);
+                        elem.classList.remove('collapsed');
+                    });
+                    
+                    // 查找所有 details 元素并展开
+                    const detailsElements = doc.querySelectorAll('details:not([open])');
+                    detailsElements.forEach(elem => {
+                        collapsedElements.push({ elem, type: 'details' });
+                        elem.setAttribute('open', '');
+                    });
+                    
+                    // 查找所有隐藏元素（hidden类）
+                    const hiddenElements = doc.querySelectorAll('.hidden:not(script):not(style)');
+                    hiddenElements.forEach(elem => {
+                        // 只展开有实际内容的元素
+                        if (elem.textContent.trim() || elem.querySelector('img, svg, canvas')) {
+                            collapsedElements.push({ elem, type: 'hidden' });
+                            elem.classList.remove('hidden');
+                        }
+                    });
+                    
+                    console.log(`展开了 ${collapsedElements.length} 个折叠元素`);
+                } catch (err) {
+                    console.warn('展开折叠内容时出错:', err);
+                }
+
+                try {
+                    // 先检查Playwright是否可用
+                    const checkResponse = await fetch('/api/pdf_available');
+                    const checkData = await checkResponse.json();
+                    
+                    if (checkData.available) {
+                        // 使用Playwright后端生成高质量PDF
+                        let htmlContent = reportIframe.contentDocument.documentElement.outerHTML;
+                        
+                        // 替换CDN链接为本地路径（确保ECharts图表能正确渲染）
+                        htmlContent = htmlContent.replace(
+                            /https?:\/\/[^"']+echarts[^"']*(\.min)?\.js/gi,
+                            '/static/vendor/echarts.min.js'
+                        );
+                        
+                        // 如果使用了相对路径，转换为完整URL
+                        htmlContent = htmlContent.replace(
+                            /src="\/static\//g,
+                            `src="http://127.0.0.1:5000/static/`
+                        );
+                        htmlContent = htmlContent.replace(
+                            /href="\/static\//g,
+                            `href="http://127.0.0.1:5000/static/`
+                        );
+                        
+                        const response = await fetch('/api/export_pdf', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                html: htmlContent,
+                                filename: `Council_Report_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.pdf`
+                            })
+                        });
+                        
+                        if (response.ok) {
+                            // 下载PDF文件
+                            const blob = await response.blob();
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `Council_Report_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.pdf`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            window.URL.revokeObjectURL(url);
+                            
+                            showAlert(
+                                '✅ PDF已导出（高质量版本，保留超链接）',
+                                '成功',
+                                'success'
+                            );
+                        } else {
+                            const errorData = await response.json();
+                            throw new Error(errorData.message || 'PDF生成失败');
+                        }
+                    } else {
+                        // Playwright不可用，回退到客户端jsPDF方案
+                        console.warn('Playwright not available, falling back to jsPDF');
+                        showAlert(
+                            '⚠️ 使用传统PDF导出方法（可能有内容截断和超链接失效问题）。\n建议安装Playwright获得更好效果: pip install playwright && playwright install chromium',
+                            '提示',
+                            'warning'
+                        );
+                        await downloadPDFLegacy();
+                    }
+                } catch (error) {
+                    console.error('PDF export error:', error);
+                    showAlert(
+                        error.message || t('msg_pdf_failed'),
+                        t('title_error'),
+                        'error'
+                    );
+                } finally {
+                    // 恢复折叠状态
+                    try {
+                        collapsedElements.forEach(item => {
+                            if (item.type === 'details') {
+                                item.elem.removeAttribute('open');
+                            } else if (item.type === 'hidden') {
+                                item.elem.classList.add('hidden');
+                            } else if (item.classList) {
+                                item.classList.add('collapsed');
+                            }
+                        });
+                        console.log('已恢复折叠状态');
+                    } catch (err) {
+                        console.warn('恢复折叠状态时出错:', err);
+                    }
+                    
+                    if (btn) {
+                // 注意：折叠元素已在 downloadPDF 中展开，这里直接使用
+                        btn.innerText = originalText;
+                        btn.disabled = false;
+                    }
+                }
+            }
+            
+            // 旧版jsPDF导出方法（作为后备方案）
+            async function downloadPDFLegacy() {
+                if (!(reportIframe && reportIframe.contentDocument && reportIframe.contentDocument.body)) {
+                    throw new Error(t('msg_report_not_ready'));
+                }
+
+                if (!window.jspdf || !window.jspdf.jsPDF) {
+                    throw new Error('jsPDF not loaded');
+                }
+
+                const { jsPDF } = window.jspdf;
+                const canvas = await html2canvas(reportIframe.contentDocument.body, {
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: '#ffffff',
+                    scale: 2
+                });
+
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF('p', 'pt', 'a4');
+                const pageWidth = pdf.internal.pageSize.getWidth();
+                const pageHeight = pdf.internal.pageSize.getHeight();
+                const imgWidth = pageWidth;
+                const imgHeight = canvas.height * (imgWidth / canvas.width);
+
+                let heightLeft = imgHeight;
+                let position = 0;
+
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+
+                while (heightLeft > 0) {
+                    position = heightLeft - imgHeight;
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                    heightLeft -= pageHeight;
+                }
+
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                pdf.save(`Council_Report_${timestamp}.pdf`);
+            }
+
             async function downloadImage(e) {
                 if (reportIframe && reportIframe.contentDocument && reportIframe.contentDocument.body) {
                     const btn = e.currentTarget;
@@ -2109,9 +2306,44 @@
                     btn.innerText = '转换中...';
                     btn.disabled = true;
 
+                    // 保存折叠状态并全部展开
+                    const collapsedElements = [];
+                    try {
+                        const doc = reportIframe.contentDocument;
+                        
+                        // 查找所有带 'collapsed' 类的元素
+                        const collapsedItems = doc.querySelectorAll('.collapsed');
+                        collapsedItems.forEach(elem => {
+                            collapsedElements.push(elem);
+                            elem.classList.remove('collapsed');
+                        });
+                        
+                        // 查找所有 details 元素并展开
+                        const detailsElements = doc.querySelectorAll('details:not([open])');
+                        detailsElements.forEach(elem => {
+                            collapsedElements.push({ elem, type: 'details' });
+                            elem.setAttribute('open', '');
+                        });
+                        
+                        // 查找所有隐藏元素（hidden类）
+                        const hiddenElements = doc.querySelectorAll('.hidden:not(script):not(style)');
+                        hiddenElements.forEach(elem => {
+                            if (elem.textContent.trim() || elem.querySelector('img, svg, canvas')) {
+                                collapsedElements.push({ elem, type: 'hidden' });
+                                elem.classList.remove('hidden');
+                            }
+                        });
+                        
+                        console.log(`长图导出：展开了 ${collapsedElements.length} 个折叠元素`);
+                        
+                        // 给DOM一点时间重新渲染
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                    } catch (err) {
+                        console.warn('展开折叠内容时出错:', err);
+                    }
+
                     try {
                         // 使用 html2canvas 渲染 iframe 内容
-                        // 注意：由于 iframe 是 srcdoc 模式，属于同源，可以直接访问
                         const canvas = await html2canvas(reportIframe.contentDocument.body, {
                             useCORS: true,
                             allowTaint: true,
@@ -2121,9 +2353,9 @@
                         
                         const url = canvas.toDataURL('image/png');
                         const a = document.createElement('a');
-                        a.href = url;
                         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
                         a.download = `Council_Report_${timestamp}.png`;
+                        a.href = url;
                         document.body.appendChild(a);
                         a.click();
                         document.body.removeChild(a);
@@ -2131,6 +2363,22 @@
                         console.error('Image conversion error:', error);
                         showAlert(t('msg_image_failed'), t('title_error'), 'error');
                     } finally {
+                        // 恢复折叠状态
+                        try {
+                            collapsedElements.forEach(item => {
+                                if (item.type === 'details') {
+                                    item.elem.removeAttribute('open');
+                                } else if (item.type === 'hidden') {
+                                    item.elem.classList.add('hidden');
+                                } else if (item.classList) {
+                                    item.classList.add('collapsed');
+                                }
+                            });
+                            console.log('已恢复折叠状态');
+                        } catch (err) {
+                            console.warn('恢复折叠状态时出错:', err);
+                        }
+                        
                         btn.innerText = originalText;
                         btn.disabled = false;
                     }

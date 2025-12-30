@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECharts布局测试 - 防止重叠</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+        }
+        h1 { color: #2c3e50; margin-bottom: 30px; }
+        
+        /* 关键CSS：防止图表被分页截断 */
+        .chart-section {
+            background: #f8f9fa;
+            padding: 25px;
+            margin: 30px 0;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+            
+            /* 防止分页截断 */
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+        }
+        
+        .chart-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        
+        .chart-description {
+            color: #7f8c8d;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        
+        /* 确保图表容器有固定尺寸 */
+        .chart-wrapper {
+            width: 100%;
+            height: 450px;
+            background: white;
+            border-radius: 5px;
+            padding: 10px;
+            
+            /* 额外保护：防止内部被截断 */
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+        }
+        
+        .test-info {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        
+        .test-info strong {
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 ECharts PDF布局测试</h1>
+        
+        <div class="test-info">
+            <strong>测试目标：</strong>验证PDF导出时多个图表是否正确布局，无重叠或截断问题。<br>
+            <strong>关键要素：</strong>
+            <ul style="margin: 10px 0 0 20px;">
+                <li>每个图表容器设置 <code>page-break-inside: avoid</code></li>
+                <li>图表高度固定（450px），避免自动计算导致的偏差</li>
+                <li>容器间距足够（margin: 30px 0），防止紧贴</li>
+                <li>PDF生成前会自动调用所有图表的 <code>resize()</code> 方法</li>
+            </ul>
+        </div>
+        
+        <!-- 图表1 -->
+        <div class="chart-section">
+            <div class="chart-title">📈 图表1：销售数据趋势</div>
+            <div class="chart-description">
+                测试图表在页面顶部的布局情况，检查是否被正确渲染且不与标题重叠。
+            </div>
+            <div class="chart-wrapper">
+                <div id="chart1" style="width: 100%; height: 100%;"></div>
+            </div>
+        </div>
+        
+        <!-- 图表2 -->
+        <div class="chart-section">
+            <div class="chart-title">📊 图表2：市场份额分布</div>
+            <div class="chart-description">
+                测试连续图表之间的间距是否足够，防止重叠。这个图表应该与上一个图表保持至少30px的间距。
+            </div>
+            <div class="chart-wrapper">
+                <div id="chart2" style="width: 100%; height: 100%;"></div>
+            </div>
+        </div>
+        
+        <!-- 图表3 -->
+        <div class="chart-section">
+            <div class="chart-title">🎯 图表3：多维度评估雷达图</div>
+            <div class="chart-description">
+                测试复杂图表（雷达图）的布局，以及是否会因为标签或图例导致布局错位。
+            </div>
+            <div class="chart-wrapper">
+                <div id="chart3" style="width: 100%; height: 100%;"></div>
+            </div>
+        </div>
+        
+        <!-- 图表4 -->
+        <div class="chart-section">
+            <div class="chart-title">📉 图表4：对比分析柱状图</div>
+            <div class="chart-description">
+                测试页面末尾的图表是否会因为分页导致布局问题。此图表应该完整出现在同一页。
+            </div>
+            <div class="chart-wrapper">
+                <div id="chart4" style="width: 100%; height: 100%;"></div>
+            </div>
+        </div>
+        
+        <div class="test-info" style="background: #d1ecf1; border-color: #0c5460;">
+            <strong style="color: #0c5460;">✅ 测试检查项：</strong>
+            <ol style="margin: 10px 0 0 20px; color: #0c5460;">
+                <li>每个图表是否完整显示（无截断）</li>
+                <li>图表之间是否有明显间距（不重叠）</li>
+                <li>图表标题和描述是否与图表本体正确关联</li>
+                <li>雷达图的标签是否完整显示</li>
+                <li>分页时图表是否被完整保留在同一页</li>
+            </ol>
+        </div>
+    </div>
+    
+    <script>
+        window.addEventListener('load', function() {
+            // 图表1：折线图
+            const chart1 = echarts.init(document.getElementById('chart1'));
+            chart1.setOption({
+                title: { text: '月度销售趋势', left: 'center' },
+                tooltip: { trigger: 'axis' },
+                xAxis: {
+                    type: 'category',
+                    data: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
+                },
+                yAxis: { type: 'value', name: '销售额（万元）' },
+                series: [{
+                    name: '销售额',
+                    type: 'line',
+                    smooth: true,
+                    data: [120, 132, 101, 134, 90, 230, 210, 182, 191, 234, 290, 330],
+                    areaStyle: { color: 'rgba(52, 152, 219, 0.2)' },
+                    itemStyle: { color: '#3498db' }
+                }]
+            });
+            
+            // 图表2：饼图
+            const chart2 = echarts.init(document.getElementById('chart2'));
+            chart2.setOption({
+                title: { text: '市场份额占比', left: 'center' },
+                tooltip: { trigger: 'item', formatter: '{b}: {c}% ({d}%)' },
+                legend: { orient: 'horizontal', bottom: 10 },
+                series: [{
+                    type: 'pie',
+                    radius: ['40%', '70%'],
+                    center: ['50%', '50%'],
+                    data: [
+                        { value: 35, name: '产品A', itemStyle: { color: '#5470c6' } },
+                        { value: 25, name: '产品B', itemStyle: { color: '#91cc75' } },
+                        { value: 20, name: '产品C', itemStyle: { color: '#fac858' } },
+                        { value: 12, name: '产品D', itemStyle: { color: '#ee6666' } },
+                        { value: 8, name: '其他', itemStyle: { color: '#73c0de' } }
+                    ],
+                    label: { 
+                        show: true,
+                        formatter: '{b}\n{d}%'
+                    }
+                }]
+            });
+            
+            // 图表3：雷达图
+            const chart3 = echarts.init(document.getElementById('chart3'));
+            chart3.setOption({
+                title: { text: '产品综合评分', left: 'center' },
+                tooltip: {},
+                legend: { data: ['产品A', '产品B', '产品C'], bottom: 10 },
+                radar: {
+                    indicator: [
+                        { name: '性能', max: 100 },
+                        { name: '价格', max: 100 },
+                        { name: '用户体验', max: 100 },
+                        { name: '可靠性', max: 100 },
+                        { name: '创新性', max: 100 },
+                        { name: '售后服务', max: 100 }
+                    ],
+                    center: ['50%', '55%'],
+                    radius: '60%'
+                },
+                series: [{
+                    type: 'radar',
+                    data: [
+                        {
+                            value: [90, 70, 85, 88, 75, 80],
+                            name: '产品A',
+                            areaStyle: { color: 'rgba(84, 112, 198, 0.3)' }
+                        },
+                        {
+                            value: [70, 85, 75, 80, 90, 75],
+                            name: '产品B',
+                            areaStyle: { color: 'rgba(145, 204, 117, 0.3)' }
+                        },
+                        {
+                            value: [85, 75, 90, 70, 80, 85],
+                            name: '产品C',
+                            areaStyle: { color: 'rgba(250, 200, 88, 0.3)' }
+                        }
+                    ]
+                }]
+            });
+            
+            // 图表4：柱状图
+            const chart4 = echarts.init(document.getElementById('chart4'));
+            chart4.setOption({
+                title: { text: '季度业绩对比', left: 'center' },
+                tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+                legend: { data: ['Q1', 'Q2', 'Q3', 'Q4'], bottom: 10 },
+                xAxis: {
+                    type: 'category',
+                    data: ['北区', '南区', '东区', '西区', '中区']
+                },
+                yAxis: { type: 'value', name: '业绩（万元）' },
+                series: [
+                    {
+                        name: 'Q1',
+                        type: 'bar',
+                        data: [320, 332, 301, 334, 390],
+                        itemStyle: { color: '#5470c6' }
+                    },
+                    {
+                        name: 'Q2',
+                        type: 'bar',
+                        data: [220, 182, 191, 234, 290],
+                        itemStyle: { color: '#91cc75' }
+                    },
+                    {
+                        name: 'Q3',
+                        type: 'bar',
+                        data: [150, 232, 201, 154, 190],
+                        itemStyle: { color: '#fac858' }
+                    },
+                    {
+                        name: 'Q4',
+                        type: 'bar',
+                        data: [98, 77, 101, 99, 40],
+                        itemStyle: { color: '#ee6666' }
+                    }
+                ]
+            });
+            
+            // 响应式调整
+            window.addEventListener('resize', function() {
+                chart1.resize();
+                chart2.resize();
+                chart3.resize();
+                chart4.resize();
+            });
+            
+            console.log('✅ 4个测试图表已渲染完成');
+            console.log('提示：导出PDF前，系统会自动对所有图表调用resize()并等待布局稳定');
+        });
+    </script>
+</body>
+</html>

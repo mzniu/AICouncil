@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECharts PDF导出测试</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            padding: 40px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .chart-container {
+            background: #fff;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 8px;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.1);
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        .chart-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #34495e;
+            margin-bottom: 15px;
+        }
+        /* 确保图表容器有固定高度，避免PDF布局错乱 */
+        .chart-container > div[id*="Chart"] {
+            min-height: 400px !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 ECharts PDF导出测试报告</h1>
+        
+        <p>本页面用于测试PDF导出时ECharts图表是否能正确渲染。</p>
+        
+        <div class="chart-container">
+            <div class="chart-title">1. 柱状图示例 - 方案对比分析</div>
+            <div id="barChart" style="width: 100%; height: 400px;"></div>
+        </div>
+        
+        <div class="chart-container">
+            <div class="chart-title">2. 饼图示例 - 资源分配占比</div>
+            <div id="pieChart" style="width: 100%; height: 400px;"></div>
+        </div>
+        
+        <div class="chart-container">
+            <div class="chart-title">3. 雷达图示例 - 方案综合评分</div>
+            <div id="radarChart" style="width: 100%; height: 400px;"></div>
+        </div>
+        
+        <div class="chart-container">
+            <div class="chart-title">4. 折线图示例 - 进度时间线</div>
+            <div id="lineChart" style="width: 100%; height: 400px;"></div>
+        </div>
+    </div>
+    
+    <script>
+        // 等待ECharts加载完成
+        window.addEventListener('load', function() {
+            // 1. 柱状图
+            const barChart = echarts.init(document.getElementById('barChart'));
+            barChart.setOption({
+                title: { text: '三种方案成本对比', left: 'center' },
+                tooltip: { trigger: 'axis' },
+                legend: { data: ['开发成本', '维护成本', '运营成本'], top: 30 },
+                xAxis: { type: 'category', data: ['方案A', '方案B', '方案C'] },
+                yAxis: { type: 'value', name: '成本（万元）' },
+                series: [
+                    {
+                        name: '开发成本',
+                        type: 'bar',
+                        data: [120, 200, 150],
+                        itemStyle: { color: '#5470c6' }
+                    },
+                    {
+                        name: '维护成本',
+                        type: 'bar',
+                        data: [80, 60, 100],
+                        itemStyle: { color: '#91cc75' }
+                    },
+                    {
+                        name: '运营成本',
+                        type: 'bar',
+                        data: [50, 70, 60],
+                        itemStyle: { color: '#fac858' }
+                    }
+                ]
+            });
+            
+            // 2. 饼图
+            const pieChart = echarts.init(document.getElementById('pieChart'));
+            pieChart.setOption({
+                title: { text: '项目资源分配', left: 'center' },
+                tooltip: { trigger: 'item', formatter: '{a} <br/>{b}: {c} ({d}%)' },
+                legend: { orient: 'vertical', left: 'left', top: 30 },
+                series: [
+                    {
+                        name: '资源分配',
+                        type: 'pie',
+                        radius: '50%',
+                        data: [
+                            { value: 335, name: '研发团队', itemStyle: { color: '#5470c6' } },
+                            { value: 310, name: '测试团队', itemStyle: { color: '#91cc75' } },
+                            { value: 234, name: '运维团队', itemStyle: { color: '#fac858' } },
+                            { value: 135, name: '市场团队', itemStyle: { color: '#ee6666' } },
+                            { value: 148, name: '管理团队', itemStyle: { color: '#73c0de' } }
+                        ],
+                        emphasis: {
+                            itemStyle: {
+                                shadowBlur: 10,
+                                shadowOffsetX: 0,
+                                shadowColor: 'rgba(0, 0, 0, 0.5)'
+                            }
+                        }
+                    }
+                ]
+            });
+            
+            // 3. 雷达图
+            const radarChart = echarts.init(document.getElementById('radarChart'));
+            radarChart.setOption({
+                title: { text: '方案综合评估', left: 'center' },
+                tooltip: {},
+                legend: { data: ['方案A', '方案B', '方案C'], top: 30 },
+                radar: {
+                    indicator: [
+                        { name: '技术可行性', max: 100 },
+                        { name: '成本控制', max: 100 },
+                        { name: '实施周期', max: 100 },
+                        { name: '用户体验', max: 100 },
+                        { name: '可扩展性', max: 100 },
+                        { name: '安全性', max: 100 }
+                    ]
+                },
+                series: [
+                    {
+                        name: '方案对比',
+                        type: 'radar',
+                        data: [
+                            {
+                                value: [85, 70, 60, 90, 75, 80],
+                                name: '方案A',
+                                areaStyle: { color: 'rgba(84, 112, 198, 0.3)' }
+                            },
+                            {
+                                value: [70, 85, 80, 70, 85, 75],
+                                name: '方案B',
+                                areaStyle: { color: 'rgba(145, 204, 117, 0.3)' }
+                            },
+                            {
+                                value: [90, 60, 70, 85, 70, 90],
+                                name: '方案C',
+                                areaStyle: { color: 'rgba(250, 200, 88, 0.3)' }
+                            }
+                        ]
+                    }
+                ]
+            });
+            
+            // 4. 折线图
+            const lineChart = echarts.init(document.getElementById('lineChart'));
+            lineChart.setOption({
+                title: { text: '项目进度规划', left: 'center' },
+                tooltip: { trigger: 'axis' },
+                legend: { data: ['计划进度', '实际进度'], top: 30 },
+                xAxis: {
+                    type: 'category',
+                    data: ['第1周', '第2周', '第3周', '第4周', '第5周', '第6周', '第7周', '第8周']
+                },
+                yAxis: { type: 'value', name: '完成度（%）', max: 100 },
+                series: [
+                    {
+                        name: '计划进度',
+                        type: 'line',
+                        data: [10, 25, 40, 55, 70, 80, 90, 100],
+                        smooth: true,
+                        itemStyle: { color: '#5470c6' }
+                    },
+                    {
+                        name: '实际进度',
+                        type: 'line',
+                        data: [8, 22, 38, 58, 72, 85, 92, 98],
+                        smooth: true,
+                        itemStyle: { color: '#91cc75' }
+                    }
+                ]
+            });
+            
+            // 响应式调整
+            window.addEventListener('resize', function() {
+                barChart.resize();
+                pieChart.resize();
+                radarChart.resize();
+                lineChart.resize();
+            });
+            
+            console.log('✅ 所有ECharts图表渲染完成');
+        });
+    </script>
+</body>
+</html>

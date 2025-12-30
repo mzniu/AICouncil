@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>折叠内容展开测试</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            padding: 40px;
+            line-height: 1.6;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 { color: #2563eb; border-bottom: 3px solid #2563eb; padding-bottom: 10px; }
+        h2 { color: #0ea5e9; margin-top: 30px; }
+        .section { background: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        
+        /* 测试CSS折叠 */
+        .collapsed {
+            max-height: 0;
+            opacity: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+            margin: 0;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        .collapsible-content {
+            background: #fef3c7;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #f59e0b;
+        }
+        
+        /* 测试hidden类 */
+        .hidden { display: none; }
+        
+        details {
+            background: #e0f2fe;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        summary {
+            cursor: pointer;
+            font-weight: bold;
+            color: #0369a1;
+        }
+        summary:hover { color: #0284c7; }
+    </style>
+</head>
+<body>
+    <h1>🧪 折叠内容展开测试页面</h1>
+    
+    <div class="section">
+        <h2>1. CSS折叠测试 (.collapsed)</h2>
+        <p>以下内容默认折叠（使用 <code>.collapsed</code> 类）：</p>
+        <button onclick="toggleCollapsed('content1')">切换显示</button>
+        
+        <div id="content1" class="collapsible-content collapsed">
+            <h3>这是被折叠的内容</h3>
+            <p>这段文字在PDF导出时应该自动展开显示。</p>
+            <ul>
+                <li>折叠项目 1</li>
+                <li>折叠项目 2</li>
+                <li>折叠项目 3</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="section">
+        <h2>2. HTML Details 测试</h2>
+        <p>使用HTML5原生的 <code>&lt;details&gt;</code> 元素：</p>
+        
+        <details>
+            <summary>📋 点击展开详细信息</summary>
+            <div style="padding: 10px; margin-top: 10px;">
+                <p>这是details元素中的隐藏内容。在PDF导出时应该自动展开。</p>
+                <p><strong>重要提示：</strong>Details元素的优势是无需JavaScript即可实现折叠效果。</p>
+            </div>
+        </details>
+        
+        <details>
+            <summary>🔍 另一个折叠区域</summary>
+            <div style="padding: 10px; margin-top: 10px;">
+                <p>第二个折叠区域的内容。</p>
+                <pre>
+代码块示例:
+function test() {
+    console.log('Hello World');
+}
+                </pre>
+            </div>
+        </details>
+    </div>
+    
+    <div class="section">
+        <h2>3. Hidden类测试</h2>
+        <p>使用 <code>.hidden</code> 类隐藏的内容：</p>
+        <button onclick="toggleHidden('hidden1')">切换显示</button>
+        
+        <div id="hidden1" class="hidden" style="background: #fce7f3; padding: 15px; margin: 10px 0; border-radius: 5px;">
+            <h3>隐藏内容区域</h3>
+            <p>这段内容使用了 <code>display: none</code>，在PDF导出时应该自动显示。</p>
+            <p style="color: #be123c;">注意：包含脚本和样式的hidden元素不会被展开。</p>
+        </div>
+    </div>
+    
+    <div class="section">
+        <h2>4. 嵌套折叠测试</h2>
+        <p>测试多层嵌套的折叠内容：</p>
+        
+        <details>
+            <summary>🎯 外层折叠</summary>
+            <div style="padding: 10px; margin-top: 10px;">
+                <p>外层内容...</p>
+                
+                <details style="margin: 10px 0;">
+                    <summary>📦 内层折叠</summary>
+                    <div style="padding: 10px; background: #ffffff;">
+                        <p>这是嵌套的折叠内容。PDF导出时应该递归展开所有层级。</p>
+                        
+                        <div class="collapsible-content collapsed" id="nested-collapsed">
+                            <p>甚至包含CSS折叠的内容！</p>
+                        </div>
+                        <button onclick="toggleCollapsed('nested-collapsed')">展开CSS折叠内容</button>
+                    </div>
+                </details>
+            </div>
+        </details>
+    </div>
+    
+    <div class="section">
+        <h2>5. 混合内容测试</h2>
+        <p>同时测试多种折叠方式：</p>
+        
+        <div id="mixed1" class="collapsible-content collapsed">
+            <details>
+                <summary>折叠中的details</summary>
+                <p>这是在CSS折叠容器中的details元素。</p>
+            </details>
+        </div>
+        <button onclick="toggleCollapsed('mixed1')">展开查看</button>
+    </div>
+    
+    <hr style="margin: 40px 0; border: 1px solid #e5e7eb;">
+    
+    <footer style="text-align: center; color: #6b7280; font-size: 14px;">
+        <p><strong>测试说明：</strong></p>
+        <ol style="text-align: left; display: inline-block;">
+            <li>在页面中手动点击按钮，确认折叠/展开功能正常</li>
+            <li>将此HTML嵌入iframe并导出PDF</li>
+            <li>检查PDF中所有折叠内容是否都已展开显示</li>
+            <li>导出完成后，检查页面折叠状态是否恢复</li>
+        </ol>
+    </footer>
+    
+    <script>
+        function toggleCollapsed(id) {
+            const elem = document.getElementById(id);
+            if (elem) {
+                elem.classList.toggle('collapsed');
+            }
+        }
+        
+        function toggleHidden(id) {
+            const elem = document.getElementById(id);
+            if (elem) {
+                elem.classList.toggle('hidden');
+            }
+        }
+        
+        // 模拟PDF导出展开流程
+        function simulateExport() {
+            console.log('=== 模拟PDF导出 ===');
+            const collapsedElements = [];
+            
+            // 查找所有折叠元素
+            const collapsedItems = document.querySelectorAll('.collapsed');
+            console.log(`找到 ${collapsedItems.length} 个 .collapsed 元素`);
+            collapsedItems.forEach(elem => {
+                collapsedElements.push(elem);
+                elem.classList.remove('collapsed');
+            });
+            
+            const detailsElements = document.querySelectorAll('details:not([open])');
+            console.log(`找到 ${detailsElements.length} 个未展开的 details 元素`);
+            detailsElements.forEach(elem => {
+                collapsedElements.push({ elem, type: 'details' });
+                elem.setAttribute('open', '');
+            });
+            
+            const hiddenElements = document.querySelectorAll('.hidden:not(script):not(style)');
+            console.log(`找到 ${hiddenElements.length} 个 .hidden 元素`);
+            hiddenElements.forEach(elem => {
+                if (elem.textContent.trim() || elem.querySelector('img, svg, canvas')) {
+                    collapsedElements.push({ elem, type: 'hidden' });
+                    elem.classList.remove('hidden');
+                }
+            });
+            
+            console.log(`总共展开了 ${collapsedElements.length} 个元素`);
+            alert(`已展开 ${collapsedElements.length} 个折叠元素。\n3秒后将恢复原始状态。`);
+            
+            // 3秒后恢复
+            setTimeout(() => {
+                collapsedElements.forEach(item => {
+                    if (item.type === 'details') {
+                        item.elem.removeAttribute('open');
+                    } else if (item.type === 'hidden') {
+                        item.elem.classList.add('hidden');
+                    } else if (item.classList) {
+                        item.classList.add('collapsed');
+                    }
+                });
+                console.log('已恢复折叠状态');
+                alert('折叠状态已恢复！');
+            }, 3000);
+        }
+        
+        // 添加测试按钮
+        document.addEventListener('DOMContentLoaded', function() {
+            const btn = document.createElement('button');
+            btn.textContent = '🧪 模拟PDF导出流程';
+            btn.style.cssText = 'position: fixed; bottom: 20px; right: 20px; padding: 15px 25px; background: #3b82f6; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 9999;';
+            btn.onclick = simulateExport;
+            document.body.appendChild(btn);
+        });
+    </script>
+</body>
+</html>
