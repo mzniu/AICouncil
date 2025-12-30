@@ -18,6 +18,7 @@ if str(ROOT) not in sys.path:
 
 from src.agents.langchain_agents import generate_report_from_workspace
 from src import config
+from src.utils.pdf_exporter import generate_pdf_from_html, PLAYWRIGHT_AVAILABLE
 import logging
 
 # 禁用 Werkzeug 默认的访问日志（减少 /api/update 等高频请求的输出）
@@ -567,6 +568,77 @@ def delete_workspace(session_id):
         return jsonify({"status": "success", "message": "工作区已删除"})
     except Exception as e:
         return jsonify({"status": "error", "message": f"删除失败: {str(e)}"}), 500
+
+@app.route('/api/export_pdf', methods=['POST'])
+def export_pdf():
+    """使用Playwright导出高质量PDF（保留超链接、避免截断）"""
+    if not PLAYWRIGHT_AVAILABLE:
+        return jsonify({
+            "status": "error", 
+            "message": "Playwright未安装。请运行: pip install playwright && playwright install chromium"
+        }), 400
+    
+    try:
+        data = request.json
+        html_content = data.get('html')
+        filename = data.get('filename', 'report.pdf')
+        
+        if not html_content:
+            return jsonify({"status": "error", "message": "HTML内容不能为空"}), 400
+        
+        # 生成临时PDF文件
+        temp_dir = os.path.join(os.getcwd(), "temp_pdfs")
+        if not os.path.exists(temp_dir):
+            os.makedirs(temp_dir)
+        
+        import time
+        timestamp = int(time.time() * 1000)
+        temp_pdf = os.path.join(temp_dir, f"{timestamp}_{filename}")
+        
+        # 生成PDF
+        success = generate_pdf_from_html(html_content, temp_pdf, timeout=60000)
+        
+        if success and os.path.exists(temp_pdf):
+            # 读取PDF文件并返回
+            with open(temp_pdf, 'rb') as f:
+                pdf_data = f.read()
+            
+            # 清理临时文件
+            try:
+                os.remove(temp_pdf)
+            except:
+                pass
+            
+            # 返回PDF文件
+            from flask import send_file
+            import io
+            return send_file(
+                io.BytesIO(pdf_data),
+                mimetype='application/pdf',
+                as_attachment=True,
+                download_name=filename
+            )
+        else:
+            return jsonify({
+                "status": "error", 
+                "message": "PDF生成失败，请查看日志"
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"[api] PDF export error: {e}")
+        traceback.print_exc()
+        return jsonify({
+            "status": "error", 
+            "message": f"导出失败: {str(e)}"
+        }), 500
+
+@app.route('/api/pdf_available', methods=['GET'])
+def check_pdf_available():
+    """检查Playwright PDF导出功能是否可用"""
+    return jsonify({
+        "available": PLAYWRIGHT_AVAILABLE,
+        "message": "Playwright已安装" if PLAYWRIGHT_AVAILABLE else "需要安装Playwright: pip install playwright && playwright install chromium"
+    })
 
 if __name__ == '__main__':
     app.run(port=5000, debug=True)

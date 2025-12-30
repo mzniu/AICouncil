@@ -19,7 +19,7 @@
   - **Reporter**: Records the deliberation process in real-time to ensure no information is missed.
 - **🔍 Enhanced Search**: Integrates multi-engine parallel search (Bing, Baidu, DuckDuckGo, Yahoo, Mojeek). Features a **Requests-First** architecture for high performance, with **intelligent relevance validation** and **query optimization** (automatically bypassing irrelevant search engine noise). Yahoo and Mojeek are pure Requests-based implementations that require no browser dependencies and run more stably.
 - **💻 Real-time Monitoring Panel**: A Flask-based web interface that displays agent thinking processes, search progress, and debate flows in real-time. Supports **Maximize/Restore** for better readability.
-- **📄 Deep Report Generation**: Automatically generates structured HTML deliberation reports, supporting one-click copy and a **consolidated download menu** (HTML or long image).
+- **📄 Deep Report Generation**: Automatically generates structured HTML deliberation reports, supporting one-click copy and a **consolidated download menu** (HTML / long image / PDF).
 - **📊 Local Chart Rendering**: Reports load ECharts from `/static/vendor/echarts.min.js`, avoiding CDN/tracking prevention blocks; works inside iframes.
 - **📜 History Management**: Complete session persistence, supporting anytime backtracking, loading, or deletion of historical records.
 - **💾 Council Formations**: Supports saving, loading, and managing common council configurations (including backend models, rounds, agent counts) for quick startup in different scenarios.
