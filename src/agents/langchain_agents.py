@@ -2,6 +2,7 @@
 from src.agents.langchain_llm import AdapterLLM, ModelConfig
 from src.agents import schemas, model_adapter
 from src.utils import logger, search_utils
+from src.utils.path_manager import get_workspace_dir
 from pydantic import ValidationError
 import json
 import requests
@@ -430,8 +431,8 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
     """
     # 1. 初始化 Session 和 Workspace
     session_id = datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + str(uuid.uuid4())[:8]
-    workspace_path = os.path.join(os.getcwd(), "workspaces", session_id)
-    os.makedirs(workspace_path, exist_ok=True)
+    workspace_path = get_workspace_dir() / session_id
+    workspace_path.mkdir(parents=True, exist_ok=True)
     logger.info(f"[cycle] Session ID: {session_id}, Workspace: {workspace_path}")
 
     # 重置 Web 面板

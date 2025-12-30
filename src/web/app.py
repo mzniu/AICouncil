@@ -19,6 +19,7 @@ if str(ROOT) not in sys.path:
 from src.agents.langchain_agents import generate_report_from_workspace
 from src import config
 from src.utils.pdf_exporter import generate_pdf_from_html, PLAYWRIGHT_AVAILABLE
+from src.utils.path_manager import get_workspace_dir
 import logging
 
 # 禁用 Werkzeug 默认的访问日志（减少 /api/update 等高频请求的输出）
@@ -223,8 +224,8 @@ def intervene():
     if not content:
         return jsonify({"status": "error", "message": "干预内容不能为空"}), 400
     
-    workspace_path = os.path.join(os.getcwd(), "workspaces", current_session_id)
-    if not os.path.exists(workspace_path):
+    workspace_path = get_workspace_dir() / current_session_id
+    if not workspace_path.exists():
         return jsonify({"status": "error", "message": "工作区不存在"}), 400
     
     intervention_file = os.path.join(workspace_path, "user_intervention.json")
@@ -267,8 +268,8 @@ def rereport():
     data = request.json or {}
     selected_backend = data.get('backend') or current_config.get('backend', 'deepseek')
     
-    workspace_path = os.path.join(os.getcwd(), "workspaces", current_session_id)
-    if not os.path.exists(workspace_path):
+    workspace_path = get_workspace_dir() / current_session_id
+    if not workspace_path.exists():
         return jsonify({"status": "error", "message": f"工作区不存在: {current_session_id}"}), 404
 
     # 在后台线程运行，避免阻塞
@@ -307,34 +308,33 @@ def rereport():
 
 @app.route('/api/workspaces', methods=['GET'])
 def list_workspaces():
-    workspace_root = os.path.join(os.getcwd(), "workspaces")
-    if not os.path.exists(workspace_root):
+    workspace_root = get_workspace_dir()
+    if not workspace_root.exists():
         return jsonify([])
     
     workspaces = []
-    for d in os.listdir(workspace_root):
-        path = os.path.join(workspace_root, d)
-        if os.path.isdir(path):
+    for d in workspace_root.iterdir():
+        if d.is_dir():
             # 尝试获取议题内容
             issue = "未知议题"
             try:
                 # 从 final_session_data.json 或 decomposition.json 获取
-                data_path = os.path.join(path, "final_session_data.json")
-                if os.path.exists(data_path):
-                    with open(data_path, "r", encoding="utf-8") as f:
+                data_path = d / "final_session_data.json"
+                if data_path.exists():
+                    with open(str(data_path), "r", encoding="utf-8") as f:
                         issue = json.load(f).get("issue", issue)
                 else:
-                    decomp_path = os.path.join(path, "decomposition.json")
-                    if os.path.exists(decomp_path):
-                        with open(decomp_path, "r", encoding="utf-8") as f:
+                    decomp_path = d / "decomposition.json"
+                    if decomp_path.exists():
+                        with open(str(decomp_path), "r", encoding="utf-8") as f:
                             issue = json.load(f).get("core_goal", issue)
             except:
                 pass
             
             workspaces.append({
-                "id": d,
+                "id": d.name,
                 "issue": issue,
-                "timestamp": d.split('_')[0] if '_' in d else ""
+                "timestamp": d.name.split('_')[0] if '_' in d.name else ""
             })
     
     # 按时间倒序排列
@@ -348,8 +348,8 @@ def list_workspaces():
 def load_workspace(session_id):
     global discussion_events, backend_logs, final_report, current_session_id, current_config
     
-    workspace_path = os.path.join(os.getcwd(), "workspaces", session_id)
-    if not os.path.exists(workspace_path):
+    workspace_path = get_workspace_dir() / session_id
+    if not workspace_path.exists():
         return jsonify({"status": "error", "message": "工作区不存在"}), 404
     
     try:
@@ -559,12 +559,12 @@ def delete_preset(name):
 
 @app.route('/api/delete_workspace/<session_id>', methods=['DELETE'])
 def delete_workspace(session_id):
-    workspace_path = os.path.join(os.getcwd(), "workspaces", session_id)
-    if not os.path.exists(workspace_path):
+    workspace_path = get_workspace_dir() / session_id
+    if not workspace_path.exists():
         return jsonify({"status": "error", "message": "工作区不存在"}), 404
     
     try:
-        shutil.rmtree(workspace_path)
+        shutil.rmtree(str(workspace_path))
         return jsonify({"status": "success", "message": "工作区已删除"})
     except Exception as e:
         return jsonify({"status": "error", "message": f"删除失败: {str(e)}"}), 500
