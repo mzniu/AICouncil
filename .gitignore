@@ -11,6 +11,11 @@ env/
 *.log
 aicouncil.log
 
+# Build outputs
+build/
+dist/
+*.spec.bak
+
 # Project specific
 workspaces/
 .env
