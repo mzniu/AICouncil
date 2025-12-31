@@ -26,21 +26,23 @@ APP_COPYRIGHT = "Copyright © 2025 AICouncil Team"
 # ═══════════════════════════════════════════════════════════
 # 打包模式配置
 # ═══════════════════════════════════════════════════════════
+# 打包模式配置
+# ═══════════════════════════════════════════════════════════
 # 选择打包方案：
-# - "lightweight": 轻量级版本 (~100MB，延迟安装 Playwright)
-# - "full": 完整功能版本 (~250MB，内嵌 Chromium)
-PACKAGING_MODE = "full"  # 默认使用完整功能版本
+# - "minimal": 精简版本 (~80-120MB，不含 Playwright/浏览器)
+# - "full": 完整功能版本 (~150-200MB，内嵌 Playwright)
+PACKAGING_MODE = "full"  # 使用完整版本，包含 Playwright
 
 # 打包类型：
 # - "onedir": 单目录模式（更快启动，推荐）
 # - "onefile": 单文件模式（体积更小，启动慢）
-BUNDLE_TYPE = "onedir"
+BUNDLE_TYPE = "onefile"
 
 # 是否使用 UPX 压缩（可减少 30-40% 体积）
 USE_UPX = True
 
 # 是否启用控制台窗口（调试时设为 True）
-CONSOLE_MODE = False
+CONSOLE_MODE = True
 
 # ═══════════════════════════════════════════════════════════
 # 数据文件配置（需要打包的非 Python 文件）
@@ -61,10 +63,32 @@ DATA_FILES = [
 
 # 如果是完整功能版本，添加 Playwright 相关文件
 if PACKAGING_MODE == "full":
-    # Playwright Chromium 浏览器（需手动添加路径）
-    # 示例：playwright_dir = Path.home() / "AppData" / "Local" / "ms-playwright"
-    # DATA_FILES.append((str(playwright_dir), "playwright/"))
-    pass  # 暂时标记，实际路径在 Step 3.1 确定
+    import site
+    from pathlib import Path
+    
+    # 1. 打包 Playwright 驱动程序
+    playwright_pkg = None
+    for site_pkg in site.getsitepackages():
+        playwright_path = Path(site_pkg) / "playwright"
+        if playwright_path.exists():
+            playwright_pkg = playwright_path
+            break
+    
+    if playwright_pkg:
+        # 打包 playwright 驱动和依赖
+        DATA_FILES.append((str(playwright_pkg / "driver"), "playwright/driver"))
+    
+    # 2. 打包 Chromium 浏览器（用户的 AppData）
+    playwright_browsers = Path.home() / "AppData" / "Local" / "ms-playwright"
+    if playwright_browsers.exists():
+        # 打包chromium_headless_shell（Playwright优先使用）和chromium（fallback）
+        browser_patterns = ["chromium_headless_shell-*", "chromium-*"]
+        for pattern in browser_patterns:
+            for browser_dir in sorted(playwright_browsers.glob(pattern), reverse=True):
+                if browser_dir.is_dir():
+                    DATA_FILES.append((str(browser_dir), f"playwright/browsers/{browser_dir.name}"))
+                    print(f"✅ 已添加 Playwright 浏览器: {browser_dir.name}")
+                    break  # 只取最新版本
 
 # ═══════════════════════════════════════════════════════════
 # 隐藏导入（动态导入的模块，PyInstaller 无法自动检测）
@@ -90,8 +114,7 @@ HIDDEN_IMPORTS = [
     "urllib3",
     
     # HTML 解析
-    "bs4",
-    "beautifulsoup4",
+    "bs4",  # beautifulsoup4 的导入名
     
     # 工具模块
     "dotenv",
@@ -112,6 +135,8 @@ if PACKAGING_MODE == "full":
     HIDDEN_IMPORTS.extend([
         "playwright",
         "playwright.async_api",
+        "playwright.sync_api",
+        "greenlet",  # Playwright依赖
         "DrissionPage",
     ])
 
@@ -134,6 +159,21 @@ EXCLUDED_MODULES = [
     "PyQt5",
     "PySide2",
     
+    # 科学计算库（AICouncil不需要）
+    "torch",
+    "torchvision",
+    "torchaudio", 
+    "pandas",
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "PIL",
+    "pillow",
+    "cv2",
+    "sklearn",
+    "tensorflow",
+    "keras",
+    
     # 文档生成
     "sphinx",
     "docutils",
@@ -147,8 +187,7 @@ EXCLUDED_MODULES = [
 # ═══════════════════════════════════════════════════════════
 # 图标和资源文件
 # ═══════════════════════════════════════════════════════════
-# ICON_FILE = str(PROJECT_ROOT / "assets" / "icon.ico")  # 待添加
-ICON_FILE = None  # 暂无图标，使用默认
+ICON_FILE = str(PROJECT_ROOT / "assets" / "senate.ico")  # 🏛️ 元老院图标
 
 # ═══════════════════════════════════════════════════════════
 # Windows 版本信息

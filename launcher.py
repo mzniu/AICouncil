@@ -16,6 +16,17 @@ if getattr(sys, 'frozen', False):
     # 打包后的环境
     application_path = Path(sys._MEIPASS)
     base_path = Path(sys.executable).parent
+    
+    # 设置 Playwright 浏览器路径（打包后）
+    playwright_browsers = application_path / "playwright" / "browsers"
+    if playwright_browsers.exists():
+        os.environ['PLAYWRIGHT_BROWSERS_PATH'] = str(playwright_browsers)
+        print(f"✅ Playwright 浏览器路径: {playwright_browsers}")
+    
+    # 设置 Playwright 驱动路径
+    playwright_driver = application_path / "playwright" / "driver"
+    if playwright_driver.exists():
+        os.environ['PLAYWRIGHT_DRIVER_PATH'] = str(playwright_driver)
 else:
     # 开发环境
     application_path = Path(__file__).parent

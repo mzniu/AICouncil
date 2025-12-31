@@ -2159,12 +2159,9 @@
                 }
 
                 try {
-                    // 先检查Playwright是否可用
-                    const checkResponse = await fetch('/api/pdf_available');
-                    const checkData = await checkResponse.json();
-                    
-                    if (checkData.available) {
-                        // 使用Playwright后端生成高质量PDF
+                    // 打包版本直接尝试使用Playwright（已内置），开发环境会自动降级
+                    try {
+                        // 尝试使用高质量PDF导出（Playwright）
                         let htmlContent = reportIframe.contentDocument.documentElement.outerHTML;
                         
                         // 替换CDN链接为本地路径（确保ECharts图表能正确渲染）
@@ -2215,14 +2212,9 @@
                             const errorData = await response.json();
                             throw new Error(errorData.message || 'PDF生成失败');
                         }
-                    } else {
-                        // Playwright不可用，回退到客户端jsPDF方案
-                        console.warn('Playwright not available, falling back to jsPDF');
-                        showAlert(
-                            '⚠️ 使用传统PDF导出方法（可能有内容截断和超链接失效问题）。\n建议安装Playwright获得更好效果: pip install playwright && playwright install chromium',
-                            '提示',
-                            'warning'
-                        );
+                    } catch (playwrightError) {
+                        // Playwright导出失败，降级到传统方式
+                        console.warn('Playwright PDF导出失败，降级到传统方式:', playwrightError);
                         await downloadPDFLegacy();
                     }
                 } catch (error) {

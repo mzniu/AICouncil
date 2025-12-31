@@ -8,10 +8,34 @@ AICouncil PyInstaller 配置文件（.spec）
 import sys
 import os
 from pathlib import Path
+import importlib.util
 
-# 导入构建配置
-sys.path.insert(0, str(Path.cwd()))
-from build.build_config import *
+# 导入构建配置（避免与 build.py 冲突）
+build_config_path = Path.cwd() / 'build' / 'build_config.py'
+spec = importlib.util.spec_from_file_location("build_config", build_config_path)
+build_config = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(build_config)
+
+# 导入配置常量
+APP_VERSION = build_config.APP_VERSION
+APP_NAME = build_config.APP_NAME
+PACKAGING_MODE = build_config.PACKAGING_MODE
+BUNDLE_TYPE = build_config.BUNDLE_TYPE
+PROJECT_ROOT = build_config.PROJECT_ROOT
+SRC_DIR = build_config.SRC_DIR
+DATA_FILES = build_config.DATA_FILES
+HIDDEN_IMPORTS = build_config.HIDDEN_IMPORTS
+EXCLUDED_MODULES = build_config.EXCLUDED_MODULES
+ICON_FILE = build_config.ICON_FILE
+DEBUG_MODE = build_config.DEBUG_MODE
+USE_UPX = build_config.USE_UPX
+UPX_EXCLUDE = build_config.UPX_EXCLUDE
+CONSOLE_MODE = build_config.CONSOLE_MODE
+
+# 导入辅助函数
+get_output_name = build_config.get_output_name
+get_version_string = build_config.get_version_string
+get_build_mode_description = build_config.get_build_mode_description
 
 # ═══════════════════════════════════════════════════════════
 # Analysis 阶段：分析依赖

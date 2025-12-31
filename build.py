@@ -49,16 +49,16 @@ def check_dependencies():
     """检查依赖"""
     print_header("🔍 检查依赖")
     
-    required = ['pyinstaller']
+    required = [('PyInstaller', 'pyinstaller')]
     missing = []
     
-    for pkg in required:
+    for import_name, display_name in required:
         try:
-            __import__(pkg)
-            print(f"✅ {pkg}")
+            __import__(import_name)
+            print(f"✅ {display_name}")
         except ImportError:
-            print(f"❌ {pkg} (未安装)")
-            missing.append(pkg)
+            print(f"❌ {display_name} (未安装)")
+            missing.append(display_name)
     
     if missing:
         print()
