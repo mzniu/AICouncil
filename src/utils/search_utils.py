@@ -5,7 +5,7 @@ import shutil
 import tempfile
 from bs4 import BeautifulSoup
 from src import config_manager as config
-from src.utils import logger
+from src.utils.logger import logger
 
 def bing_search(query: str, max_results: int = 10, max_retries: int = 3) -> str:
     """使用 Bing 搜索。优先使用 requests，失败则回退到 DrissionPage。"""

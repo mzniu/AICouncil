@@ -37,17 +37,42 @@
 
 ## 🚀 快速部署
 
-### 1. 环境准备
+### 方式 1: 使用打包版（推荐 Windows 用户）
+
+从 [GitHub Releases](https://github.com/mzniu/AICouncil/releases) 下载最新打包版：
+
+1. **下载**: 选择适合的版本：
+   - `AICouncil-minimal-vX.X.X.zip`: 精简版（80-120 MB）- 基础功能
+   - `AICouncil-full-vX.X.X.zip`: 完整版（150-250 MB）- 包含所有增强功能
+
+2. **解压**: 解压到任意目录（如 `C:\AICouncil\`）
+
+3. **运行**: 双击 `AICouncil.exe`，自动启动 Web 界面
+
+4. **配置**: 首次运行后，在 Web 界面右上角「设置」中填入 API 密钥
+
+**特点**:
+- ✅ 无需安装 Python 或任何依赖
+- ✅ 双击即用，自动配置环境
+- ✅ 配置数据存储在用户目录（`%APPDATA%\AICouncil\`）
+
+详细使用说明请参考：[打包版用户手册](docs/user_manual_exe.md)
+
+---
+
+### 方式 2: 从源代码运行
+
+#### 1. 环境准备
 - **Python**: 确保您的系统已安装 Python 3.9 或更高版本。
 - **浏览器**: 建议安装 **Google Chrome** 或 **Microsoft Edge**。部分搜索引擎（Baidu/Bing）需要调用浏览器内核进行自动化抓取。如果不安装浏览器，您仍可使用 Yahoo、Mojeek 或 DuckDuckGo 进行联网搜索。
 
-### 2. 克隆项目
+##### 2. 克隆项目
 ```bash
 git clone https://github.com/mzniu/AICouncil.git
 cd AICouncil
 ```
 
-### 3. 安装依赖
+##### 3. 安装依赖
 建议使用虚拟环境：
 ```bash
 # 创建虚拟环境
@@ -77,7 +102,7 @@ pip install -r requirements-optional.txt
 - `requirements-minimal.txt`: 核心依赖（基本功能，体积更小）
 - `requirements-optional.txt`: 可选增强（PDF导出、浏览器搜索）
 
-### 4. 配置 API 密钥
+#### 4. 配置 API 密钥
 1. 复制配置模板文件：
    ```bash
    cp src/config_template.py src/config.py
@@ -92,7 +117,7 @@ pip install -r requirements-optional.txt
 
 **【建议】或者您也可以在页面右上角的设置中进行配置。**
 
-### 5. 启动应用
+#### 5. 启动应用
 ```bash
 python src/web/app.py
 ```
@@ -104,7 +129,36 @@ python src/web/app.py
 
 ---
 
-## 🛠️ 技术栈
+## � 从源代码构建 EXE
+
+如果您希望自己打包 AICouncil 为 EXE 可执行文件：
+
+1. **安装打包依赖**：
+   ```bash
+   pip install pyinstaller>=5.0
+   ```
+
+2. **一键打包**：
+   ```bash
+   python build.py
+   ```
+   构建脚本会自动：
+   - 检查依赖完整性
+   - 验证关键文件存在
+   - 使用 PyInstaller 打包
+   - 生成发行版 ZIP 包
+
+3. **查看构建结果**：
+   - 打包文件位于 `dist/AICouncil/` 目录
+   - 发行版 ZIP 位于 `dist/release/`
+
+4. **详细说明**：
+   - 完整构建指南：[docs/build_guide.md](docs/build_guide.md)
+   - 打包前检查工具：`python check_packaging.py`
+
+---
+
+## �🛠️ 技术栈
 
 - **后端**: Python, Flask, LangChain
 - **前端**: Tailwind CSS, JavaScript (ES6+)
@@ -122,9 +176,22 @@ AICouncil/
 │   ├── web/             # Flask Web 服务与前端模板
 │   ├── utils/           # 搜索、日志等工具类
 │   └── config.py        # 全局配置文件
+├── build/               # 构建工具与打包脚本
+│   ├── build_config.py  # 构建配置
+│   ├── path_manager.py  # 路径管理
+│   └── config_manager.py # 配置管理
 ├── workspaces/          # 议事历史记录存储目录
 ├── tests/               # 单元测试
-├── requirements.txt     # 项目依赖
+├── docs/                # 项目文档
+│   ├── build_guide.md       # 构建打包指南
+│   └── user_manual_exe.md   # 打包版用户手册
+├── requirements.txt     # 完整依赖
+├── requirements-minimal.txt # 核心依赖
+├── requirements-optional.txt # 可选依赖
+├── launcher.py          # EXE 启动器
+├── build.py             # 自动构建脚本
+├── check_packaging.py   # 打包前检查工具
+├── aicouncil.spec       # PyInstaller 配置
 └── README.md            # 项目说明文档
 ```
 
@@ -138,17 +205,18 @@ AICouncil/
 - [x] **UI 交互升级**：全站移除原生弹窗，采用 Tailwind CSS 自定义模态框。
 - [x] **历史记录管理**：支持议事记录的持久化存储、回溯及物理删除。
 - [x] **模型适配**：支持 DeepSeek, OpenAI, OpenRouter, Ollama 等主流模型。
-- [x] **报告导出**：支持 HTML 报告生成及长图导出功能。
-- [x] **用户介入模式**：允许用户在议事过程中随时“插话”，引导辩论方向。
+- [x] **报告导出**：支持 HTML 报告生成、长图导出及 PDF 导出功能。
+- [x] **用户介入模式**：允许用户在议事过程中随时"插话"，引导辩论方向。
 - [x] **多语言支持**：实现前端界面的国际化 (i18n)。
 - [x] **阵型预设**：支持保存和一键加载常用的议事配置（模型、轮数、人数）。
 - [x] **多语言文档**：提供中英文双语 README。
+- [x] **EXE 打包**：支持将应用打包为 Windows 可执行文件（双击即用，无需 Python）。
 
 ### 计划中
 - [ ] **更多 Agent 类型**：增加经济学家、法律顾问、技术专家等垂直领域智能体。
 - [ ] **本地知识库 (RAG)**：支持上传 PDF/Word/Markdown 等文档作为议事参考。
-- [ ] **导出格式扩展**：支持导出为 PDF、Markdown 或 Word 文档。
 - [ ] **搜索源扩展**：接入 Google Search API 等专业搜索服务。
+- [ ] **跨平台打包**：支持 Linux 和 macOS 打包。
 
 ---
 

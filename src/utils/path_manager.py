@@ -18,7 +18,7 @@ from typing import Optional
 
 # 延迟导入 logger，避免循环依赖
 try:
-    from src.utils import logger
+    from src.utils.logger import logger
 except ImportError:
     # 如果直接运行此文件，logger 可能不可用
     import logging

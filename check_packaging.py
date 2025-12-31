@@ -35,7 +35,7 @@ def check_dependencies():
     optional = {
         "playwright": "可选（PDF导出）",
         "DrissionPage": "可选（搜索增强）",
-        "pyinstaller": "必需（打包）",
+        "PyInstaller": "必需（打包）",
     }
     
     missing_required = []
@@ -58,8 +58,8 @@ def check_dependencies():
             print(f"  ✅ {pkg:<20} {desc}")
         except ImportError:
             print(f"  ⚠️  {pkg:<20} {desc} - 未安装")
-            if pkg == "pyinstaller":
-                missing_required.append(pkg)
+            if pkg == "PyInstaller":
+                missing_required.append("pyinstaller")
             else:
                 missing_optional.append(pkg)
     

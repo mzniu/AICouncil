@@ -16,11 +16,37 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.agents.langchain_agents import generate_report_from_workspace
+from src.agents.langchain_agents import generate_report_from_workspace, run_full_cycle
 from src import config_manager as config
-from src.utils.pdf_exporter import generate_pdf_from_html, PLAYWRIGHT_AVAILABLE
-from src.utils.path_manager import get_workspace_dir
+from src.utils import pdf_exporter
+from src.utils.path_manager import get_workspace_dir, get_config_path, is_frozen
+from src.utils.logger import logger
 import logging
+
+# 动态检测Playwright是否可用（支持打包环境）
+def check_playwright_available():
+    """检查Playwright是否可用"""
+    try:
+        logger.info("[app] Attempting to import playwright...")
+        from playwright.async_api import async_playwright
+        logger.info("[app] ✅ Playwright imported successfully")
+        
+        # 检查环境变量
+        if 'PLAYWRIGHT_BROWSERS_PATH' in os.environ:
+            logger.info(f"[app] PLAYWRIGHT_BROWSERS_PATH: {os.environ['PLAYWRIGHT_BROWSERS_PATH']}")
+        if 'PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH' in os.environ:
+            logger.info(f"[app] PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: {os.environ['PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH']}")
+        
+        return True
+    except ImportError as e:
+        logger.error(f"[app] ❌ Playwright import failed: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"[app] ❌ Unexpected error checking Playwright: {e}")
+        return False
+
+PLAYWRIGHT_AVAILABLE = check_playwright_available()
+logger.info(f"[app] Playwright available: {PLAYWRIGHT_AVAILABLE}")
 
 # 禁用 Werkzeug 默认的访问日志（减少 /api/update 等高频请求的输出）
 log = logging.getLogger('werkzeug')
@@ -124,40 +150,79 @@ def start_discussion():
 def run_backend(issue, backend, model, rounds, planners, auditors, agent_configs=None, reasoning=None):
     global is_running, current_process
     try:
-        # 获取当前 python 解释器路径
-        python_exe = sys.executable
-        # 构造命令
-        cmd = [
-            python_exe, 
-            "src/agents/demo_runner.py", 
-            "--issue", issue, 
-            "--backend", backend, 
-            "--rounds", str(rounds),
-            "--planners", str(planners),
-            "--auditors", str(auditors)
-        ]
+        # 确保参数为整数（前端传递的可能是字符串）
+        rounds = int(rounds)
+        planners = int(planners)
+        auditors = int(auditors)
         
-        if model:
-            cmd.extend(["--model", model])
-        
-        if reasoning:
-            cmd.extend(["--reasoning", json.dumps(reasoning)])
-        
-        if agent_configs:
-            cmd.extend(["--agent_configs", json.dumps(agent_configs)])
-        
-        # 运行子进程，不捕获 stdout 以免缓冲区满导致挂起
-        # 所有的日志和事件都通过 API 异步发送回 Flask
-        current_process = subprocess.Popen(
-            cmd,
-            text=True,
-            encoding='utf-8'
-        )
-        
-        # 等待进程结束
-        current_process.wait()
+        # 打包环境：直接调用函数（避免启动新的 EXE 实例）
+        if is_frozen():
+            logger.info("[app] 打包环境：直接调用 run_full_cycle")
+            
+            # 确定模型名称
+            if not model:
+                if backend == 'deepseek':
+                    model = config.DEEPSEEK_MODEL
+                elif backend == 'openrouter':
+                    model = config.OPENROUTER_MODEL
+                elif backend == 'openai':
+                    model = config.OPENAI_MODEL
+                else:
+                    model = config.MODEL_NAME
+            
+            # 构建模型配置
+            model_cfg = {"type": backend, "model": model}
+            if reasoning:
+                model_cfg["reasoning"] = reasoning
+            
+            logger.info(f"[app] 使用模型配置: {model_cfg}, 轮数: {rounds}, 策论家: {planners}, 监察官: {auditors}")
+            
+            # 直接调用核心函数
+            result = run_full_cycle(
+                issue, 
+                model_config=model_cfg, 
+                max_rounds=rounds,
+                num_planners=planners,
+                num_auditors=auditors,
+                agent_configs=agent_configs
+            )
+            
+            logger.info(f"[app] 完成 {rounds} 轮流程")
+            
+        else:
+            # 开发环境：启动子进程（保持原有行为）
+            logger.info("[app] 开发环境：启动 demo_runner.py 子进程")
+            
+            python_exe = sys.executable
+            cmd = [
+                python_exe, 
+                "src/agents/demo_runner.py", 
+                "--issue", issue, 
+                "--backend", backend, 
+                "--rounds", str(rounds),
+                "--planners", str(planners),
+                "--auditors", str(auditors)
+            ]
+            
+            if model:
+                cmd.extend(["--model", model])
+            
+            if reasoning:
+                cmd.extend(["--reasoning", json.dumps(reasoning)])
+            
+            if agent_configs:
+                cmd.extend(["--agent_configs", json.dumps(agent_configs)])
+            
+            current_process = subprocess.Popen(
+                cmd,
+                text=True,
+                encoding='utf-8'
+            )
+            
+            current_process.wait()
+            
     except Exception as e:
-        print(f"启动后端失败: {e}")
+        logger.error(f"[app] 启动后端失败: {e}")
         traceback.print_exc()
     finally:
         is_running = False
@@ -465,7 +530,7 @@ def deepseek_models():
 
 @app.route('/api/config', methods=['GET', 'POST'])
 def handle_config():
-    config_path = os.path.join(os.getcwd(), "src", "config.py")
+    config_path = str(get_config_path())
     
     if request.method == 'GET':
         # 返回当前配置中的 Key (脱敏处理或直接返回，本地工具通常直接返回)
@@ -569,13 +634,90 @@ def delete_workspace(session_id):
     except Exception as e:
         return jsonify({"status": "error", "message": f"删除失败: {str(e)}"}), 500
 
+@app.route('/api/playwright/status', methods=['GET'])
+def playwright_status():
+    """检查Playwright安装状态"""
+    try:
+        from src.utils.pdf_exporter import PLAYWRIGHT_AVAILABLE, PLAYWRIGHT_AUTO_INSTALL
+        
+        status_info = {
+            "installed": PLAYWRIGHT_AVAILABLE,
+            "auto_install_supported": PLAYWRIGHT_AUTO_INSTALL
+        }
+        
+        if PLAYWRIGHT_AVAILABLE:
+            # 检查浏览器是否已下载
+            try:
+                from src.utils.playwright_installer import is_playwright_installed
+                status_info["browser_installed"] = is_playwright_installed()
+            except:
+                status_info["browser_installed"] = True  # 假设已安装
+        
+        return jsonify({"status": "success", "data": status_info})
+        
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/playwright/install', methods=['POST'])
+def install_playwright():
+    """安装Playwright + Chromium"""
+    try:
+        from src.utils.playwright_installer import install_playwright as do_install
+        
+        # 在后台线程中安装，实时返回进度
+        def install_with_progress():
+            messages = []
+            
+            def callback(msg):
+                messages.append(msg)
+                # 发送进度到前端（可以通过 WebSocket 或 SSE，这里简化为日志）
+                logger.info(f"[playwright_install] {msg}")
+            
+            success = do_install(callback=callback)
+            return success, messages
+        
+        # 同步执行（简化实现，实际可用异步）
+        success, messages = install_with_progress()
+        
+        if success:
+            # 重新加载 Playwright
+            global PLAYWRIGHT_AVAILABLE
+            try:
+                from playwright.async_api import async_playwright
+                from src.utils import pdf_exporter
+                pdf_exporter.PLAYWRIGHT_AVAILABLE = True
+                PLAYWRIGHT_AVAILABLE = True
+            except:
+                pass
+            
+            return jsonify({
+                "status": "success",
+                "message": "Playwright 安装成功！",
+                "logs": messages
+            })
+        else:
+            return jsonify({
+                "status": "error",
+                "message": "Playwright 安装失败",
+                "logs": messages
+            }), 500
+        
+    except Exception as e:
+        logger.error(f"[playwright_install] 安装失败: {e}", exc_info=True)
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @app.route('/api/export_pdf', methods=['POST'])
 def export_pdf():
     """使用Playwright导出高质量PDF（保留超链接、避免截断）"""
-    if not PLAYWRIGHT_AVAILABLE:
+    # 动态检测Playwright（支持热重载）
+    playwright_ok = check_playwright_available()
+    
+    if not playwright_ok:
         return jsonify({
             "status": "error", 
-            "message": "Playwright未安装。请运行: pip install playwright && playwright install chromium"
+            "message": "Playwright未安装。请点击【安装Playwright】按钮或运行: pip install playwright && playwright install chromium"
         }), 400
     
     try:
@@ -596,7 +738,7 @@ def export_pdf():
         temp_pdf = os.path.join(temp_dir, f"{timestamp}_{filename}")
         
         # 生成PDF
-        success = generate_pdf_from_html(html_content, temp_pdf, timeout=60000)
+        success = pdf_exporter.generate_pdf_from_html(html_content, temp_pdf, timeout=60000)
         
         if success and os.path.exists(temp_pdf):
             # 读取PDF文件并返回

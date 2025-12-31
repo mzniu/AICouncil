@@ -10,7 +10,7 @@ import requests
 from requests.exceptions import RequestException
 import traceback
 from src import config_manager as config
-from src.utils import logger
+from src.utils.logger import logger
 
 
 def mock_generate_plan(agent_id: str, issue_text: str) -> Dict:

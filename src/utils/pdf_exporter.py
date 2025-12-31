@@ -3,20 +3,67 @@ PDF导出工具 - 使用Playwright实现高质量PDF生成
 支持超链接、避免内容截断、完整保留页面样式
 """
 import os
+import sys
 import asyncio
 import pathlib
 import re
 from typing import Optional
-from src.utils import logger
+from src.utils.logger import logger
 
-# 延迟导入 Playwright，如果没安装则退回到旧方案
+# 延迟导入 Playwright，如果没安装则提供自动安装选项
 PLAYWRIGHT_AVAILABLE = False
+PLAYWRIGHT_AUTO_INSTALL = False  # 标记是否支持自动安装
+
+# 在打包环境中设置Playwright路径
+if getattr(sys, 'frozen', False):
+    # 打包后的环境
+    base_path = pathlib.Path(sys._MEIPASS)
+    
+    # 设置Playwright浏览器路径
+    playwright_browsers = base_path / "playwright" / "browsers"
+    if playwright_browsers.exists():
+        os.environ['PLAYWRIGHT_BROWSERS_PATH'] = str(playwright_browsers)
+        logger.info(f"[pdf_exporter] Set PLAYWRIGHT_BROWSERS_PATH: {playwright_browsers}")
+        
+        # 查找chromium_headless_shell（Playwright优先使用）或chromium（fallback）
+        browser_patterns = ["chromium_headless_shell-*", "chromium-*"]
+        for pattern in browser_patterns:
+            browser_dirs = sorted(playwright_browsers.glob(pattern), reverse=True)
+            if browser_dirs:
+                browser_dir = browser_dirs[0]
+                
+                # 查找可执行文件（多个可能的路径）
+                exe_paths = [
+                    browser_dir / "chrome-headless-shell-win64" / "chrome-headless-shell.exe",
+                    browser_dir / "chrome-headless-shell-win" / "chrome-headless-shell.exe",
+                    browser_dir / "chrome-win" / "chrome.exe",
+                    browser_dir / "chrome-win64" / "chrome.exe",
+                ]
+                
+                for exe_path in exe_paths:
+                    if exe_path.exists():
+                        os.environ['PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH'] = str(exe_path)
+                        logger.info(f"[pdf_exporter] Set PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: {exe_path}")
+                        break
+                
+                if 'PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH' in os.environ:
+                    break
+
 try:
     from playwright.async_api import async_playwright
     PLAYWRIGHT_AVAILABLE = True
     logger.info("[pdf_exporter] Playwright available, using high-quality PDF export")
 except ImportError:
-    logger.warning("[pdf_exporter] Playwright not installed, PDF export will use legacy method")
+    logger.warning("[pdf_exporter] Playwright not installed, checking auto-install support...")
+    
+    # 检查是否支持自动安装（打包环境）
+    try:
+        from src.utils.path_manager import is_frozen
+        if is_frozen():
+            PLAYWRIGHT_AUTO_INSTALL = True
+            logger.info("[pdf_exporter] Auto-install support enabled for packaged environment")
+    except:
+        pass
 
 
 def _inline_echarts_script(html_content: str) -> str:
@@ -45,7 +92,8 @@ def _inline_echarts_script(html_content: str) -> str:
             
             # 替换为内嵌脚本
             inline_script = f'<script>/* ECharts Inline */\n{echarts_code}\n</script>'
-            html_content = re.sub(echarts_pattern, inline_script, html_content, flags=re.IGNORECASE)
+            # 使用函数形式替换，避免将替换字符串解释为正则表达式反向引用
+            html_content = re.sub(echarts_pattern, lambda m: inline_script, html_content, flags=re.IGNORECASE)
             logger.info("[pdf_exporter] ECharts script inlined successfully")
         else:
             logger.warning(f"[pdf_exporter] Local ECharts file not found: {echarts_local_path}")

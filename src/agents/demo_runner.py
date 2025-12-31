@@ -13,7 +13,7 @@ if str(ROOT) not in sys.path:
 
 from src.agents import schemas
 from src.agents import model_adapter
-from src.utils import logger
+from src.utils.logger import logger
 from pydantic import ValidationError
 import time
 import argparse

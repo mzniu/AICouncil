@@ -1,7 +1,8 @@
 ﻿from langchain_core.prompts import PromptTemplate
 from src.agents.langchain_llm import AdapterLLM, ModelConfig
 from src.agents import schemas, model_adapter
-from src.utils import logger, search_utils
+from src.utils.logger import logger
+from src.utils import search_utils
 from src.utils.path_manager import get_workspace_dir
 from pydantic import ValidationError
 import json
