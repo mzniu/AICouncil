@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 支持在 Web 配置页面直接设置 API Key 和 Search Engine ID
   - 完整的测试套件和集成测试
 
+- 📊 **Mermaid 流程图支持**
+  - 集成 Mermaid.js 10.9.5 实现丰富的图表渲染
+  - 支持 8 种图表类型：flowchart（流程图）、sequenceDiagram（时序图）、gantt（甘特图）、classDiagram（类图）、stateDiagram（状态图）、erDiagram（ER图）、journey（用户旅程图）、pie（饼图）
+  - Reporter 智能体可根据内容自动生成合适的流程图
+  - 本地渲染，支持离线使用和 PDF 导出
+  - 提供完整的测试页面和语法示例（test_mermaid.html、test_llm_search.html）
+  - 修复常见语法问题：使用 `flowchart TD` 替代过时的 `graph TD`、正确处理复杂连接、支持中文标签
+
 ### Changed
 
 - 🔧 **简化 Google 搜索实现**
