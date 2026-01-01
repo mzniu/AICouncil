@@ -20,7 +20,7 @@
 - **🔍 增强型搜索**：集成 **Google**（官方 API）、Bing、Baidu、DuckDuckGo、Yahoo、Mojeek 等多引擎并行搜索。采用 **Requests-First** 架构，优先通过轻量级请求获取数据，并具备**智能相关性校验**与**查询优化**功能（自动识别并规避搜索引擎的无关热点干扰）。**Google Custom Search API** 提供高质量搜索结果，国内可直接访问（免费 100 次/天）。其中 Yahoo、Mojeek 和 Google 为纯 HTTP 实现，无需浏览器依赖，运行更稳定。
 - **💻 实时监控面板**：基于 Flask 的 Web 界面，实时展示智能体思考过程、搜索进度及辩论流。支持窗口**最大化/还原**，方便深度阅读。
 - **📄 深度报告生成**：自动生成结构化的 HTML 议事报告，支持一键复制、**整合式下载菜单**（支持 HTML / 长图 / PDF）。
-- **📊 本地图表渲染**：报告内置 ECharts（/static/vendor/echarts.min.js），避免 CDN/跟踪防护阻断，iframe 内可直接使用。
+- **📊 丰富的图表支持**：报告支持 **ECharts** 数据可视化（柱状图、饼图、雷达图等）和 **Mermaid** 流程图（流程图、时序图、甘特图、类图、状态图等）。所有图表库均本地化部署（/static/vendor/），避免 CDN 依赖，离线和 iframe 场景均可用。
 - **📜 历史管理**：完整的会话持久化，支持随时回溯、加载或删除历史议事记录。
 - **💾 阵型预设**：支持保存、加载和管理常用的元老院配置（包括后端模型、议事轮数、智能体数量等），方便快速启动不同场景的议事。
 - **✋ 用户介入**：支持在议事过程中随时输入指令，实时引导智能体的讨论方向。
@@ -80,7 +80,7 @@
 - ✅ **单文件模式**: 无需安装 Python、依赖包、浏览器
 - ✅ **内置 Playwright**: 支持高质量 PDF 导出（带超链接、图表）
 - ✅ **自动配置**: 首次运行自动创建工作目录和配置文件
-- ✅ **离线图表**: 内嵌 ECharts，报告可离线查看
+- ✅ **丰富图表**: 内嵌 ECharts + Mermaid，支持数据可视化和流程图
 - ✅ **多引擎搜索**: 支持 Baidu、Bing、Yahoo、Mojeek、DuckDuckGo
 - ✅ **控制台日志**: 实时显示运行状态，方便排查问题
 
@@ -200,9 +200,34 @@ python src/web/app.py
 ```
 启动后，在浏览器访问 `http://127.0.0.1:5000` 即可开始议事。
 
-### 6. 报告图表（ECharts）
-- 已内置 ECharts 5.4.3：文件位于 `src/web/static/vendor/echarts.min.js`，报告中通过 `<script src="/static/vendor/echarts.min.js"></script>` 加载，离线和 iframe 场景均可用。
-- 若文件缺失，可从 https://registry.npmmirror.com/echarts/5.4.3/files/dist/echarts.min.js 下载后保存到上述路径（也可使用 unpkg/cdnjs 备用源）。
+### 6. 报告图表（ECharts + Mermaid）
+
+#### ECharts 数据可视化
+- 已内置 ECharts 5.4.3：文件位于 `src/web/static/vendor/echarts.min.js`
+- 支持图表类型：柱状图、折线图、饼图、雷达图、散点图等
+- 适用场景：数据对比、统计分析、趋势展示
+- 加载方式：`<script src="/static/vendor/echarts.min.js"></script>`
+- 若文件缺失，可从 https://registry.npmmirror.com/echarts/5.4.3/files/dist/echarts.min.js 下载
+
+#### Mermaid 流程图与架构图
+- 已内置 Mermaid 10.x：文件位于 `src/web/static/vendor/mermaid.min.js`
+- 支持图表类型：
+  - **流程图 (flowchart)**：业务流程、决策树、算法逻辑
+  - **时序图 (sequenceDiagram)**：系统交互、API 调用流程
+  - **甘特图 (gantt)**：项目规划、时间线、里程碑管理
+  - **类图 (classDiagram)**：系统架构、模块关系
+  - **状态图 (stateDiagram)**：状态机、生命周期
+  - **ER图 (erDiagram)**：数据库设计、实体关系
+  - **用户旅程图 (journey)**：用户体验流程
+  - **饼图 (pie)**：简单占比展示
+- 加载方式：
+  ```html
+  <script src="/static/vendor/mermaid.min.js"></script>
+  <script>mermaid.initialize({ startOnLoad: true, theme: 'default' });</script>
+  ```
+- 若文件缺失，可从 https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js 下载
+
+**测试页面**：启动服务后访问 http://127.0.0.1:5000/static/test_mermaid.html 查看所有 Mermaid 图表示例
 
 ---
 
@@ -288,11 +313,11 @@ AICouncil/
 - [x] **阵型预设**：支持保存和一键加载常用的议事配置（模型、轮数、人数）。
 - [x] **多语言文档**：提供中英文双语 README。
 - [x] **EXE 打包**：支持将应用打包为 Windows 可执行文件（双击即用，无需 Python）。
+- [x] **搜索源扩展**：接入 Google Search API 等专业搜索服务。
 
 ### 计划中
 - [ ] **更多 Agent 类型**：增加经济学家、法律顾问、技术专家等垂直领域智能体。
 - [ ] **本地知识库 (RAG)**：支持上传 PDF/Word/Markdown 等文档作为议事参考。
-- [ ] **搜索源扩展**：接入 Google Search API 等专业搜索服务。
 - [ ] **跨平台打包**：支持 Linux 和 macOS 打包。
 
 ---
