@@ -542,6 +542,8 @@ def handle_config():
                 "OPENROUTER_API_KEY": config.OPENROUTER_API_KEY,
                 "ALIYUN_API_KEY": config.ALIYUN_API_KEY,
                 "TAVILY_API_KEY": config.TAVILY_API_KEY,
+                "GOOGLE_API_KEY": config.GOOGLE_API_KEY,
+                "GOOGLE_SEARCH_ENGINE_ID": config.GOOGLE_SEARCH_ENGINE_ID,
                 "SEARCH_PROVIDER": config.SEARCH_PROVIDER,
                 "BROWSER_PATH": getattr(config, 'BROWSER_PATH', '')
             }

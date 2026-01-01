@@ -5,6 +5,32 @@ All notable changes to AICouncil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- 🔍 **Google Custom Search API 集成**
+  - 集成 Google Custom Search API，提供高质量搜索结果
+  - 国内可直接访问，无需代理或浏览器
+  - 响应速度 ~1 秒，显著优于浏览器自动化方案
+  - 免费配额：100 次/天；付费：$5/1000 次查询
+  - 支持在 Web 配置页面直接设置 API Key 和 Search Engine ID
+  - 完整的测试套件和集成测试
+
+### Changed
+
+- 🔧 **简化 Google 搜索实现**
+  - 移除 Playwright 浏览器自动化方案（复杂且不稳定）
+  - 统一使用官方 API，代码更简洁、维护成本更低
+  - 删除 `GOOGLE_SEARCH_PROXY` 配置项
+  - 更新前端配置界面，Google 搜索标注为 "API" 方式
+
+### Removed
+
+- ❌ 移除 `google_search_playwright()` 函数及相关 Playwright 依赖
+- ❌ 移除 `tests/test_google_search.py` Playwright 测试文件
+- ❌ 移除 Google 代理配置选项（不再需要）
+
 ## [1.0.0] - 2025-12-31
 
 ### Added
@@ -16,8 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 监察官（Auditor）：批判性审查，指出风险与漏洞
   - 记录员（Reporter）：实时记录议事过程
 - 🔍 多引擎并行搜索系统
-  - 集成 Baidu、Bing、DuckDuckGo、Yahoo、Mojeek 搜索引擎
-  - Requests-First 架构（Yahoo/Mojeek 纯 HTTP 实现）
+  - 集成 Google、Baidu、Bing、DuckDuckGo、Yahoo、Mojeek 搜索引擎
+  - Requests-First 架构（Google/Yahoo/Mojeek 纯 HTTP 实现）
+  - Google Custom Search API 提供高质量搜索（免费 100 次/天）
   - 智能相关性校验，自动过滤无关热点
   - 查询优化与去重机制
 - 💻 Web 实时监控面板

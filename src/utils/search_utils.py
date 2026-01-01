@@ -494,6 +494,411 @@ def mojeek_search(query: str, max_results: int = 10, max_retries: int = 3) -> st
     return f"Mojeek 搜索失败 (已重试 {max_retries} 次): {str(last_exception)}" if last_exception else "Mojeek 搜索未找到结果。"
 
 
+def google_search_api(query: str, max_results: int = 10, max_retries: int = 3) -> str:
+    """使用 Google Custom Search API 进行搜索（推荐方式）。
+    
+    优势：
+    - 官方 API，无反爬问题
+    - 速度快（~1秒）
+    - 国内可访问（无需代理）
+    - 稳定可靠
+    
+    配置：
+    1. 访问 https://developers.google.com/custom-search/v1/overview
+    2. 创建 API Key 和 Search Engine ID
+    3. 在 config.py 中设置：
+       GOOGLE_API_KEY = "your_api_key"
+       GOOGLE_SEARCH_ENGINE_ID = "your_search_engine_id"
+    
+    限制：
+    - 免费额度：100 次/天
+    - 付费：$5/1000次查询
+    """
+    query = query.strip()
+    if len(query) > 200:
+        query = query[:200]
+    
+    # 检查配置
+    api_key = config.GOOGLE_API_KEY
+    search_engine_id = config.GOOGLE_SEARCH_ENGINE_ID
+    
+    if not api_key or not search_engine_id:
+        logger.warning("GOOGLE_API_KEY or GOOGLE_SEARCH_ENGINE_ID not configured")
+        return "搜索失败：未配置 Google API。请参考文档配置 GOOGLE_API_KEY 和 GOOGLE_SEARCH_ENGINE_ID。"
+    
+    url = "https://www.googleapis.com/customsearch/v1"
+    
+    last_exception = None
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"Performing Google Custom Search (attempt {attempt+1}/{max_retries}) for: {query}")
+            
+            params = {
+                'key': api_key,
+                'cx': search_engine_id,
+                'q': query,
+                'num': min(max_results, 10),  # API 限制单次最多 10 条
+                'lr': 'lang_zh-CN',  # 语言限制
+            }
+            
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            # 检查是否有错误
+            if 'error' in data:
+                error_msg = data['error'].get('message', 'Unknown error')
+                logger.error(f"Google API error: {error_msg}")
+                return f"Google API 错误: {error_msg}"
+            
+            # 提取搜索结果
+            items = data.get('items', [])
+            
+            if not items:
+                logger.info(f"No results found for query: {query}")
+                if attempt < max_retries - 1:
+                    time.sleep(2)
+                    continue
+                return "未找到相关搜索结果。"
+            
+            logger.info(f"Successfully retrieved {len(items)} results via Google API.")
+            
+            # 格式化为统一格式
+            results = []
+            for item in items:
+                results.append({
+                    'title': item.get('title', '无标题'),
+                    'href': item.get('link', '#'),
+                    'body': item.get('snippet', '无摘要')
+                })
+            
+            return format_search_results(results)
+            
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 429:
+                logger.error("Google API rate limit exceeded")
+                return "Google API 配额已用尽。免费版限制 100 次/天。"
+            last_exception = e
+            logger.error(f"Google API attempt {attempt+1} failed: {e}")
+            if attempt < max_retries - 1:
+                time.sleep(3)
+        except Exception as e:
+            last_exception = e
+            logger.error(f"Google API attempt {attempt+1} failed: {e}")
+            if attempt < max_retries - 1:
+                time.sleep(2)
+    
+    return f"Google API 搜索失败 (已重试 {max_retries} 次): {str(last_exception)}"
+
+
+def google_search_playwright(query: str, max_results: int = 10, max_retries: int = 3, proxy: str = None) -> str:
+    """使用 Playwright 执行 Google 搜索（需要访问 Google）。
+    
+    优势：
+    - 真实浏览器环境，反爬能力强
+    - 自动处理 JavaScript 渲染
+    - 绕过部分反爬检测
+    
+    注意：
+    - 国内需要代理
+    - 启动速度较慢（~2-3秒）
+    
+    Args:
+        query: 搜索关键词
+        max_results: 最大结果数
+        max_retries: 重试次数
+        proxy: 代理服务器地址 (例如: "http://127.0.0.1:7890")
+    """
+    import asyncio
+    import urllib.parse
+    import random
+    
+    query = query.strip()
+    if len(query) > 200:
+        query = query[:200]
+    
+    async def _search():
+        try:
+            from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
+            
+            logger.info(f"Performing Google search via Playwright for: {query}")
+            
+            async with async_playwright() as p:
+                # 启动浏览器配置 - 增强反检测
+                launch_options = {
+                    'headless': True,
+                    'args': [
+                        '--no-sandbox',
+                        '--disable-dev-shm-usage',
+                        '--disable-blink-features=AutomationControlled',
+                        '--disable-features=IsolateOrigins,site-per-process',
+                        '--disable-site-isolation-trials',
+                        '--disable-web-security',
+                        '--disable-features=BlockInsecurePrivateNetworkRequests',
+                    ]
+                }
+                
+                browser = await p.chromium.launch(**launch_options)
+                
+                # 上下文配置（包含代理和更多反检测特征）
+                context_options = {
+                    'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                    'locale': 'zh-CN',
+                    'viewport': {'width': 1920, 'height': 1080},
+                    'screen': {'width': 1920, 'height': 1080},
+                    'device_scale_factor': 1,
+                    'has_touch': False,
+                    'is_mobile': False,
+                    'extra_http_headers': {
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+                        'Accept-Encoding': 'gzip, deflate, br',
+                        'DNT': '1',
+                        'Connection': 'keep-alive',
+                        'Upgrade-Insecure-Requests': '1',
+                        'Sec-Fetch-Dest': 'document',
+                        'Sec-Fetch-Mode': 'navigate',
+                        'Sec-Fetch-Site': 'none',
+                        'Sec-Fetch-User': '?1',
+                        'Cache-Control': 'max-age=0',
+                    }
+                }
+                
+                if proxy:
+                    context_options['proxy'] = {'server': proxy}
+                    logger.info(f"Using proxy: {proxy}")
+                
+                context = await browser.new_context(**context_options)
+                
+                # 注入反检测脚本
+                await context.add_init_script("""
+                    // 删除 webdriver 标志
+                    Object.defineProperty(navigator, 'webdriver', {
+                        get: () => undefined
+                    });
+                    
+                    // 修改 plugins 数量
+                    Object.defineProperty(navigator, 'plugins', {
+                        get: () => [1, 2, 3, 4, 5]
+                    });
+                    
+                    // 修改 languages
+                    Object.defineProperty(navigator, 'languages', {
+                        get: () => ['zh-CN', 'zh', 'en-US', 'en']
+                    });
+                    
+                    // Chrome runtime
+                    window.chrome = {
+                        runtime: {}
+                    };
+                    
+                    // Permissions
+                    const originalQuery = window.navigator.permissions.query;
+                    window.navigator.permissions.query = (parameters) => (
+                        parameters.name === 'notifications' ?
+                            Promise.resolve({ state: Notification.permission }) :
+                            originalQuery(parameters)
+                    );
+                """)
+                
+                page = await context.new_page()
+                
+                try:
+                    # 先访问 Google 首页，建立 cookies
+                    logger.info("Visiting Google homepage to establish cookies...")
+                    try:
+                        await page.goto('https://www.google.com', timeout=15000, wait_until='domcontentloaded')
+                        await page.wait_for_timeout(random.randint(1000, 2000))
+                    except:
+                        pass  # 如果首页访问失败，继续尝试搜索
+                    
+                    # 访问 Google 搜索
+                    search_url = f"https://www.google.com/search?q={urllib.parse.quote(query)}&hl=zh-CN&num={max_results}"
+                    
+                    try:
+                        await page.goto(search_url, timeout=20000, wait_until='networkidle')
+                    except PlaywrightTimeoutError:
+                        # 降级为 domcontentloaded
+                        await page.goto(search_url, timeout=20000, wait_until='domcontentloaded')
+                    
+                    # 模拟真实用户行为：随机等待
+                    await page.wait_for_timeout(random.randint(1500, 3000))
+                    
+                    # 模拟滚动行为
+                    try:
+                        await page.evaluate('window.scrollTo(0, Math.random() * 500)')
+                        await page.wait_for_timeout(random.randint(500, 1000))
+                    except:
+                        pass
+                    
+                    # 检查是否被 Google 阻止
+                    page_content = await page.content()
+                    if 'unusual traffic' in page_content.lower() or 'captcha' in page_content.lower():
+                        await browser.close()
+                        return "Google 检测到异常流量，需要人机验证。建议使用其他搜索引擎。"
+                    
+                    # 等待搜索结果加载（使用更通用的选择器）
+                    try:
+                        await page.wait_for_selector('div#search, div#rso, div#center_col', timeout=8000)
+                    except PlaywrightTimeoutError:
+                        # 检查是否是网络不可达
+                        title = await page.title()
+                        if not title or 'google' not in title.lower():
+                            await browser.close()
+                            return "无法访问 Google（可能需要代理）。"
+                        logger.warning("Google search results selector timeout, trying alternative selectors...")
+                    
+                    # 额外等待确保内容加载
+                    await page.wait_for_timeout(1500)
+                    
+                    # 提取搜索结果 - 使用多种选择器
+                    results = []
+                    
+                    # 方法1: 标准搜索结果
+                    search_items = await page.query_selector_all('div.g:not(.g-blk)')
+                    
+                    # 方法2: 如果方法1失败，尝试更宽泛的选择器
+                    if len(search_items) == 0:
+                        search_items = await page.query_selector_all('div[data-sokoban-container], div.Gx5Zad')
+                    
+                    # 方法3: 如果还是没有，尝试直接找 h3
+                    if len(search_items) == 0:
+                        logger.warning("Standard selectors failed, trying h3-based extraction...")
+                        h3_elements = await page.query_selector_all('h3')
+                        
+                        for h3 in h3_elements[:max_results]:
+                            try:
+                                title = await h3.inner_text()
+                                parent = await h3.evaluate_handle('el => el.closest("a")')
+                                
+                                if parent:
+                                    href = await parent.get_attribute('href')
+                                    
+                                    if href and not any(x in href for x in ['google.com/search', 'accounts.google']):
+                                        # 尝试获取摘要（在 h3 的父级元素中查找）
+                                        grandparent = await h3.evaluate_handle('el => el.parentElement.parentElement')
+                                        snippet = "无摘要"
+                                        
+                                        try:
+                                            snippet_text = await grandparent.text_content()
+                                            if snippet_text and len(snippet_text) > len(title):
+                                                snippet = snippet_text.replace(title, '').strip()[:200]
+                                        except:
+                                            pass
+                                        
+                                        results.append({
+                                            'title': title.strip(),
+                                            'href': href,
+                                            'body': snippet
+                                        })
+                            except Exception as e:
+                                logger.debug(f"Failed to parse h3 item: {e}")
+                                continue
+                    else:
+                        # 标准解析
+                        for item in search_items[:max_results * 2]:  # 多抓一些，因为可能有广告
+                            try:
+                                # 提取标题
+                                title_elem = await item.query_selector('h3')
+                                if not title_elem:
+                                    continue
+                                title = await title_elem.inner_text()
+                                
+                                # 提取链接
+                                link_elem = await item.query_selector('a')
+                                if not link_elem:
+                                    continue
+                                href = await link_elem.get_attribute('href')
+                                
+                                # 过滤 Google 自身链接和广告
+                                if not href or any(x in href for x in ['google.com/search', 'accounts.google', 'support.google']):
+                                    continue
+                                
+                                # 提取摘要（多个可能的选择器）
+                                snippet = "无摘要"
+                                for selector in ['.VwiC3b', '.yXK7lf', 'div[data-sncf]', 'div[data-content-feature]', '.IsZvec', 'div.s', 'span.st']:
+                                    snippet_elem = await item.query_selector(selector)
+                                    if snippet_elem:
+                                        text = await snippet_elem.inner_text()
+                                        if len(text) > 20:
+                                            snippet = text
+                                            break
+                                
+                                # 如果还是没找到摘要，尝试从整个 item 中提取
+                                if snippet == "无摘要":
+                                    try:
+                                        full_text = await item.inner_text()
+                                        if full_text and len(full_text) > len(title):
+                                            snippet = full_text.replace(title, '').strip()[:200]
+                                    except:
+                                        pass
+                                
+                                results.append({
+                                    'title': title.strip(),
+                                    'href': href,
+                                    'body': snippet.strip()
+                                })
+                                
+                                if len(results) >= max_results:
+                                    break
+                                    
+                            except Exception as e:
+                                logger.debug(f"Failed to parse Google search item: {e}")
+                                continue
+                    
+                    await browser.close()
+                    
+                    if results:
+                        logger.info(f"Successfully retrieved {len(results)} results via Google (Playwright).")
+                        return format_search_results(results)
+                    else:
+                        return "Google 搜索未找到结果（可能需要代理或网络问题）。"
+                        
+                except PlaywrightTimeoutError:
+                    await browser.close()
+                    return "Google 搜索超时（可能需要代理或网络不稳定）。"
+                except Exception as e:
+                    await browser.close()
+                    raise e
+                    
+        except ImportError:
+            logger.error("Playwright not installed. Run: pip install playwright && playwright install chromium")
+            return "搜索失败：Playwright 未安装。"
+        except Exception as e:
+            logger.error(f"Google search via Playwright failed: {e}")
+            import traceback
+            traceback.print_exc()
+            return f"Google 搜索失败: {str(e)}"
+    
+    # 运行异步搜索
+    last_exception = None
+    for attempt in range(max_retries):
+        try:
+            if attempt > 0:
+                logger.info(f"Retrying Google search (attempt {attempt+1}/{max_retries})...")
+                time.sleep(2 * attempt)
+            
+            result = asyncio.run(_search())
+            
+            # 如果结果成功或明确提示需要代理/Playwright 未安装，直接返回
+            if any(keyword in result for keyword in ["失败", "未找到结果", "超时", "异常流量", "未安装", "无法访问"]):
+                if attempt < max_retries - 1 and "超时" in result:
+                    last_exception = result
+                    continue
+                else:
+                    return result
+            else:
+                return result
+                
+        except Exception as e:
+            last_exception = e
+            logger.error(f"Google search attempt {attempt+1} failed: {e}")
+            if attempt < max_retries - 1:
+                time.sleep(3 * (attempt + 1))
+    
+    return f"Google 搜索失败 (已重试 {max_retries} 次): {str(last_exception)}"
+
+
 def tavily_search(query: str, max_results: int = 5, max_retries: int = 3) -> str:
     """使用 Tavily API 进行联网搜索，带重试机制。"""
     if not config.TAVILY_API_KEY:
@@ -864,6 +1269,9 @@ def search_if_needed(text: str) -> str:
                 return yahoo_search(query, max_results=max_res), provider
             elif provider == "mojeek":
                 return mojeek_search(query, max_results=max_res), provider
+            elif provider == "google":
+                # Google 搜索 (仅 API 方式)
+                return google_search_api(query, max_results=max_res), "google (API)"
             elif provider == "duckduckgo":
                 res = duckduckgo_search(query, max_results=max_res)
                 if "搜索失败" in res:

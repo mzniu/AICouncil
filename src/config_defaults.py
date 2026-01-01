@@ -38,6 +38,10 @@ DEFAULT_OPENROUTER_MODEL = 'google/gemini-2.0-flash-exp:free'
 DEFAULT_TAVILY_API_KEY = ''
 DEFAULT_SEARCH_PROVIDER = 'yahoo,mojeek'  # 默认使用无需API key的搜索引擎
 
+# ============= Google 搜索配置 =============
+DEFAULT_GOOGLE_API_KEY = ''
+DEFAULT_GOOGLE_SEARCH_ENGINE_ID = ''
+
 # ============= Ollama 配置 =============
 DEFAULT_OLLAMA_HTTP_URL = 'http://127.0.0.1:11434/api/generate'
 
