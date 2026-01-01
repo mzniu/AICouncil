@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mermaid 图表测试</title>
+    <script src="/static/vendor/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true, 
+            theme: 'default',
+            flowchart: { curve: 'basis' }
+        });
+    </script>
+    <style>
+        body {
+            font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #3498db;
+            margin-top: 30px;
+        }
+        .mermaid {
+            background: #fafafa;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .success {
+            color: #27ae60;
+            font-weight: bold;
+        }
+        .info {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Mermaid 图表功能测试</h1>
+    
+    <div class="info">
+        <p><strong>测试说明：</strong></p>
+        <p>本页面用于验证 Mermaid.js 是否正确加载并能正常渲染各种类型的图表。</p>
+        <p>如果下面的图表正常显示，说明 Mermaid 功能已成功集成！</p>
+    </div>
+
+    <div class="test-section">
+        <h2>1. 流程图 (Flowchart)</h2>
+        <p>展示业务流程、决策树等。</p>
+        <div class="mermaid">
+flowchart TD
+    A[开始需求分析] --> B{需求是否明确?}
+    B -->|是| C[制定实施方案]
+    B -->|否| D[继续调研]
+    D --> B
+    C --> E[技术评审]
+    E --> F{评审通过?}
+    F -->|是| G[开始开发]
+    F -->|否| C
+    G --> H[测试验证]
+    H --> I{测试通过?}
+    I -->|是| J[部署上线]
+    I -->|否| G
+    J --> K[结束]
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. 时序图 (Sequence Diagram)</h2>
+        <p>展示系统交互、API调用流程。</p>
+        <div class="mermaid">
+sequenceDiagram
+    participant User as 用户
+    participant Frontend as 前端
+    participant Backend as 后端
+    participant Database as 数据库
+    
+    User->>Frontend: 发起请求
+    Frontend->>Backend: API 调用
+    Backend->>Database: 查询数据
+    Database-->>Backend: 返回结果
+    Backend-->>Frontend: JSON 响应
+    Frontend-->>User: 渲染页面
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. 甘特图 (Gantt Chart)</h2>
+        <p>项目时间规划、里程碑管理。</p>
+        <div class="mermaid">
+gantt
+    title AI 项目开发计划
+    dateFormat YYYY-MM-DD
+    section 需求分析
+    需求调研 :a1, 2026-01-01, 7d
+    需求文档 :a2, after a1, 5d
+    section 设计开发
+    架构设计 :b1, after a2, 10d
+    前端开发 :b2, after b1, 20d
+    后端开发 :b3, after b1, 25d
+    section 测试上线
+    系统测试 :c1, after b2, 10d
+    部署上线 :c2, after c1, 3d
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>4. 类图 (Class Diagram)</h2>
+        <p>系统架构、模块关系。</p>
+        <div class="mermaid">
+classDiagram
+    class AIAgent {
+        +String name
+        +String role
+        +execute()
+        +think()
+    }
+    class Leader {
+        +decompose()
+        +synthesize()
+    }
+    class Planner {
+        +generatePlan()
+        +search()
+    }
+    class Auditor {
+        +review()
+        +critique()
+    }
+    
+    AIAgent <|-- Leader
+    AIAgent <|-- Planner
+    AIAgent <|-- Auditor
+    Leader "1" --> "*" Planner : manage
+    Leader "1" --> "*" Auditor : manage
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>5. 状态图 (State Diagram)</h2>
+        <p>状态机、生命周期。</p>
+        <div class="mermaid">
+stateDiagram-v2
+    [*] --> Pending
+    Pending --> Discussing : start
+    Discussing --> Reviewing : propose
+    Reviewing --> Discussing : issue_found
+    Reviewing --> Summarizing : approved
+    Summarizing --> Completed : generate_report
+    Completed --> [*]
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>6. 饼图 (Pie Chart)</h2>
+        <p>简单的占比展示。</p>
+        <div class="mermaid">
+pie title 资源分配占比
+    "研发" : 45
+    "测试" : 20
+    "运维" : 15
+    "产品" : 12
+    "其他" : 8
+        </div>
+    </div>
+
+    <div class="success" style="text-align: center; padding: 30px; font-size: 1.2em;">
+        ✅ 如果上述所有图表都正常显示，说明 Mermaid 功能已成功集成！
+    </div>
+
+    <script>
+        // 检测 Mermaid 是否加载成功
+        window.addEventListener('load', function() {
+            if (typeof mermaid !== 'undefined') {
+                console.log('✅ Mermaid.js 加载成功！');
+                console.log('Mermaid 版本:', mermaid.version || 'unknown');
+            } else {
+                console.error('❌ Mermaid.js 加载失败！');
+                document.body.innerHTML = '<div style="color: red; text-align: center; padding: 50px;"><h1>❌ Mermaid.js 加载失败</h1><p>请检查文件路径是否正确</p></div>';
+            }
+        });
+    </script>
+</body>
+</html>
