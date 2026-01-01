@@ -37,7 +37,7 @@
 
 ## 📅 TODOs
 
-- [ ] **Report Export Enhancement**: Support for PDF export.
+- [x] **Report Export Enhancement**: Support for PDF, Markdown exports.
 - [ ] **Search Capability Upgrade**: Add Google Search support and more precise web content extraction.
 - [ ] **Memory System**: Introduce long-term and short-term memory mechanisms for cross-session context.
 - [ ] **Mobile Optimization**: Improve the user experience on mobile browsers.
@@ -82,7 +82,7 @@ pip install -r requirements-optional.txt
 **Dependency Guide**:
 - `requirements.txt`: Full dependencies (all features)
 - `requirements-minimal.txt`: Core dependencies (basic features, smaller size)
-- `requirements-optional.txt`: Optional enhancements (PDF export, browser search)
+- `requirements-optional.txt`: Optional enhancements (PDF/Markdown export, browser search)
 
 ### 4. Configure API Keys
 1. Copy the configuration template file:
@@ -143,7 +143,7 @@ AICouncil/
 - [x] **UI Interaction Upgrade**: Replaced native alerts with Tailwind CSS custom modals.
 - [x] **History Management**: Supported persistence, backtracking, and physical deletion of records.
 - [x] **Model Adaptation**: Supported DeepSeek, OpenAI, OpenRouter, Ollama, etc.
-- [x] **Report Export**: Supported HTML report generation and long image export.
+- [x] **Report Export**: Supported HTML, PDF, Image, and Markdown format exports.
 - [x] **User Intervention Mode**: Allows users to guide the debate direction at any time.
 - [x] **Multi-language Support**: Implement internationalization (i18n) for the frontend interface.
 - [x] **Council Formations**: Supports saving and one-click loading of common deliberation configurations (models, rounds, agent counts).
@@ -152,7 +152,7 @@ AICouncil/
 ### Planned
 - [ ] **More Agent Types**: Add vertical domain agents like Economists, Legal Advisors, Technical Experts, etc.
 - [ ] **Local Knowledge Base (RAG)**: Support uploading PDF/Word/Markdown documents as references.
-- [ ] **Export Format Extension**: Support exporting to PDF, Markdown, or Word documents.
+- [x] **Export Format Extension**: Supports PDF and Markdown formats; Word export pending.
 - [ ] **Search Source Expansion**: Integrate professional search services like Google Search API.
 
 ---

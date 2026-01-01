@@ -474,6 +474,10 @@
                                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                                         <span data-i18n="btn_download_image">图片格式</span>
                                     </button>
+                                    <button onclick="downloadMarkdown(event); toggleDownloadDropdown()" class="flex items-center">
+                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                                        <span data-i18n="btn_download_md">Markdown 格式</span>
+                                    </button>
                                 </div>
                             </div>
 
@@ -787,6 +791,7 @@
                     btn_download_html: "HTML 格式",
                     btn_download_pdf: "PDF 格式",
                     btn_download_image: "图片格式",
+                    btn_download_md: "Markdown 格式",
                     btn_maximize: "最大化",
                     btn_restore: "还原",
                     loader_text: "正在进行议事讨论...",
@@ -928,6 +933,7 @@
                     btn_download_html: "HTML Format",
                     btn_download_pdf: "PDF Format",
                     btn_download_image: "Image Format",
+                    btn_download_md: "Markdown Format",
                     btn_maximize: "Maximize",
                     btn_restore: "Restore",
                     loader_text: "Discussion in progress...",
@@ -2135,6 +2141,65 @@
                     URL.revokeObjectURL(url);
                 } else {
                     showAlert(t('msg_report_not_ready'), t('title_hint'));
+                }
+            }
+
+            async function downloadMarkdown(e) {
+                if (!(reportIframe && reportIframe.srcdoc)) {
+                    showAlert(t('msg_report_not_ready'), t('title_hint'));
+                    return;
+                }
+                
+                const btn = e ? e.target.closest('button') : null;
+                const originalText = btn ? btn.innerText : '';
+                
+                try {
+                    if (btn) {
+                        btn.disabled = true;
+                        btn.innerText = '🔄 转换中...';
+                    }
+                    
+                    console.log('开始Markdown导出...');
+                    
+                    // 发送HTML到后端转换
+                    const response = await fetch('/api/export_md', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            html: reportIframe.srcdoc,
+                            filename: `议事报告_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.md`
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.message || 'Markdown导出失败');
+                    }
+                    
+                    // 获取文件
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `议事报告_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.md`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    
+                    console.log('✅ Markdown导出成功');
+                    showAlert('Markdown格式导出成功！', t('title_success'));
+                    
+                } catch (error) {
+                    console.error('Markdown导出失败:', error);
+                    showAlert('Markdown导出失败: ' + error.message, t('title_error'), 'error');
+                } finally {
+                    if (btn) {
+                        btn.innerText = originalText;
+                        btn.disabled = false;
+                    }
                 }
             }
 
