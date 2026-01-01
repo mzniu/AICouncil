@@ -205,30 +205,58 @@ class MarkdownExporter:
     
     def _get_text(self, element) -> str:
         """获取元素的文本内容，处理特殊元素"""
+        # 递归处理元素的子节点，保留并转换内嵌的特殊标签（如<a>, <strong>, <em>, <code>）
         if isinstance(element, NavigableString):
             return str(element).strip()
-        
-        # 处理链接
-        if element.name == 'a':
-            text = element.get_text().strip()
-            href = element.get('href', '')
-            if href:
-                return f"[{text}]({href})"
-            return text
-        
-        # 处理粗体
-        if element.name in ['strong', 'b']:
-            return f"**{element.get_text().strip()}**"
-        
-        # 处理斜体
-        if element.name in ['em', 'i']:
-            return f"*{element.get_text().strip()}*"
-        
-        # 处理行内代码
-        if element.name == 'code':
-            return f"`{element.get_text().strip()}`"
-        
-        return element.get_text().strip()
+
+        if not isinstance(element, Tag):
+            return str(element).strip()
+
+        parts = []
+        for child in element.children:
+            # 文本节点
+            if isinstance(child, NavigableString):
+                parts.append(str(child))
+                continue
+
+            if not isinstance(child, Tag):
+                parts.append(str(child))
+                continue
+
+            name = child.name.lower()
+
+            if name == 'a':
+                text = child.get_text().strip()
+                href = child.get('href', '').strip()
+                if href:
+                    parts.append(f"[{text}]({href})")
+                else:
+                    parts.append(text)
+                continue
+
+            if name in ['strong', 'b']:
+                inner = self._get_text(child)
+                parts.append(f"**{inner}**")
+                continue
+
+            if name in ['em', 'i']:
+                inner = self._get_text(child)
+                parts.append(f"*{inner}*")
+                continue
+
+            if name == 'code':
+                code_text = child.get_text().strip()
+                parts.append(f"`{code_text}`")
+                continue
+
+            # 其他标签递归展开
+            parts.append(self._get_text(child))
+
+        # 合并并规范空白
+        text = ''.join(parts)
+        # 将多个空白压缩为单个空格
+        text = re.sub(r"\s+", ' ', text).strip()
+        return text
     
     def _process_table(self, table: Tag):
         """处理HTML表格，转换为Markdown表格"""
