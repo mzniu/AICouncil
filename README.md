@@ -17,7 +17,7 @@
   - **策论家 (Planner)**：基于搜索增强（RAG）提供专业方案与深度见解。
   - **监察官 (Auditor)**：对策论家的方案进行批判性审查，指出潜在风险与漏洞。
   - **记录员 (Reporter)**：实时记录议事过程，确保信息不遗漏。
-- **🔍 增强型搜索**：集成 Bing、Baidu、DuckDuckGo、Yahoo、Mojeek 等多引擎并行搜索。采用 **Requests-First** 架构，优先通过轻量级请求获取数据，并具备**智能相关性校验**与**查询优化**功能（自动识别并规避搜索引擎的无关热点干扰）。其中 Yahoo 和 Mojeek 为纯 Requests 实现，无需浏览器依赖，运行更稳定。
+- **🔍 增强型搜索**：集成 **Google**（官方 API）、Bing、Baidu、DuckDuckGo、Yahoo、Mojeek 等多引擎并行搜索。采用 **Requests-First** 架构，优先通过轻量级请求获取数据，并具备**智能相关性校验**与**查询优化**功能（自动识别并规避搜索引擎的无关热点干扰）。**Google Custom Search API** 提供高质量搜索结果，国内可直接访问（免费 100 次/天）。其中 Yahoo、Mojeek 和 Google 为纯 HTTP 实现，无需浏览器依赖，运行更稳定。
 - **💻 实时监控面板**：基于 Flask 的 Web 界面，实时展示智能体思考过程、搜索进度及辩论流。支持窗口**最大化/还原**，方便深度阅读。
 - **📄 深度报告生成**：自动生成结构化的 HTML 议事报告，支持一键复制、**整合式下载菜单**（支持 HTML / 长图 / PDF）。
 - **📊 本地图表渲染**：报告内置 ECharts（/static/vendor/echarts.min.js），避免 CDN/跟踪防护阻断，iframe 内可直接使用。

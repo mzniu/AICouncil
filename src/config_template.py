@@ -39,11 +39,28 @@ OPENROUTER_MODEL = os.getenv('OPENROUTER_MODEL', 'google/gemini-3-flash-preview'
 
 # Search API configuration (Tavily is recommended for LLM search)
 TAVILY_API_KEY = os.getenv('TAVILY_API_KEY', '')
-# 搜索引擎选项: 'tavily', 'duckduckgo', 'bing', 'baidu', 'yahoo', 'mojeek'
-# 支持多选，用逗号分隔，例如: 'yahoo,bing,baidu'
-# yahoo: 底层使用Bing引擎，无需API key，支持中英文
-# mojeek: 独立搜索引擎，无需API key，英文效果较好
-SEARCH_PROVIDER = os.getenv('SEARCH_PROVIDER', 'baidu')  # Options: 'tavily', 'duckduckgo', 'bing', 'baidu', 'yahoo', 'mojeek' (comma separated for multiple)
+
+# Google Custom Search API configuration (推荐：稳定快速，国内无需代理)
+# 配置步骤：https://developers.google.com/custom-search/v1/overview
+# 1. 创建 API Key: https://console.cloud.google.com/apis/credentials
+# 2. 创建 Search Engine: https://programmablesearchengine.google.com/
+# 免费额度：100 次/天 | 付费：$5/1000次
+GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', '')
+GOOGLE_SEARCH_ENGINE_ID = os.getenv('GOOGLE_SEARCH_ENGINE_ID', '')
+
+# Google 搜索代理配置（仅 Playwright 方案需要，国内环境必需）
+# 格式：http://127.0.0.1:7890 或 socks5://127.0.0.1:1080
+GOOGLE_SEARCH_PROXY = os.getenv('GOOGLE_SEARCH_PROXY', '')
+
+# 搜索引擎选项: 'tavily', 'duckduckgo', 'bing', 'baidu', 'yahoo', 'mojeek', 'google'
+# 支持多选，用逗号分隔，例如: 'google,yahoo,bing'
+# - google: 使用 Google Custom Search API（推荐，需配置 GOOGLE_API_KEY）
+#          如未配置 API，自动降级为 Playwright 方案（国内需要代理）
+# - google_api: 强制使用 API 方案
+# - google_playwright: 强制使用 Playwright 方案（需代理）
+# - yahoo: 底层使用Bing引擎，无需API key，支持中英文
+# - mojeek: 独立搜索引擎，无需API key，英文效果较好
+SEARCH_PROVIDER = os.getenv('SEARCH_PROVIDER', 'baidu')  # Options: 'tavily', 'duckduckgo', 'bing', 'baidu', 'yahoo', 'mojeek', 'google' (comma separated for multiple)
 
 # Ollama HTTP endpoint (if running local HTTP server)
 OLLAMA_HTTP_URL = os.getenv('OLLAMA_HTTP_URL', 'http://127.0.0.1:11434/api/generate')
