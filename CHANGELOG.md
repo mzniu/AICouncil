@@ -25,6 +25,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 提供完整的测试页面和语法示例（test_mermaid.html、test_llm_search.html）
   - 修复常见语法问题：使用 `flowchart TD` 替代过时的 `graph TD`、正确处理复杂连接、支持中文标签
 
+- 📝 **Markdown 格式导出**
+  - 新增 Markdown 格式报告导出功能
+  - 使用 BeautifulSoup4 智能解析 HTML 结构
+  - 自动转换标题、段落、列表、表格、链接、代码块
+  - 保留 Mermaid 流程图代码块（可在 Typora、VS Code、GitHub 中渲染）
+  - ECharts 图表转换为文字描述占位符
+  - 完整保留报告层级结构和格式化
+  - 支持 CommonMark 标准，兼容主流 Markdown 编辑器
+  - 一键导出，文件大小仅为 HTML 的 5-10%
+
 ### Changed
 
 - 🔧 **简化 Google 搜索实现**

@@ -73,7 +73,7 @@
 5. **查看结果**
    - 实时查看各智能体的思考过程
    - 讨论结束后自动生成 HTML 报告
-   - 支持导出为 **HTML / 截图 / PDF** 格式
+   - 支持导出为 **HTML / PDF / 图片 / Markdown** 格式
 
 #### ⚙️ 核心功能
 
@@ -81,7 +81,8 @@
 - ✅ **内置 Playwright**: 支持高质量 PDF 导出（带超链接、图表）
 - ✅ **自动配置**: 首次运行自动创建工作目录和配置文件
 - ✅ **丰富图表**: 内嵌 ECharts + Mermaid，支持数据可视化和流程图
-- ✅ **多引擎搜索**: 支持 Baidu、Bing、Yahoo、Mojeek、DuckDuckGo
+- ✅ **多格式导出**: HTML、PDF、图片、Markdown 四种格式任选
+- ✅ **多引擎搜索**: 支持 Google API、Baidu、Bing、Yahoo、Mojeek、DuckDuckGo
 - ✅ **控制台日志**: 实时显示运行状态，方便排查问题
 
 #### ⚠️ 注意事项
@@ -264,7 +265,9 @@ python src/web/app.py
 
 - **后端**: Python, Flask, LangChain
 - **前端**: Tailwind CSS, JavaScript (ES6+)
-- **搜索**: DrissionPage (自动化抓取), Requests + BeautifulSoup4 (轻量级抓取)
+- **搜索**: Google Custom Search API, DrissionPage (自动化抓取), Requests + BeautifulSoup4 (轻量级抓取)
+- **导出**: Playwright (PDF), BeautifulSoup4 (Markdown)
+- **可视化**: ECharts 5.4.3 (数据图表), Mermaid 10.9.5 (流程图)
 - **模型**: OpenAI API 兼容接口, Ollama (本地)
 
 ---

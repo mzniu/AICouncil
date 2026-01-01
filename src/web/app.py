@@ -19,6 +19,7 @@ if str(ROOT) not in sys.path:
 from src.agents.langchain_agents import generate_report_from_workspace, run_full_cycle
 from src import config_manager as config
 from src.utils import pdf_exporter
+from src.utils import md_exporter
 from src.utils.path_manager import get_workspace_dir, get_config_path, is_frozen
 from src.utils.logger import logger
 import logging
@@ -783,6 +784,48 @@ def check_pdf_available():
         "available": PLAYWRIGHT_AVAILABLE,
         "message": "Playwright已安装" if PLAYWRIGHT_AVAILABLE else "需要安装Playwright: pip install playwright && playwright install chromium"
     })
+
+@app.route('/api/export_md', methods=['POST'])
+def export_md():
+    """导出Markdown格式报告"""
+    try:
+        data = request.json
+        html_content = data.get('html')
+        filename = data.get('filename', 'report.md')
+        
+        if not html_content:
+            return jsonify({"status": "error", "message": "HTML内容不能为空"}), 400
+        
+        logger.info("[api] Converting HTML to Markdown...")
+        
+        # 转换为Markdown
+        markdown_content = md_exporter.export_html_to_markdown(html_content)
+        
+        if not markdown_content:
+            return jsonify({
+                "status": "error",
+                "message": "Markdown转换失败"
+            }), 500
+        
+        logger.info(f"[api] Markdown conversion successful, length: {len(markdown_content)} chars")
+        
+        # 返回Markdown文件
+        from flask import send_file
+        import io
+        return send_file(
+            io.BytesIO(markdown_content.encode('utf-8')),
+            mimetype='text/markdown',
+            as_attachment=True,
+            download_name=filename
+        )
+        
+    except Exception as e:
+        logger.error(f"[api] Markdown export error: {e}")
+        traceback.print_exc()
+        return jsonify({
+            "status": "error",
+            "message": f"导出失败: {str(e)}"
+        }), 500
 
 if __name__ == '__main__':
     app.run(port=5000, debug=True)
