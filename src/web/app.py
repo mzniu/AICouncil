@@ -876,34 +876,49 @@ def save_report_edit(workspace_id):
         versions_dir = workspace_path / "versions"
         versions_dir.mkdir(exist_ok=True)
         
-        # 生成版本信息
-        now = datetime.now()
-        timestamp_str = now.strftime('%Y%m%d_%H%M%S')
-        timestamp_iso = now.isoformat()
-        version_id = f"v{len(list(versions_dir.glob('*.html'))) + 1}"
-        version_path = versions_dir / f"{version_id}_{timestamp_str}.html"
-        
-        # 备份当前版本
-        report_path = workspace_path / "report.html"
-        if report_path.exists():
-            shutil.copy(report_path, version_path)
-        
-        # 保存新版本
-        html_content = data.get('html_content', '')
-        report_path.write_text(html_content, encoding='utf-8')
-        
-        # 更新元数据
+        # 读取或初始化元数据
         metadata_path = workspace_path / "report_edits.json"
         if metadata_path.exists():
             with open(metadata_path, 'r', encoding='utf-8') as f:
                 metadata = json.load(f)
         else:
-            metadata = {"current_version": "initial", "versions": []}
+            # 首次编辑，初始化元数据并保存原始报告为v0
+            metadata = {"current_version": "v0", "versions": []}
+            report_path = workspace_path / "report.html"
+            if report_path.exists():
+                # 保存原始报告为v0
+                v0_path = versions_dir / "v0_original.html"
+                shutil.copy(report_path, v0_path)
+                metadata["versions"].append({
+                    "id": "v0",
+                    "timestamp": datetime.fromtimestamp(report_path.stat().st_mtime).isoformat(),
+                    "changes_summary": "初始生成的报告（AI生成）",
+                    "file_path": str(v0_path.relative_to(workspace_path))
+                })
+                logger.info(f"[editor] 已将原始报告保存为 v0: {workspace_id}")
         
+        # 生成新版本信息
+        now = datetime.now()
+        timestamp_str = now.strftime('%Y%m%d_%H%M%S')
+        timestamp_iso = now.isoformat()
+        # 版本号基于已有版本数量（包括v0）
+        version_num = len(metadata["versions"]) + 1
+        version_id = f"v{version_num}"
+        version_path = versions_dir / f"{version_id}_{timestamp_str}.html"
+        
+        # 保存新版本的HTML到版本目录
+        html_content = data.get('html_content', '')
+        version_path.write_text(html_content, encoding='utf-8')
+        
+        # 同时更新当前报告文件（这样打开报告时看到的就是最新版本）
+        report_path = workspace_path / "report.html"
+        report_path.write_text(html_content, encoding='utf-8')
+        
+        # 更新元数据
         metadata["current_version"] = version_id
         metadata["versions"].append({
             "id": version_id,
-            "timestamp": timestamp_iso,  # 使用ISO格式便于JavaScript解析
+            "timestamp": timestamp_iso,
             "changes_summary": data.get('metadata', {}).get('edit_summary', '用户编辑'),
             "file_path": str(version_path.relative_to(workspace_path))
         })
@@ -963,26 +978,34 @@ def get_report_versions(workspace_id):
         metadata_path = workspace_path / "report_edits.json"
         
         if not metadata_path.exists():
-            # 返回当前版本信息
+            # 如果没有编辑历史，返回原始报告信息
+            report_path = workspace_path / "report.html"
+            if report_path.exists():
+                file_time = datetime.fromtimestamp(report_path.stat().st_mtime).isoformat()
+            else:
+                file_time = datetime.now().isoformat()
+            
             return jsonify([{
-                "id": "current",
-                "timestamp": datetime.now().isoformat(),
-                "changes_summary": "初始生成的报告",
-                "file_path": "report.html"
+                "id": "v0",
+                "timestamp": file_time,
+                "changes_summary": "初始生成的报告（AI生成）",
+                "file_path": "report.html",
+                "is_current": True
             }])
         
         with open(metadata_path, 'r', encoding='utf-8') as f:
             metadata = json.load(f)
         
-        # 添加当前版本到列表最前面
-        versions = [{
-            "id": "current",
-            "timestamp": datetime.now().isoformat(),
-            "changes_summary": "当前版本",
-            "file_path": "report.html"
-        }] + metadata.get("versions", [])
+        # 获取版本列表（倒序显示，最新的在前）
+        versions = metadata.get("versions", [])
+        current_version_id = metadata.get("current_version", "v0")
         
-        return jsonify(versions)
+        # 标记当前版本
+        for v in versions:
+            v["is_current"] = (v["id"] == current_version_id)
+        
+        # 倒序返回（最新版本在最前）
+        return jsonify(list(reversed(versions)))
         
     except Exception as e:
         logger.error(f"[editor] Get versions error: {e}")
@@ -1020,7 +1043,7 @@ def get_report_version_content(workspace_id, version_id):
 
 @app.route('/api/report/restore/<workspace_id>/<version_id>', methods=['POST'])
 def restore_report_version(workspace_id, version_id):
-    """恢复到指定版本"""
+    """恢复到指定版本（作为新的当前版本）"""
     try:
         workspace_path = pathlib.Path(get_workspace_dir()) / workspace_id
         metadata_path = workspace_path / "report_edits.json"
@@ -1035,8 +1058,13 @@ def restore_report_version(workspace_id, version_id):
         version_path = workspace_path / version_info["file_path"]
         report_path = workspace_path / "report.html"
         
-        # 恢复版本
+        # 恢复版本到当前报告
         shutil.copy(version_path, report_path)
+        
+        # 更新当前版本标记
+        metadata["current_version"] = version_id
+        with open(metadata_path, 'w', encoding='utf-8') as f:
+            json.dump(metadata, f, ensure_ascii=False, indent=2)
         
         logger.info(f"[editor] Restored version {version_id} for workspace {workspace_id}")
         

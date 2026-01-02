@@ -601,27 +601,36 @@ class ReportEditor {
             return '<p class="no-versions">暂无版本历史</p>';
         }
         
-        return versions.map((version, index) => `
-            <div class="version-item ${index === 0 ? 'current' : ''}">
-                <div class="version-header">
-                    <span class="version-tag">${index === 0 ? '当前版本' : version.id}</span>
-                    <span class="version-time">${this.formatDate(version.timestamp)}</span>
-                </div>
-                <div class="version-changes">
-                    ${version.changes_summary || '无修改说明'}
-                </div>
-                ${index > 0 ? `
-                    <div class="version-actions">
-                        <button onclick="reportEditor.previewVersion('${version.id}')" class="btn-small btn-secondary">
-                            预览
-                        </button>
-                        <button onclick="reportEditor.restoreVersion('${version.id}')" class="btn-small btn-primary">
-                            恢复此版本
-                        </button>
+        return versions.map((version) => {
+            const isCurrent = version.is_current === true;
+            const isV0 = version.id === 'v0';
+            
+            return `
+                <div class="version-item ${isCurrent ? 'current' : ''}">
+                    <div class="version-header">
+                        <span class="version-tag">
+                            ${version.id}
+                            ${isCurrent ? ' <span class="current-badge">当前版本</span>' : ''}
+                            ${isV0 ? ' <span class="original-badge">原始</span>' : ''}
+                        </span>
+                        <span class="version-time">${this.formatDate(version.timestamp)}</span>
                     </div>
-                ` : ''}
-            </div>
-        `).join('');
+                    <div class="version-changes">
+                        ${version.changes_summary || '无修改说明'}
+                    </div>
+                    ${!isCurrent ? `
+                        <div class="version-actions">
+                            <button onclick="reportEditor.previewVersion('${version.id}')" class="btn-small btn-secondary">
+                                预览
+                            </button>
+                            <button onclick="reportEditor.restoreVersion('${version.id}')" class="btn-small btn-primary">
+                                恢复此版本
+                            </button>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }).join('');
     }
     
     async previewVersion(versionId) {
