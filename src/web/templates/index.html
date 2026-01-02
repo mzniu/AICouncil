@@ -1325,6 +1325,8 @@
             let lastEventCount = 0;
             let lastLogCount = 0;
             let currentProgress = 0;
+            let currentRound = 1;
+            let currentSessionId = null;
             let isRunning = false;
             let isReportingPhase = false;
             let openRouterModelsFetched = false;
@@ -1728,6 +1730,12 @@
                 if (event.chunk_id) div.id = `event-${event.chunk_id}`;
                 
                 if (event.type === 'system_start') {
+                    // 捕获并保存当前会话ID
+                    if (event.session_id) {
+                        currentSessionId = event.session_id;
+                        console.log('[Editor] Session ID captured:', currentSessionId);
+                    }
+                    
                     div.className = 'space-y-4 my-6';
                     div.innerHTML = `
                         <div class="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-5 shadow-xl border border-slate-700 text-white">
