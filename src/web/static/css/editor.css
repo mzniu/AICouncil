@@ -1,0 +1,442 @@
+/**
+ * AICouncil 报告编辑器样式
+ * 版本: MVP v1.0
+ */
+
+/* ==================== 编辑器工具栏 ==================== */
+.editor-toolbar {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    padding: 12px 16px;
+    transition: all 0.3s ease;
+}
+
+.toolbar-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.editor-toolbar .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.editor-toolbar .btn svg {
+    flex-shrink: 0;
+}
+
+.editor-toolbar .btn-primary {
+    background: #2563eb;
+    color: white;
+}
+
+.editor-toolbar .btn-primary:hover {
+    background: #1d4ed8;
+    transform: translateY(-1px);
+}
+
+.editor-toolbar .btn-success {
+    background: #10b981;
+    color: white;
+}
+
+.editor-toolbar .btn-success:hover {
+    background: #059669;
+    transform: translateY(-1px);
+}
+
+.editor-toolbar .btn-secondary {
+    background: #64748b;
+    color: white;
+}
+
+.editor-toolbar .btn-secondary:hover {
+    background: #475569;
+}
+
+.editor-toolbar .btn-info {
+    background: #0ea5e9;
+    color: white;
+}
+
+.editor-toolbar .btn-info:hover {
+    background: #0284c7;
+}
+
+.toolbar-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-left: 16px;
+    margin-left: 16px;
+    border-left: 1px solid #e2e8f0;
+    font-size: 13px;
+    color: #64748b;
+}
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #94a3b8;
+    animation: pulse 2s infinite;
+}
+
+.status-indicator.status-view {
+    background: #94a3b8;
+    animation: none;
+}
+
+.status-indicator.status-editing {
+    background: #f59e0b;
+}
+
+.status-indicator.status-saving {
+    background: #3b82f6;
+}
+
+.status-indicator.status-saved {
+    background: #10b981;
+    animation: none;
+}
+
+.status-indicator.status-warning {
+    background: #f59e0b;
+}
+
+.status-indicator.status-error {
+    background: #ef4444;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* ==================== 编辑模式样式 ==================== */
+body.edit-mode-active {
+    padding-top: 80px; /* 为工具栏留出空间 */
+}
+
+[contenteditable="true"] {
+    outline: 2px dashed transparent;
+    transition: outline 0.2s ease;
+    cursor: text;
+    padding: 4px;
+    border-radius: 4px;
+}
+
+[contenteditable="true"]:hover {
+    outline-color: #93c5fd;
+    background-color: rgba(147, 197, 253, 0.05);
+}
+
+[contenteditable="true"]:focus {
+    outline-color: #3b82f6;
+    background-color: rgba(59, 130, 246, 0.05);
+}
+
+.editable-active {
+    position: relative;
+}
+
+/* ==================== 通知消息 ==================== */
+.notification {
+    position: fixed;
+    top: 90px;
+    right: 20px;
+    z-index: 1001;
+    max-width: 400px;
+    padding: 16px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    font-size: 14px;
+    font-weight: 500;
+    opacity: 0;
+    transform: translateX(400px);
+    transition: all 0.3s ease;
+}
+
+.notification.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.notification-info {
+    background: #dbeafe;
+    color: #1e40af;
+    border-left: 4px solid #3b82f6;
+}
+
+.notification-success {
+    background: #d1fae5;
+    color: #065f46;
+    border-left: 4px solid #10b981;
+}
+
+.notification-warning {
+    background: #fef3c7;
+    color: #92400e;
+    border-left: 4px solid #f59e0b;
+}
+
+.notification-error {
+    background: #fee2e2;
+    color: #991b1b;
+    border-left: 4px solid #ef4444;
+}
+
+/* ==================== 模态框样式 ==================== */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+}
+
+.modal-content {
+    position: relative;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    max-width: 800px;
+    width: 90%;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: #1e293b;
+}
+
+.modal-close {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 6px;
+    transition: background 0.2s ease;
+}
+
+.modal-close:hover {
+    background: #f1f5f9;
+}
+
+.modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+}
+
+.modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 16px 24px;
+    border-top: 1px solid #e2e8f0;
+}
+
+/* ==================== 版本历史样式 ==================== */
+.version-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.version-item {
+    padding: 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    transition: all 0.2s ease;
+}
+
+.version-item:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.version-item.current {
+    border-color: #3b82f6;
+    background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
+}
+
+.version-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.version-tag {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.version-item.current .version-tag {
+    background: #3b82f6;
+    color: white;
+}
+
+.version-time {
+    font-size: 13px;
+    color: #64748b;
+}
+
+.version-changes {
+    color: #475569;
+    font-size: 14px;
+    line-height: 1.6;
+    margin-bottom: 12px;
+}
+
+.version-actions {
+    display: flex;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px dashed #e2e8f0;
+}
+
+.btn-small {
+    padding: 6px 12px;
+    font-size: 13px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.btn-small.btn-primary {
+    background: #2563eb;
+    color: white;
+}
+
+.btn-small.btn-primary:hover {
+    background: #1d4ed8;
+}
+
+.btn-small.btn-secondary {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.btn-small.btn-secondary:hover {
+    background: #e2e8f0;
+}
+
+.no-versions {
+    text-align: center;
+    padding: 40px;
+    color: #94a3b8;
+    font-size: 14px;
+}
+
+/* ==================== 响应式设计 ==================== */
+@media (max-width: 768px) {
+    .editor-toolbar {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        padding: 10px;
+    }
+    
+    .toolbar-content {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    .editor-toolbar .btn {
+        padding: 6px 12px;
+        font-size: 13px;
+    }
+    
+    .editor-toolbar .btn span {
+        display: none;
+    }
+    
+    .toolbar-status {
+        width: 100%;
+        padding-left: 0;
+        margin-left: 0;
+        border-left: none;
+        border-top: 1px solid #e2e8f0;
+        padding-top: 8px;
+        margin-top: 8px;
+    }
+    
+    .modal-content {
+        width: 95%;
+        max-height: 90vh;
+    }
+    
+    .notification {
+        right: 10px;
+        left: 10px;
+        max-width: none;
+    }
+}
+
+/* ==================== 打印样式 ==================== */
+@media print {
+    .editor-toolbar,
+    .notification,
+    .modal {
+        display: none !important;
+    }
+    
+    [contenteditable="true"] {
+        outline: none !important;
+        background: none !important;
+    }
+}

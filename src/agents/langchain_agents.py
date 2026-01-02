@@ -391,7 +391,14 @@ def make_reporter_chain(model_config: Dict[str, Any]):
         2. **输出格式**：必须输出一个完整的、自包含的 HTML 页面代码（包含 <!DOCTYPE html>, <html>, <head>, <style>, <body>）。
         3. **禁止 Markdown**：绝对不要将 HTML 代码包裹在 ```html 或 ``` 等 Markdown 代码块标签中，直接输出 HTML 源码。
         4. **视觉设计**：使用现代、简约、专业的 UI 设计。利用 CSS 构建清晰的卡片布局、步骤条或信息图表。
-        5. **数据可视化（强烈推荐）**：
+        5. **交互式编辑器支持**：
+           - **引入编辑器资源**：在 HTML 的 <head> 中添加以下内容（用于支持报告编辑功能）：
+             ```html
+             <link rel="stylesheet" href="/static/css/editor.css">
+             <script src="/static/js/report-editor.js"></script>
+             ```
+           - **数据属性标记**：为可编辑章节添加 `data-section-id` 属性，例如：`<div class="card" data-section-id="section-1">`
+        6. **数据可视化（强烈推荐）**：
            - **使用 ECharts 图表**：在报告中适当位置添加数据可视化图表，让报告更加直观和专业。
            - **引入方式**：在 HTML 的 <head> 中添加：`<script src="/static/vendor/echarts.min.js"></script>`
            - **推荐图表类型**：
