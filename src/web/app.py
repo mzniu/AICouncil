@@ -827,6 +827,39 @@ def export_md():
             "message": f"导出失败: {str(e)}"
         }), 500
 
+# ==================== 报告查看路由 ====================
+
+@app.route('/report/<workspace_id>')
+def view_report(workspace_id):
+    """通过Flask服务器查看报告（正确识别workspace_id）"""
+    try:
+        workspace_path = pathlib.Path(get_workspace_dir()) / workspace_id
+        report_path = workspace_path / "report.html"
+        
+        if not report_path.exists():
+            return f"<h1>报告不存在</h1><p>工作区 {workspace_id} 中未找到 report.html</p>", 404
+        
+        with open(report_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        
+        # 确保workspace-id元数据存在（防止旧报告缺失）
+        if 'name="workspace-id"' not in html_content:
+            # 在<head>中注入workspace-id
+            if '<head>' in html_content:
+                html_content = html_content.replace(
+                    '<head>',
+                    f'<head>\n    <meta name="workspace-id" content="{workspace_id}">'
+                )
+                logger.info(f"[view_report] 已动态注入 workspace-id: {workspace_id}")
+        
+        from flask import Response
+        return Response(html_content, mimetype='text/html')
+        
+    except Exception as e:
+        logger.error(f"[view_report] Error: {e}")
+        traceback.print_exc()
+        return f"<h1>加载失败</h1><p>{str(e)}</p>", 500
+
 # ==================== 报告编辑器 API 端点 ====================
 
 @app.route('/api/report/edit/<workspace_id>', methods=['POST'])

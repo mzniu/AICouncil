@@ -12,7 +12,95 @@ class ReportEditor {
         this.autoSaveInterval = null;
         this.hasUnsavedChanges = false;
         
+        // **核心修复**: 检测workspace_id是否有效
+        if (!this.workspaceId || this.workspaceId === 'unknown') {
+            console.error('[Editor] ❌ workspace_id 未识别 (当前值:', this.workspaceId, ')');
+            this.showCriticalError();
+            return;
+        }
+        
+        console.log('[Editor] ✅ 初始化编辑器，workspace_id:', this.workspaceId);
         this.init();
+    }
+    
+    showCriticalError() {
+        // 显示醒目的错误提示
+        const errorBanner = document.createElement('div');
+        errorBanner.className = 'critical-error-banner';
+        errorBanner.innerHTML = `
+            <div class="error-content">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <div>
+                    <h3>⚠️ 无法使用编辑器</h3>
+                    <p>报告必须通过 Flask 服务器访问才能编辑。</p>
+                    <p><strong>正确方式</strong>: 访问 <code>http://127.0.0.1:5000/report/${this.extractSessionIdFromPath()}</code></p>
+                    <p><strong>错误方式</strong>: 直接打开本地 HTML 文件 (file:///...)</p>
+                </div>
+            </div>
+        `;
+        document.body.insertBefore(errorBanner, document.body.firstChild);
+        
+        // 添加错误样式
+        const style = document.createElement('style');
+        style.textContent = `
+            .critical-error-banner {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+                color: white;
+                padding: 20px;
+                z-index: 10000;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            }
+            .critical-error-banner .error-content {
+                display: flex;
+                align-items: flex-start;
+                gap: 16px;
+                max-width: 1200px;
+                margin: 0 auto;
+            }
+            .critical-error-banner svg {
+                flex-shrink: 0;
+                margin-top: 4px;
+            }
+            .critical-error-banner h3 {
+                margin: 0 0 8px 0;
+                font-size: 18px;
+            }
+            .critical-error-banner p {
+                margin: 4px 0;
+                font-size: 14px;
+            }
+            .critical-error-banner code {
+                background: rgba(255,255,255,0.2);
+                padding: 2px 8px;
+                border-radius: 4px;
+                font-family: monospace;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    extractSessionIdFromPath() {
+        // 尝试从文件路径中提取 session_id (例如: 20251229_210718_b206e1a2)
+        const pathMatch = window.location.pathname.match(/(\d{8}_\d{6}_[a-f0-9]+)/);
+        if (pathMatch) {
+            return pathMatch[1];
+        }
+        
+        // 尝试从 meta 标签提取
+        const metaTag = document.querySelector('meta[name="workspace-id"]');
+        if (metaTag) {
+            return metaTag.getAttribute('content');
+        }
+        
+        return 'YOUR_SESSION_ID';
     }
     
     init() {
