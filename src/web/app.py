@@ -901,8 +901,10 @@ def save_report_edit(workspace_id):
         now = datetime.now()
         timestamp_str = now.strftime('%Y%m%d_%H%M%S')
         timestamp_iso = now.isoformat()
-        # 版本号基于已有版本数量（包括v0）
-        version_num = len(metadata["versions"]) + 1
+        # 版本号基于已有版本数量：如果只有v0，下一个是v1
+        # 计算下一个版本号：找出现有版本中的最大版本号+1
+        existing_versions = [int(v["id"][1:]) for v in metadata["versions"] if v["id"].startswith("v")]
+        version_num = max(existing_versions) + 1 if existing_versions else 1
         version_id = f"v{version_num}"
         version_path = versions_dir / f"{version_id}_{timestamp_str}.html"
         

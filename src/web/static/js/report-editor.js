@@ -13,7 +13,8 @@ class ReportEditor {
         this.hasUnsavedChanges = false;
         
         // **新增检测**: 检测是否在iframe中（只有独立窗口才显示编辑器）
-        if (window.self !== window.top) {
+        // 注意：只有在主页面的iframe中才隐藏，/report/路由下的独立页面不受影响
+        if (window.self !== window.top && window.location.pathname.indexOf('/report/') === -1) {
             console.log('[Editor] 报告在iframe中显示，编辑器功能已隐藏（请通过新窗口打开以使用编辑功能）');
             return;
         }
@@ -417,6 +418,12 @@ class ReportEditor {
     
     async saveReport() {
         const summary = prompt('请简要描述本次修改内容（可选）：');
+        
+        // 用户点击取消时，summary为null，直接返回不保存
+        if (summary === null) {
+            console.log('[Editor] 用户取消保存');
+            return;
+        }
         
         this.updateStatus('保存中...', 'saving');
         
