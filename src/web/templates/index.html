@@ -452,6 +452,7 @@
                             <span class="mr-2">📜</span> <span data-i18n="final_report_title">最终议事报告</span>
                         </h3>
                         <div id="report-actions" class="flex items-center space-x-2">
+                            <button onclick="openReportInNewTab()" class="text-xs bg-emerald-500/90 hover:bg-emerald-600 px-2 py-1 rounded transition disabled:opacity-50 disabled:cursor-not-allowed" data-i18n="btn_open_editor" title="在新标签页中打开报告（支持编辑器）">📝 编辑器</button>
                             <button onclick="reReport()" class="text-xs bg-white/20 hover:bg-white/30 px-2 py-1 rounded transition disabled:opacity-50 disabled:cursor-not-allowed" data-i18n="btn_re_report">重新生成报告</button>
                             <button onclick="copyReport()" class="text-xs bg-white/20 hover:bg-white/30 px-2 py-1 rounded transition disabled:opacity-50 disabled:cursor-not-allowed" data-i18n="btn_copy">复制</button>
                             
@@ -2118,6 +2119,17 @@
             function clearLogs() {
                 logContainer.innerHTML = '';
                 lastLogCount = 0;
+            }
+
+            function openReportInNewTab() {
+                if (!currentSessionId) {
+                    showAlert('报告尚未生成，无法打开编辑器', '提示');
+                    return;
+                }
+                
+                const reportUrl = `/report/${currentSessionId}`;
+                window.open(reportUrl, '_blank');
+                showAlert('已在新标签页中打开报告（支持编辑功能）', '成功');
             }
 
             function copyReport() {

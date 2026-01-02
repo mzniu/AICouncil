@@ -391,12 +391,14 @@ def make_reporter_chain(model_config: Dict[str, Any]):
         2. **输出格式**：必须输出一个完整的、自包含的 HTML 页面代码（包含 <!DOCTYPE html>, <html>, <head>, <style>, <body>）。
         3. **禁止 Markdown**：绝对不要将 HTML 代码包裹在 ```html 或 ``` 等 Markdown 代码块标签中，直接输出 HTML 源码。
         4. **视觉设计**：使用现代、简约、专业的 UI 设计。利用 CSS 构建清晰的卡片布局、步骤条或信息图表。
-        5. **交互式编辑器支持**：
+        5. **交互式编辑器支持（重要）**：
            - **引入编辑器资源**：在 HTML 的 <head> 中添加以下内容（用于支持报告编辑功能）：
              ```html
+             <meta name="workspace-id" content="">
              <link rel="stylesheet" href="/static/css/editor.css">
              <script src="/static/js/report-editor.js"></script>
              ```
+             **注意**：workspace-id的content留空即可，系统会自动填充实际的会话ID。
            - **数据属性标记**：为可编辑章节添加 `data-section-id` 属性，例如：`<div class="card" data-section-id="section-1">`
         6. **数据可视化（强烈推荐）**：
            - **使用 ECharts 图表**：在报告中适当位置添加数据可视化图表，让报告更加直观和专业。
@@ -867,7 +869,7 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
     with open(os.path.join(workspace_path, "search_references.json"), "w", encoding="utf-8") as f:
         json.dump(all_search_references, f, ensure_ascii=False, indent=4)
 
-    report_html = generate_report_from_workspace(workspace_path, model_config)
+    report_html = generate_report_from_workspace(workspace_path, model_config, session_id)
 
     return {
         "decomposition": decomposition,
@@ -876,9 +878,19 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
         "report_html": report_html
     }
 
-def generate_report_from_workspace(workspace_path: str, model_config: Dict[str, Any]) -> str:
-    """根据工作区保存的数据重新生成报告。"""
-    logger.info(f"[report] 正在从工作区 {workspace_path} 重新生成报告...")
+def generate_report_from_workspace(workspace_path: str, model_config: Dict[str, Any], session_id: str = None) -> str:
+    """根据工作区保存的数据重新生成报告。
+    
+    Args:
+        workspace_path: 工作区路径
+        model_config: 模型配置
+        session_id: 会话ID，用于在HTML中嵌入workspace标识
+    """
+    # 如果没有传入session_id，从workspace_path中提取
+    if not session_id:
+        session_id = os.path.basename(workspace_path)
+    
+    logger.info(f"[report] 正在从工作区 {workspace_path} 重新生成报告（Session ID: {session_id}）...")
     
     try:
         # 加载数据
@@ -930,6 +942,27 @@ def generate_report_from_workspace(workspace_path: str, model_config: Dict[str, 
                 if report_html.endswith("```"):
                     report_html = report_html[:-3]
                 report_html = report_html.strip()
+                
+                # **核心修复**: 将 workspace_id 注入 HTML（查找meta标签并替换内容）
+                if session_id:
+                    # 查找并替换 meta 标签中的 workspace-id（如果LLM已生成）
+                    import re
+                    if 'name="workspace-id"' in report_html:
+                        # 如果LLM生成了meta标签，替换其中的内容
+                        report_html = re.sub(
+                            r'<meta\s+name="workspace-id"\s+content="[^"]*">',
+                            f'<meta name="workspace-id" content="{session_id}">',
+                            report_html
+                        )
+                    else:
+                        # 如果没有生成meta标签，在<head>后插入
+                        if '<head>' in report_html:
+                            report_html = report_html.replace(
+                                '<head>',
+                                f'<head>\n    <meta name="workspace-id" content="{session_id}">',
+                                1
+                            )
+                    logger.info(f"[report] 已将 workspace-id 注入 HTML: {session_id}")
                 
                 send_web_event("final_report", content=report_html)
                 
