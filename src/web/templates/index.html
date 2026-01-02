@@ -1219,40 +1219,50 @@
             }
 
             function handleFinalReport(reportHtml) {
-                if (reportIframe && reportIframe.srcdoc !== reportHtml) {
+                // **方案A修复**: 使用缓存避免重复替换导致的闪烁
+                // 如果缓存与新内容相同，直接返回（避免无限循环）
+                if (cachedReportHtml === reportHtml) {
+                    return;
+                }
+                
+                if (reportIframe) {
                     if (reportHtml && !reportHtml.includes('italic') && !reportHtml.includes('text-align:center')) {
                         // 修复 srcdoc 中的静态资源路径（相对路径 -> 绝对URL）
-                        // 获取当前页面的协议和主机名
                         const baseUrl = window.location.origin;
                         
-                        // 替换 ECharts 引用为绝对路径
-                        reportHtml = reportHtml.replace(
-                            /src=["']\/static\/vendor\/echarts\.min\.js["']/g,
-                            `src="${baseUrl}/static/vendor/echarts.min.js"`
-                        );
+                        // 执行路径替换（只执行一次）
+                        const processedHtml = reportHtml
+                            .replace(
+                                /src=["']\/static\/vendor\/echarts\.min\.js["']/g,
+                                `src="${baseUrl}/static/vendor/echarts.min.js"`
+                            )
+                            .replace(
+                                /src=["']\/static\/vendor\/mermaid\.min\.js["']/g,
+                                `src="${baseUrl}/static/vendor/mermaid.min.js"`
+                            )
+                            .replace(
+                                /href=["']\/static\/css\/editor\.css["']/g,
+                                `href="${baseUrl}/static/css/editor.css"`
+                            )
+                            .replace(
+                                /src=["']\/static\/js\/report-editor\.js["']/g,
+                                `src="${baseUrl}/static/js/report-editor.js"`
+                            );
                         
-                        // 替换 Mermaid 引用为绝对路径
-                        reportHtml = reportHtml.replace(
-                            /src=["']\/static\/vendor\/mermaid\.min\.js["']/g,
-                            `src="${baseUrl}/static/vendor/mermaid.min.js"`
-                        );
-                        
-                        // 替换编辑器资源为绝对路径
-                        reportHtml = reportHtml.replace(
-                            /href=["']\/static\/css\/editor\.css["']/g,
-                            `href="${baseUrl}/static/css/editor.css"`
-                        );
-                        reportHtml = reportHtml.replace(
-                            /src=["']\/static\/js\/report-editor\.js["']/g,
-                            `src="${baseUrl}/static/js/report-editor.js"`
-                        );
-                        
-                        reportIframe.srcdoc = reportHtml;
-                        // 不在这里隐藏 loading，由 updateStatusUI 根据 is_running 状态统一处理
-                        // 这样可以确保在流式生成过程中 loading 蒙板一直存在
-                        setLayoutMode('report');
+                        // 只在处理后的内容与当前 srcdoc 不同时才更新
+                        if (reportIframe.srcdoc !== processedHtml) {
+                            reportIframe.srcdoc = processedHtml;
+                            // 缓存原始 HTML（用于比较）
+                            cachedReportHtml = reportHtml;
+                            // 不在这里隐藏 loading，由 updateStatusUI 根据 is_running 状态统一处理
+                            setLayoutMode('report');
+                        }
                     } else {
-                        reportIframe.srcdoc = reportHtml;
+                        // 处理空白或加载中的状态
+                        if (reportIframe.srcdoc !== reportHtml) {
+                            reportIframe.srcdoc = reportHtml;
+                            cachedReportHtml = reportHtml;
+                        }
                     }
                 }
             }
@@ -1357,6 +1367,7 @@
             let isReportingPhase = false;
             let openRouterModelsFetched = false;
             let isFetchingModels = false;
+            let cachedReportHtml = null;  // 缓存处理后的报告HTML，避免重复替换导致闪烁
             const flowContainer = document.getElementById('discussion-flow');
             const discussionContainer = document.getElementById('discussion-container');
             const logContainer = document.getElementById('log-container');
