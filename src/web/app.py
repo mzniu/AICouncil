@@ -827,5 +827,218 @@ def export_md():
             "message": f"导出失败: {str(e)}"
         }), 500
 
+# ==================== 报告编辑器 API 端点 ====================
+
+@app.route('/api/report/edit/<workspace_id>', methods=['POST'])
+def save_report_edit(workspace_id):
+    """保存报告编辑内容并创建版本快照"""
+    try:
+        data = request.json
+        workspace_path = pathlib.Path(get_workspace_dir()) / workspace_id
+        
+        if not workspace_path.exists():
+            return jsonify({"status": "error", "message": "工作区不存在"}), 404
+        
+        # 创建版本目录
+        versions_dir = workspace_path / "versions"
+        versions_dir.mkdir(exist_ok=True)
+        
+        # 生成版本信息
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        version_id = f"v{len(list(versions_dir.glob('*.html'))) + 1}"
+        version_path = versions_dir / f"{version_id}_{timestamp}.html"
+        
+        # 备份当前版本
+        report_path = workspace_path / "report.html"
+        if report_path.exists():
+            shutil.copy(report_path, version_path)
+        
+        # 保存新版本
+        html_content = data.get('html_content', '')
+        report_path.write_text(html_content, encoding='utf-8')
+        
+        # 更新元数据
+        metadata_path = workspace_path / "report_edits.json"
+        if metadata_path.exists():
+            with open(metadata_path, 'r', encoding='utf-8') as f:
+                metadata = json.load(f)
+        else:
+            metadata = {"current_version": "initial", "versions": []}
+        
+        metadata["current_version"] = version_id
+        metadata["versions"].append({
+            "id": version_id,
+            "timestamp": timestamp,
+            "changes_summary": data.get('metadata', {}).get('edit_summary', '用户编辑'),
+            "file_path": str(version_path.relative_to(workspace_path))
+        })
+        
+        with open(metadata_path, 'w', encoding='utf-8') as f:
+            json.dump(metadata, f, ensure_ascii=False, indent=2)
+        
+        logger.info(f"[editor] Report edited and saved: {workspace_id}, version: {version_id}")
+        
+        return jsonify({
+            "status": "success",
+            "version": version_id,
+            "message": "保存成功"
+        })
+        
+    except Exception as e:
+        logger.error(f"[editor] Save report error: {e}")
+        traceback.print_exc()
+        return jsonify({
+            "status": "error",
+            "message": f"保存失败: {str(e)}"
+        }), 500
+
+@app.route('/api/report/draft/<workspace_id>', methods=['POST'])
+def save_report_draft(workspace_id):
+    """保存报告草稿（自动保存）"""
+    try:
+        data = request.json
+        workspace_path = pathlib.Path(get_workspace_dir()) / workspace_id
+        
+        if not workspace_path.exists():
+            return jsonify({"status": "error", "message": "工作区不存在"}), 404
+        
+        # 保存草稿
+        draft_path = workspace_path / "report_draft.html"
+        html_content = data.get('html_content', '')
+        draft_path.write_text(html_content, encoding='utf-8')
+        
+        # 保存草稿元数据
+        draft_meta_path = workspace_path / "draft_meta.json"
+        draft_meta_path.write_text(json.dumps({
+            "last_saved": datetime.now().isoformat(),
+            "is_draft": True
+        }, ensure_ascii=False, indent=2), encoding='utf-8')
+        
+        return jsonify({"status": "success", "message": "草稿已保存"})
+        
+    except Exception as e:
+        logger.error(f"[editor] Save draft error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/report/versions/<workspace_id>', methods=['GET'])
+def get_report_versions(workspace_id):
+    """获取报告版本历史列表"""
+    try:
+        workspace_path = pathlib.Path(get_workspace_dir()) / workspace_id
+        metadata_path = workspace_path / "report_edits.json"
+        
+        if not metadata_path.exists():
+            # 返回当前版本信息
+            return jsonify([{
+                "id": "current",
+                "timestamp": datetime.now().isoformat(),
+                "changes_summary": "初始生成的报告",
+                "file_path": "report.html"
+            }])
+        
+        with open(metadata_path, 'r', encoding='utf-8') as f:
+            metadata = json.load(f)
+        
+        # 添加当前版本到列表最前面
+        versions = [{
+            "id": "current",
+            "timestamp": datetime.now().isoformat(),
+            "changes_summary": "当前版本",
+            "file_path": "report.html"
+        }] + metadata.get("versions", [])
+        
+        return jsonify(versions)
+        
+    except Exception as e:
+        logger.error(f"[editor] Get versions error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/report/version/<workspace_id>/<version_id>', methods=['GET'])
+def get_report_version_content(workspace_id, version_id):
+    """获取指定版本的报告内容"""
+    try:
+        workspace_path = pathlib.Path(get_workspace_dir()) / workspace_id
+        
+        if version_id == "current":
+            report_path = workspace_path / "report.html"
+        else:
+            # 从元数据中查找版本路径
+            metadata_path = workspace_path / "report_edits.json"
+            with open(metadata_path, 'r', encoding='utf-8') as f:
+                metadata = json.load(f)
+            
+            version_info = next((v for v in metadata["versions"] if v["id"] == version_id), None)
+            if not version_info:
+                return "版本不存在", 404
+            
+            report_path = workspace_path / version_info["file_path"]
+        
+        if not report_path.exists():
+            return "报告文件不存在", 404
+        
+        content = report_path.read_text(encoding='utf-8')
+        return content, 200, {'Content-Type': 'text/html; charset=utf-8'}
+        
+    except Exception as e:
+        logger.error(f"[editor] Get version content error: {e}")
+        return f"获取失败: {str(e)}", 500
+
+@app.route('/api/report/restore/<workspace_id>/<version_id>', methods=['POST'])
+def restore_report_version(workspace_id, version_id):
+    """恢复到指定版本"""
+    try:
+        workspace_path = pathlib.Path(get_workspace_dir()) / workspace_id
+        metadata_path = workspace_path / "report_edits.json"
+        
+        with open(metadata_path, 'r', encoding='utf-8') as f:
+            metadata = json.load(f)
+        
+        version_info = next((v for v in metadata["versions"] if v["id"] == version_id), None)
+        if not version_info:
+            return jsonify({"status": "error", "message": "版本不存在"}), 404
+        
+        version_path = workspace_path / version_info["file_path"]
+        report_path = workspace_path / "report.html"
+        
+        # 恢复版本
+        shutil.copy(version_path, report_path)
+        
+        logger.info(f"[editor] Restored version {version_id} for workspace {workspace_id}")
+        
+        return jsonify({
+            "status": "success",
+            "message": f"已恢复到版本 {version_id}"
+        })
+        
+    except Exception as e:
+        logger.error(f"[editor] Restore version error: {e}")
+        traceback.print_exc()
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/report/history/<workspace_id>', methods=['GET'])
+def get_report_edit_history(workspace_id):
+    """获取报告编辑历史（用于编辑器初始化）"""
+    try:
+        workspace_path = pathlib.Path(get_workspace_dir()) / workspace_id
+        metadata_path = workspace_path / "report_edits.json"
+        
+        if not metadata_path.exists():
+            return jsonify({"status": "success", "history": []})
+        
+        with open(metadata_path, 'r', encoding='utf-8') as f:
+            metadata = json.load(f)
+        
+        return jsonify({
+            "status": "success",
+            "history": metadata.get("versions", []),
+            "current_version": metadata.get("current_version", "initial")
+        })
+        
+    except Exception as e:
+        logger.error(f"[editor] Get edit history error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# ============================================================
+
 if __name__ == '__main__':
     app.run(port=5000, debug=True)

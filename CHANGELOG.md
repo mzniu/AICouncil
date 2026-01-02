@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- ✏️ **交互式报告编辑器 (MVP)**
+  - **所见即所得编辑**：直接在浏览器中编辑报告内容，支持标题、段落、列表等文本元素
+  - **版本控制**：自动创建版本快照，支持查看历史版本、预览和恢复
+  - **自动保存**：编辑模式下每 60 秒自动保存草稿，防止内容丢失
+  - **友好 UI**：固定工具栏、状态指示器、通知消息、模态框等现代化交互界面
+  - **数据持久化**：基于文件系统的版本管理，元数据存储在 `report_edits.json`
+  - **REST API**：完整的后端 API 支持（保存、加载、版本列表、恢复等）
+  - **轻量实现**：无需 React/Vue 等框架，使用原生 ContentEditable API
+  - **响应式设计**：支持桌面和移动端编辑（移动端工具栏自适应）
+  - **安全防护**：离开页面前自动提示未保存修改
+  - **文档完善**：提供详细的使用指南 (`docs/editor_guide.md`)
+
 - 🔍 **Google Custom Search API 集成**
   - 集成 Google Custom Search API，提供高质量搜索结果
   - 国内可直接访问，无需代理或浏览器
