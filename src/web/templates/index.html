@@ -400,8 +400,8 @@
         </div>
 
         <div id="main-layout" class="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
-            <!-- 左侧讨论流 -->
-            <div id="discussion-section" class="flex flex-col min-h-0 transition-all duration-300 flex-1">
+            <!-- 左侧讨论流 (固定50%宽度) -->
+            <div id="discussion-section" class="flex flex-col min-h-0 transition-all duration-300 w-full lg:w-1/2">
                 <div class="bg-white rounded-xl shadow-lg border border-slate-200 flex flex-col flex-1 min-h-0 overflow-hidden">
                     <div class="bg-slate-50 px-4 py-3 border-b border-slate-200">
                         <div class="flex justify-between items-center mb-2">
@@ -444,8 +444,8 @@
                 </div>
             </div>
 
-            <!-- 中间最终报告 -->
-            <div id="report-section" class="flex flex-col min-h-0 transition-all duration-300 flex-[2]">
+            <!-- 右侧最终报告 (固定50%宽度) -->
+            <div id="report-section" class="flex flex-col min-h-0 transition-all duration-300 w-full lg:w-1/2">
                 <div class="bg-white rounded-xl shadow-lg border border-purple-200 flex flex-col flex-1 min-h-0 overflow-hidden">
                     <div class="bg-purple-600 text-white px-4 py-3 flex justify-between items-center">
                         <h3 class="font-bold flex items-center text-base">
