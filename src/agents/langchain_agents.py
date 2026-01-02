@@ -435,7 +435,7 @@ def make_reporter_chain(model_config: Dict[str, Any]):
              * **饼图 (pie)**：简单的占比展示
            - **使用方法**：
              ```html
-             <div class="mermaid">
+             <div class="mermaid" data-mermaid-source="flowchart TD\n    A[开始] --> B{{是否满足条件?}}\n    B -->|是| C[执行操作]\n    B -->|否| D[跳过]\n    C --> E[结束]\n    D --> E">
              flowchart TD
                  A[开始] --> B{{是否满足条件?}}
                  B -->|是| C[执行操作]
@@ -446,6 +446,7 @@ def make_reporter_chain(model_config: Dict[str, Any]):
              ```
            - **注意事项**：
              * Mermaid 代码块必须放在 `<div class="mermaid">` 中
+             * **必须在 div 标签中添加 `data-mermaid-source` 属性保存原始代码**（支持 \\n 换行）
              * 语法必须严格遵循 Mermaid 规范，避免语法错误
              * 建议在复杂流程、系统架构等场景使用 Mermaid
              * 简单的数据对比、统计分析优先使用 ECharts

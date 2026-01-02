@@ -183,32 +183,121 @@ class ReportEditor {
     }
     
     makeElementEditable(el) {
-        // 跳过图表容器、引用列表和脚本标签
-        if (el.querySelector('.chart-container') || 
-            el.classList.contains('references') ||
-            el.tagName === 'SCRIPT' ||
+        // 跳过工具栏、脚本、样式等元素
+        if (!el || el.id === 'editorToolbar' || 
+            el.tagName === 'SCRIPT' || 
             el.tagName === 'STYLE') {
             return;
         }
         
-        // 查找所有文本元素
-        const textElements = el.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, .data-point, .methodology-note, div:not(:has(*))');
+        // 递归遍历所有子元素
+        const makeTextEditable = (element) => {
+            // 跳过已经处理过的元素
+            if (element.hasAttribute('contenteditable')) {
+                return;
+            }
+            
+            // 跳过图表容器
+            if (element.classList.contains('chart-container') || 
+                element.classList.contains('references')) {
+                return;
+            }
+            
+            // 特殊处理 Mermaid SVG 容器（稍后特殊处理）
+            if (element.classList.contains('mermaid') && element.querySelector('svg')) {
+                this.makeMermaidEditable(element);
+                return;
+            }
+            
+            // 可编辑的文本元素
+            const editableTagNames = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'TD', 'TH', 'SPAN', 'DIV', 'BLOCKQUOTE'];
+            
+            if (editableTagNames.includes(element.tagName)) {
+                // 检查是否有文本内容（排除只有子元素的容器）
+                const hasDirectText = Array.from(element.childNodes).some(
+                    node => node.nodeType === Node.TEXT_NODE && node.textContent.trim().length > 0
+                );
+                
+                // 或者是叶子节点（没有子元素）
+                const isLeafNode = element.children.length === 0;
+                
+                if ((hasDirectText || isLeafNode) && element.textContent.trim().length > 0) {
+                    element.setAttribute('contenteditable', 'true');
+                    element.classList.add('editable-active');
+                    return; // 不继续递归子元素
+                }
+            }
+            
+            // 递归处理子元素
+            Array.from(element.children).forEach(child => {
+                makeTextEditable(child);
+            });
+        };
         
-        if (textElements.length > 0) {
-            textElements.forEach(textEl => {
-                // 确保元素有实际文本内容
-                if (textEl.textContent.trim().length > 0) {
-                    textEl.setAttribute('contenteditable', 'true');
-                    textEl.classList.add('editable-active');
+        makeTextEditable(el);
+    }
+    
+    makeMermaidEditable(mermaidContainer) {
+        // 保存原始 Mermaid 代码
+        const svg = mermaidContainer.querySelector('svg');
+        if (!svg) return;
+        
+        // 尝试从 data 属性或其他地方恢复源代码
+        let sourceCode = mermaidContainer.getAttribute('data-mermaid-source');
+        
+        if (!sourceCode) {
+            // 如果没有保存源代码，显示警告
+            sourceCode = '// Mermaid 源代码不可用\n// 原图表已渲染，无法编辑';
+        }
+        
+        // 添加双击编辑功能
+        mermaidContainer.style.cursor = 'pointer';
+        mermaidContainer.title = '双击编辑 Mermaid 源代码';
+        
+        mermaidContainer.addEventListener('dblclick', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // 创建编辑界面
+            const editor = document.createElement('div');
+            editor.className = 'mermaid-editor-popup';
+            editor.innerHTML = `
+                <div class="mermaid-editor-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999;">
+                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 80%; max-width: 800px;">
+                        <h3 style="margin: 0 0 15px 0; color: #1e293b;">编辑 Mermaid 图表源代码</h3>
+                        <textarea class="mermaid-source" style="width: 100%; height: 300px; font-family: 'Courier New', monospace; font-size: 13px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 4px; resize: vertical;">${sourceCode}</textarea>
+                        <div style="margin-top: 15px; text-align: right;">
+                            <button class="btn-cancel" style="padding: 8px 16px; margin-right: 10px; background: #e2e8f0; border: none; border-radius: 4px; cursor: pointer;">取消</button>
+                            <button class="btn-save" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">保存</button>
+                        </div>
+                        <p style="margin: 10px 0 0 0; font-size: 12px; color: #64748b;">注意：保存后需要刷新页面才能看到新图表</p>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(editor);
+            
+            // 绑定事件
+            editor.querySelector('.btn-cancel').addEventListener('click', () => {
+                editor.remove();
+            });
+            
+            editor.querySelector('.btn-save').addEventListener('click', () => {
+                const newSource = editor.querySelector('.mermaid-source').value;
+                mermaidContainer.setAttribute('data-mermaid-source', newSource);
+                mermaidContainer.textContent = newSource; // 保存为文本
+                mermaidContainer.classList.add('mermaid-source-edited');
+                this.hasUnsavedChanges = true;
+                this.showNotification('Mermaid 源代码已更新，保存后刷新页面查看效果', 'success');
+                editor.remove();
+            });
+            
+            editor.querySelector('.mermaid-editor-overlay').addEventListener('click', (e) => {
+                if (e.target.classList.contains('mermaid-editor-overlay')) {
+                    editor.remove();
                 }
             });
-        } else {
-            // 如果没有找到子元素，尝试直接编辑该元素
-            if (el.textContent.trim().length > 0 && !el.querySelector('*')) {
-                el.setAttribute('contenteditable', 'true');
-                el.classList.add('editable-active');
-            }
-        }
+        });
     }
     
     toggleEditMode() {
