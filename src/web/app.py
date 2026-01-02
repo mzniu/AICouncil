@@ -877,9 +877,11 @@ def save_report_edit(workspace_id):
         versions_dir.mkdir(exist_ok=True)
         
         # 生成版本信息
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        now = datetime.now()
+        timestamp_str = now.strftime('%Y%m%d_%H%M%S')
+        timestamp_iso = now.isoformat()
         version_id = f"v{len(list(versions_dir.glob('*.html'))) + 1}"
-        version_path = versions_dir / f"{version_id}_{timestamp}.html"
+        version_path = versions_dir / f"{version_id}_{timestamp_str}.html"
         
         # 备份当前版本
         report_path = workspace_path / "report.html"
@@ -901,7 +903,7 @@ def save_report_edit(workspace_id):
         metadata["current_version"] = version_id
         metadata["versions"].append({
             "id": version_id,
-            "timestamp": timestamp,
+            "timestamp": timestamp_iso,  # 使用ISO格式便于JavaScript解析
             "changes_summary": data.get('metadata', {}).get('edit_summary', '用户编辑'),
             "file_path": str(version_path.relative_to(workspace_path))
         })

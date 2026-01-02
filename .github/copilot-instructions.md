@@ -10,7 +10,7 @@ AICouncil is a multi-agent deliberation system that simulates a council ("元老
 - **Reporter** (记录员): Tracks and documents the entire deliberation process
 
 **Critical Design Principle**: Agents operate in **blind evaluation mode** - each agent cannot see outputs from other agents in the same role tier until the Leader synthesizes them. This is enforced through independent LangChain execution contexts.
-
+**Critical Principle**: Don't commit and push the code.
 ## Core Workflow
 
 1. **Planning Phase**: Leader decomposes issue into `key_questions` and designs report structure

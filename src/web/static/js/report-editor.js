@@ -598,7 +598,21 @@ class ReportEditor {
     }
     
     formatDate(timestamp) {
+        if (!timestamp) return '未知时间';
+        
         const date = new Date(timestamp);
+        
+        // 检查日期是否有效
+        if (isNaN(date.getTime())) {
+            // 尝试解析旧格式 (YYYYMMDD_HHMMSS)
+            const match = String(timestamp).match(/^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})$/);
+            if (match) {
+                const [, year, month, day, hour, minute, second] = match;
+                return `${year}-${month}-${day} ${hour}:${minute}`;
+            }
+            return '无效日期';
+        }
+        
         return date.toLocaleString('zh-CN', {
             year: 'numeric',
             month: '2-digit',
