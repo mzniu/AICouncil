@@ -12,6 +12,12 @@ class ReportEditor {
         this.autoSaveInterval = null;
         this.hasUnsavedChanges = false;
         
+        // **新增检测**: 检测是否在iframe中（只有独立窗口才显示编辑器）
+        if (window.self !== window.top) {
+            console.log('[Editor] 报告在iframe中显示，编辑器功能已隐藏（请通过新窗口打开以使用编辑功能）');
+            return;
+        }
+        
         // **方案C修复**: 检测全局禁用标志（由协议检测脚本设置）
         if (window.EDITOR_DISABLED) {
             console.warn('[Editor] 编辑器已被禁用（可能是通过 file:// 协议打开）');
