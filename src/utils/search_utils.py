@@ -35,6 +35,33 @@ def resolve_url(url: str, timeout: int = 5) -> str:
             final_url = response.url
             response.close()
             
+        # 特殊处理：如果被重定向到百度验证码页面，尝试从参数中提取原始链接
+        if "wappass.baidu.com" in final_url or "captcha" in final_url:
+            import urllib.parse
+            parsed = urllib.parse.urlparse(final_url)
+            params = urllib.parse.parse_qs(parsed.query)
+            
+            # 尝试多个可能的参数名
+            target_url = None
+            for param_name in ['backurl', 'u', 'url', 'dest', 'rd', 'target']:
+                if param_name in params:
+                    target_url = urllib.parse.unquote(params[param_name][0])
+                    break
+            
+            if target_url and target_url.startswith('http') and target_url != final_url:
+                # 如果提取出的链接还是百度跳转链接，则继续解析；否则直接返回，避免再次触发验证码
+                if "baidu.com/link?url=" in target_url or "bing.com/ck/ms" in target_url:
+                    return resolve_url(target_url, timeout=timeout)
+                return target_url
+            
+            # 如果没找到参数，但 URL 中包含另一个 http，尝试正则提取
+            import re
+            all_urls = re.findall(r'https?%3A%2F%2F[^\s&]+', final_url)
+            if all_urls:
+                potential_url = urllib.parse.unquote(all_urls[0])
+                if potential_url != final_url:
+                    return potential_url
+            
         return final_url
     except Exception as e:
         # logger.debug(f"Failed to resolve URL {url}: {e}")
