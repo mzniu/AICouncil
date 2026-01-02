@@ -12,6 +12,12 @@ class ReportEditor {
         this.autoSaveInterval = null;
         this.hasUnsavedChanges = false;
         
+        // **方案C修复**: 检测全局禁用标志（由协议检测脚本设置）
+        if (window.EDITOR_DISABLED) {
+            console.warn('[Editor] 编辑器已被禁用（可能是通过 file:// 协议打开）');
+            return;
+        }
+        
         // **核心修复**: 检测workspace_id是否有效
         if (!this.workspaceId || this.workspaceId === 'unknown') {
             console.error('[Editor] ❌ workspace_id 未识别 (当前值:', this.workspaceId, ')');

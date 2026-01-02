@@ -397,6 +397,26 @@ def make_reporter_chain(model_config: Dict[str, Any]):
              <meta name="workspace-id" content="">
              <link rel="stylesheet" href="/static/css/editor.css">
              <script src="/static/js/report-editor.js"></script>
+             <!-- 协议检测脚本（防止file://协议下编辑器功能异常） -->
+             <script>
+             (function() {{
+                 // 检测报告是否通过 file:// 协议打开
+                 if (window.location.protocol === 'file:') {{
+                     console.warn('[Report] ⚠️  报告通过本地文件系统打开，编辑器功能不可用');
+                     window.EDITOR_DISABLED = true;
+                     
+                     // 页面加载完成后显示友好提示
+                     window.addEventListener('DOMContentLoaded', function() {{
+                         const banner = document.createElement('div');
+                         banner.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 20px; text-align: center; z-index: 10000; box-shadow: 0 2px 8px rgba(0,0,0,0.15); font-family: -apple-system, sans-serif;';
+                         banner.innerHTML = '<strong>⚠️  编辑器不可用</strong> - 您正在通过本地文件打开报告。<span style="margin-left: 15px;">✅ 解决方案：启动服务器后访问 <code style="background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 3px;">http://localhost:5000/report/[session_id]</code></span>';
+                         document.body.insertBefore(banner, document.body.firstChild);
+                     }});
+                 }} else if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {{
+                     console.warn('[Report] ⚠️  未检测到本地服务器，编辑器功能可能不可用');
+                 }}
+             }})();
+             </script>
              ```
              **注意**：workspace-id的content留空即可，系统会自动填充实际的会话ID。
            - **数据属性标记**：为可编辑章节添加 `data-section-id` 属性，例如：`<div class="card" data-section-id="section-1">`
