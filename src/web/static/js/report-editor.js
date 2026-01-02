@@ -325,21 +325,21 @@ class ReportEditor {
         
         this.originalContent = mainContainer.cloneNode(true);
         
-        // 为可编辑区域添加contenteditable属性
-        const editableElements = document.querySelectorAll('.card, .executive-summary-card, [data-section-id]');
+        // **方案3修复**: 直接处理主容器的所有顶级子元素
+        // 这样可以适应任何HTML结构，包括 .header、.card、section 等
+        // makeElementEditable 内部会自动过滤工具栏、脚本等不可编辑元素
+        console.log('[Editor] 开始处理主容器的所有子元素...');
         
-        if (editableElements.length === 0) {
-            console.warn('[Editor] 未找到可编辑的卡片元素，尝试使用通用选择器');
-            // 如果没有找到标准的卡片元素，尝试找其他可编辑内容
-            const fallbackElements = document.querySelectorAll('section, article, .content, main > div');
-            fallbackElements.forEach(el => {
-                this.makeElementEditable(el);
-            });
-        } else {
-            editableElements.forEach(el => {
-                this.makeElementEditable(el);
-            });
-        }
+        Array.from(mainContainer.children).forEach((el, index) => {
+            // 跳过编辑器工具栏（如果已存在）
+            if (el.id === 'editorToolbar') {
+                console.log(`[Editor] 跳过工具栏元素`);
+                return;
+            }
+            this.makeElementEditable(el);
+        });
+        
+        console.log('[Editor] 所有可编辑元素已标记');
         
         // 更新UI
         document.getElementById('toggleEditMode').style.display = 'none';
