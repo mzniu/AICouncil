@@ -6,6 +6,73 @@ import tempfile
 from bs4 import BeautifulSoup
 from src import config_manager as config
 from src.utils.logger import logger
+from concurrent.futures import ThreadPoolExecutor
+
+def resolve_url(url: str, timeout: int = 5) -> str:
+    """解析重定向链接，获取实际的原始链接。"""
+    if not url or not url.startswith('http'):
+        return url
+    
+    # 排除明显的非重定向链接，减少请求
+    if any(domain in url for domain in ["github.com", "wikipedia.org", "zhihu.com", "csdn.net"]):
+        return url
+
+    try:
+        # 针对百度和 Bing 的特殊处理（可选，但 HEAD 请求通常更通用）
+        # 百度跳转链接示例: http://www.baidu.com/link?url=...
+        # Bing 跳转链接示例: https://www.bing.com/ck/ms?url=...
+        
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+        }
+        # 使用 HEAD 请求跟随重定向
+        response = requests.head(url, headers=headers, allow_redirects=True, timeout=timeout)
+        final_url = response.url
+        
+        # 如果 HEAD 请求没拿到（有些服务器不支持），尝试 GET 但只读头部
+        if final_url == url and response.status_code in [404, 405]:
+            response = requests.get(url, headers=headers, allow_redirects=True, timeout=timeout, stream=True)
+            final_url = response.url
+            response.close()
+            
+        return final_url
+    except Exception as e:
+        # logger.debug(f"Failed to resolve URL {url}: {e}")
+        return url
+
+def format_search_results(results: list) -> str:
+    """将搜索结果列表格式化为 Markdown 表格，包含更多元数据。支持并行解析重定向。"""
+    if not results:
+        return "未找到结果。"
+
+    # 并行解析重定向链接
+    logger.info(f"Resolving redirects for {len(results)} search results...")
+    with ThreadPoolExecutor(max_workers=min(len(results), 10)) as executor:
+        # 提取所有链接
+        urls = [res.get('href', '') for res in results]
+        # 并行解析
+        resolved_urls = list(executor.map(resolve_url, urls))
+        # 更新结果
+        for i, res in enumerate(results):
+            if resolved_urls[i]:
+                res['href'] = resolved_urls[i]
+
+    table_header = "| # | 标题 | 摘要 | 来源 |\n|---|---|---|---|\n"
+    table_rows = []
+    from urllib.parse import urlparse
+    for i, res in enumerate(results, 1):
+        title = res.get('title', '无标题').replace('|', '\\|')
+        content = res.get('body', '无内容').replace('|', '\\|').replace('\n', ' ')
+        url_link = res.get('href', '#')
+        # 提取域名作为来源
+        try:
+            domain = urlparse(url_link).netloc if url_link.startswith('http') else '未知'
+            if domain.startswith('www.'):
+                domain = domain[4:]
+        except:
+            domain = '未知'
+        table_rows.append(f"| {i} | [{title}]({url_link}) | {content[:200]}... | {domain} |")
+    return table_header + "\n".join(table_rows)
 
 def bing_search(query: str, max_results: int = 10, max_retries: int = 3) -> str:
     """使用 Bing 搜索。优先使用 requests，失败则回退到 DrissionPage。"""
@@ -278,19 +345,6 @@ def bing_search_requests(query: str, max_results: int = 10, max_retries: int = 3
                 time.sleep(3)
                 
     return f"Bing 搜索(Requests)失败: {str(last_exception)}" if last_exception else "Bing 搜索(Requests)未找到结果。"
-                
-    return f"Bing 搜索失败: {str(last_exception)}"
-
-def format_search_results(results: list) -> str:
-    """将搜索结果列表格式化为 Markdown 表格。"""
-    table_header = "| # | 标题 | 摘要 |\n|---|---|---|\n"
-    table_rows = []
-    for i, res in enumerate(results, 1):
-        title = res.get('title', '无标题').replace('|', '\\|')
-        content = res.get('body', '无内容').replace('|', '\\|').replace('\n', ' ')
-        url_link = res.get('href', '#')
-        table_rows.append(f"| {i} | [{title}]({url_link}) | {content[:200]}... |")
-    return table_header + "\n".join(table_rows)
 
 def duckduckgo_search(query: str, max_results: int = 5, max_retries: int = 3) -> str:
     """使用 DuckDuckGo 进行免费联网搜索，带重试机制。"""

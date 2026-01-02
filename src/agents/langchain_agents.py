@@ -441,14 +441,63 @@ def make_reporter_chain(model_config: Dict[str, Any]):
              * 建议在复杂流程、系统架构等场景使用 Mermaid
              * 简单的数据对比、统计分析优先使用 ECharts
              * **布局提示**：Mermaid 容器外层添加 `page-break-inside: avoid;` 防止分页截断
-        7. **交互性**：可以在 HTML 中加入简单的 JS（如点击展开详情、切换标签等）以增强展示效果。
+        7. **交互性与高级引用 (Advanced Citations)**：
+           - **悬停预览 (Hover Preview)**：为所有行内引用添加悬停预览功能。
+           - **实现方式**：
+             * 在 HTML 的 `<style>` 中添加引用样式（如：`.citation { color: #2563eb; text-decoration: none; font-size: 0.8em; vertical-align: super; margin-left: 2px; cursor: help; }`）。
+             * 在 HTML 的 `<head>` 中添加悬停预览的 JS 逻辑。
+             * **引用格式**：使用 `<a href="URL" class="citation" data-title="标题" data-snippet="摘要内容..." data-source="来源域名" target="_blank">[n]</a>`。
+             * **JS 逻辑示例**：
+               ```javascript
+               document.addEventListener('DOMContentLoaded', function() {
+                   const citations = document.querySelectorAll('.citation');
+                   citations.forEach(cite => {
+                       cite.addEventListener('mouseenter', function(e) {
+                           const title = this.getAttribute('data-title');
+                           const snippet = this.getAttribute('data-snippet');
+                           const source = this.getAttribute('data-source');
+                           const tooltip = document.createElement('div');
+                           tooltip.className = 'citation-tooltip';
+                           tooltip.innerHTML = `<strong>${title}</strong><br><small>${source}</small><p>${snippet}</p>`;
+                           document.body.appendChild(tooltip);
+                           const rect = this.getBoundingClientRect();
+                           tooltip.style.top = (rect.top + window.scrollY - tooltip.offsetHeight - 10) + 'px';
+                           tooltip.style.left = (rect.left + window.scrollX) + 'px';
+                       });
+                       cite.addEventListener('mouseleave', function() {
+                           const tooltips = document.querySelectorAll('.citation-tooltip');
+                           tooltips.forEach(t => t.remove());
+                       });
+                   });
+               });
+               ```
+             * **Tooltip 样式示例**：
+               ```css
+               .citation-tooltip {
+                   position: absolute;
+                   z-index: 1000;
+                   background: white;
+                   border: 1px solid #e2e8f0;
+                   border-radius: 8px;
+                   padding: 12px;
+                   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+                   max-width: 300px;
+                   font-size: 13px;
+                   line-height: 1.5;
+                   color: #1e293b;
+                   pointer-events: none;
+               }
+               .citation-tooltip strong { display: block; color: #2563eb; margin-bottom: 4px; }
+               .citation-tooltip small { color: #64748b; display: block; margin-bottom: 8px; border-bottom: 1px solid #f1f5f9; padding-bottom: 4px; }
+               .citation-tooltip p { margin: 0; color: #475569; }
+               ```
         8. **结构遵循**：请务必遵循议长设计的报告结构（report_design）进行内容组织。
         9. **语言一致性**：报告的所有内容（包括标题、按钮、标签、正文）必须使用与原始议题相同的语言。
         10. **引用与参考资料（严禁虚构链接）**：
             - **真实性原则**：**严禁胡编乱造任何链接、数据或事实**。
             - **行内引用**：仅引用"联网搜索参考资料"中提供的真实 URL。**严禁虚构类似 `https://developer.aliyun.com/article/xxxxxx` 这种占位符链接**。
-            - **引用格式**：在报告正文中引用到联网搜索提供的信息时，请务必在对应文字后加上超链接引用，例如：`<a href="URL" target="_blank">[1]</a>`。
-            - **末尾列表**：在报告末尾添加"参考资料"章节，列出所有参考链接。
+            - **引用格式**：在报告正文中引用到联网搜索提供的信息时，请务必使用上述 **高级引用格式**。
+            - **末尾列表**：在报告末尾添加"参考资料"章节，列出所有参考链接。建议使用列表或表格形式，包含标题、来源和链接。
         11. **禁止废话**：不要包含任何关于报告生成过程的描述（如"基于多轮讨论形成"、"本报告整合自..."）、版权声明、讲解时长建议或任何前言/后记。直接从报告标题和正文内容开始。
         
         请确保 HTML 代码在 <iframe> 中能完美渲染。
