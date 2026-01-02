@@ -1221,6 +1221,32 @@
             function handleFinalReport(reportHtml) {
                 if (reportIframe && reportIframe.srcdoc !== reportHtml) {
                     if (reportHtml && !reportHtml.includes('italic') && !reportHtml.includes('text-align:center')) {
+                        // 修复 srcdoc 中的静态资源路径（相对路径 -> 绝对URL）
+                        // 获取当前页面的协议和主机名
+                        const baseUrl = window.location.origin;
+                        
+                        // 替换 ECharts 引用为绝对路径
+                        reportHtml = reportHtml.replace(
+                            /src=["']\/static\/vendor\/echarts\.min\.js["']/g,
+                            `src="${baseUrl}/static/vendor/echarts.min.js"`
+                        );
+                        
+                        // 替换 Mermaid 引用为绝对路径
+                        reportHtml = reportHtml.replace(
+                            /src=["']\/static\/vendor\/mermaid\.min\.js["']/g,
+                            `src="${baseUrl}/static/vendor/mermaid.min.js"`
+                        );
+                        
+                        // 替换编辑器资源为绝对路径
+                        reportHtml = reportHtml.replace(
+                            /href=["']\/static\/css\/editor\.css["']/g,
+                            `href="${baseUrl}/static/css/editor.css"`
+                        );
+                        reportHtml = reportHtml.replace(
+                            /src=["']\/static\/js\/report-editor\.js["']/g,
+                            `src="${baseUrl}/static/js/report-editor.js"`
+                        );
+                        
                         reportIframe.srcdoc = reportHtml;
                         // 不在这里隐藏 loading，由 updateStatusUI 根据 is_running 状态统一处理
                         // 这样可以确保在流式生成过程中 loading 蒙板一直存在
