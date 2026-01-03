@@ -138,6 +138,7 @@ class ReportEditor {
     }
     
     createToolbar() {
+        console.log('[Editor] 开始创建工具栏...');
         const toolbar = document.createElement('div');
         toolbar.id = 'editorToolbar';
         toolbar.className = 'editor-toolbar';
@@ -184,13 +185,29 @@ class ReportEditor {
         `;
         
         document.body.insertBefore(toolbar, document.body.firstChild);
+        console.log('[Editor] ✅ 工具栏创建完成，已添加到DOM');
     }
     
     bindEvents() {
-        document.getElementById('toggleEditMode').addEventListener('click', () => this.toggleEditMode());
-        document.getElementById('saveReport').addEventListener('click', () => this.saveReport());
-        document.getElementById('cancelEdit').addEventListener('click', () => this.cancelEdit());
-        document.getElementById('versionHistory').addEventListener('click', () => this.showVersionHistory());
+        console.log('[Editor] 开始绑定事件...');
+        const toggleBtn = document.getElementById('toggleEditMode');
+        const saveBtn = document.getElementById('saveReport');
+        const cancelBtn = document.getElementById('cancelEdit');
+        const historyBtn = document.getElementById('versionHistory');
+        
+        console.log('[Editor] 找到的按钮:', {
+            toggleBtn: !!toggleBtn,
+            saveBtn: !!saveBtn,
+            cancelBtn: !!cancelBtn,
+            historyBtn: !!historyBtn
+        });
+        
+        if (toggleBtn) toggleBtn.addEventListener('click', () => this.toggleEditMode());
+        if (saveBtn) saveBtn.addEventListener('click', () => this.saveReport());
+        if (cancelBtn) cancelBtn.addEventListener('click', () => this.cancelEdit());
+        if (historyBtn) historyBtn.addEventListener('click', () => this.showVersionHistory());
+        
+        console.log('[Editor] ✅ 事件绑定完成');
         
         // 监听内容变化
         document.addEventListener('input', (e) => {
