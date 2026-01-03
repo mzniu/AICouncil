@@ -13,8 +13,14 @@ class ReportEditor {
         this.hasUnsavedChanges = false;
         
         // **新增检测**: 检测是否在iframe中（只有独立窗口才显示编辑器）
-        // 注意：只有在主页面的iframe中才隐藏，/report/路由下的独立页面不受影响
-        if (window.self !== window.top && window.location.pathname.indexOf('/report/') === -1) {
+        const isInIframe = window.self !== window.top;
+        console.log('[Editor] iframe检测:', {
+            isInIframe: isInIframe,
+            pathname: window.location.pathname,
+            href: window.location.href
+        });
+        
+        if (isInIframe) {
             console.log('[Editor] 报告在iframe中显示，编辑器功能已隐藏（请通过新窗口打开以使用编辑功能）');
             return;
         }
