@@ -396,6 +396,7 @@ def make_reporter_chain(model_config: Dict[str, Any]):
              ```html
              <meta name="workspace-id" content="">
              <link rel="stylesheet" href="/static/css/editor.css">
+             <script src="/static/vendor/html2canvas.min.js"></script>
              <script src="/static/js/report-editor.js"></script>
              <!-- 协议检测脚本（防止file://协议下编辑器功能异常） -->
              <script>
