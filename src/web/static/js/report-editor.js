@@ -349,11 +349,23 @@ class ReportEditor {
         console.log('[Editor] 进入编辑模式...');
         this.isEditMode = true;
         
-        // 查找主容器，支持多种可能的选择器
-        const mainContainer = document.querySelector('.container') || 
-                             document.querySelector('main') || 
-                             document.querySelector('body > div') ||
-                             document.body;
+        // 查找主容器 - 使用更智能的选择器，排除工具栏
+        let mainContainer = document.querySelector('.container');
+        
+        if (!mainContainer) {
+            // 如果没有.container，找到第一个不是工具栏的大型div
+            const bodyChildren = Array.from(document.body.children);
+            mainContainer = bodyChildren.find(el => 
+                el.id !== 'editorToolbar' && 
+                !el.classList.contains('editor-toolbar') &&
+                el.tagName === 'DIV' &&
+                el.children.length > 0  // 必须有子元素
+            );
+        }
+        
+        if (!mainContainer) {
+            mainContainer = document.querySelector('main');
+        }
         
         if (!mainContainer) {
             console.error('[Editor] 找不到主容器元素');
@@ -361,32 +373,43 @@ class ReportEditor {
             return;
         }
         
+        console.log('[Editor] 主容器:', mainContainer.tagName, mainContainer.className || '(无class)');
+        console.log('[Editor] 主容器子元素数量:', mainContainer.children.length);
+        
+        // 保存原始内容（仅保存主容器）
         this.originalContent = mainContainer.cloneNode(true);
         
-        // **方案3修复**: 直接处理主容器的所有顶级子元素
-        // 这样可以适应任何HTML结构，包括 .header、.card、section 等
-        // makeElementEditable 内部会自动过滤工具栏、脚本等不可编辑元素
+        // 处理主容器内的所有顶级子元素
         console.log('[Editor] 开始处理主容器的所有子元素...');
         
+        let processedCount = 0;
         Array.from(mainContainer.children).forEach((el, index) => {
-            // 跳过编辑器工具栏（如果已存在）
-            if (el.id === 'editorToolbar') {
-                console.log(`[Editor] 跳过工具栏元素`);
-                return;
-            }
+            console.log(`[Editor] [${index}] 处理元素:`, el.tagName, el.className || '(无class)');
             this.makeElementEditable(el);
+            processedCount++;
         });
         
-        console.log('[Editor] 所有可编辑元素已标记');
+        console.log(`[Editor] 所有可编辑元素已标记，共处理 ${processedCount} 个顶级元素`);
+        
+        // 统计实际被标记为可编辑的元素数量
+        const editableElements = document.querySelectorAll('[contenteditable="true"]');
+        console.log(`[Editor] 实际可编辑元素数量: ${editableElements.length}`);
         
         // 更新UI
-        document.getElementById('toggleEditMode').style.display = 'none';
-        document.getElementById('saveReport').style.display = 'inline-flex';
-        document.getElementById('cancelEdit').style.display = 'inline-flex';
+        const toggleBtn = document.getElementById('toggleEditMode');
+        const saveBtn = document.getElementById('saveReport');
+        const cancelBtn = document.getElementById('cancelEdit');
+        
+        console.log('[Editor] 更新按钮显示状态...');
+        if (toggleBtn) toggleBtn.style.display = 'none';
+        if (saveBtn) saveBtn.style.display = 'inline-flex';
+        if (cancelBtn) cancelBtn.style.display = 'inline-flex';
+        
         document.body.classList.add('edit-mode-active');
         
         this.updateStatus('编辑模式', 'editing');
         this.showNotification('已进入编辑模式，可以直接点击文本进行编辑', 'info');
+        console.log('[Editor] ✅ UI更新完成，已显示提示消息');
         
         // 启动自动保存（每60秒）
         this.autoSaveInterval = setInterval(() => this.autoSave(), 60000);
@@ -516,54 +539,53 @@ class ReportEditor {
     }
     
     extractReportData() {
+        // **关键修复**: 保存完整的HTML文档，而不仅仅是body内容
+        // 这样可以保留<head>中的CSS、JS引用和meta标签
+        
+        // 临时移除contenteditable属性，避免保存编辑状态
+        const editableElements = document.querySelectorAll('[contenteditable="true"]');
+        editableElements.forEach(el => {
+            el.setAttribute('data-was-editable', 'true');
+            el.removeAttribute('contenteditable');
+            el.classList.remove('editable-active');
+        });
+        
+        // 获取完整的HTML文档
+        const fullHtml = document.documentElement.outerHTML;
+        
+        // 恢复contenteditable属性
+        document.querySelectorAll('[data-was-editable="true"]').forEach(el => {
+            el.setAttribute('contenteditable', 'true');
+            el.classList.add('editable-active');
+            el.removeAttribute('data-was-editable');
+        });
+        
+        // 提取章节和引用信息（用于元数据）
         const container = document.querySelector('.container') || 
                          document.querySelector('main') || 
-                         document.querySelector('body > div') ||
                          document.body;
         
-        if (!container) {
-            console.error('[Editor] 无法提取报告数据：找不到容器');
-            return {
-                html_content: document.body.innerHTML,
-                sections: [],
-                citations: []
-            };
-        }
-        
-        // 提取章节内容
         const sections = [];
         const sectionCards = container.querySelectorAll('.card, [data-section-id], section, article');
         sectionCards.forEach((card, index) => {
             const title = card.querySelector('.section-title, h2, h1')?.textContent.trim() || '';
-            const content = card.innerHTML;
-            
             sections.push({
                 id: card.getAttribute('data-section-id') || `section-${index}`,
                 title: title,
-                content: content,
                 order: index
             });
         });
         
-        // 提取引用列表
         const citations = [];
         const citationItems = container.querySelectorAll('.ref-item, .citation-item');
         citationItems.forEach(item => {
             const num = item.querySelector('.ref-num')?.textContent.trim() || '';
             const title = item.querySelector('.ref-title')?.textContent.trim() || '';
-            const link = item.querySelector('.ref-link, a')?.getAttribute('href') || '';
-            const source = item.querySelector('.ref-source')?.textContent.trim() || '';
-            
-            citations.push({
-                num: num,
-                title: title,
-                url: link,
-                source: source
-            });
+            citations.push({ num, title });
         });
         
         return {
-            html_content: container.innerHTML,
+            html_content: fullHtml,
             sections: sections,
             citations: citations
         };
