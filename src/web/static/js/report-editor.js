@@ -177,14 +177,52 @@ class ReportEditor {
                     <span>版本历史</span>
                 </button>
                 
-                <button id="downloadReport" class="btn btn-success" title="下载报告">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                    <span>下载报告</span>
-                </button>
+                <div class="download-dropdown-wrapper">
+                    <button id="downloadReport" class="btn btn-success" title="下载报告">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        <span>下载报告</span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left: 4px;">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </button>
+                    <div id="downloadDropdown" class="download-dropdown-menu">
+                        <button class="download-option" data-format="html">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                            </svg>
+                            <span>HTML 格式</span>
+                        </button>
+                        <button class="download-option" data-format="pdf">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                            </svg>
+                            <span>PDF 格式</span>
+                        </button>
+                        <button class="download-option" data-format="image">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                <polyline points="21 15 16 10 5 21"></polyline>
+                            </svg>
+                            <span>图片格式</span>
+                        </button>
+                        <button class="download-option" data-format="markdown">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                            </svg>
+                            <span>Markdown 格式</span>
+                        </button>
+                    </div>
+                </div>
                 
                 <div class="toolbar-status" id="editorStatus">
                     <span class="status-indicator"></span>
@@ -217,7 +255,34 @@ class ReportEditor {
         if (saveBtn) saveBtn.addEventListener('click', () => this.saveReport());
         if (cancelBtn) cancelBtn.addEventListener('click', () => this.cancelEdit());
         if (historyBtn) historyBtn.addEventListener('click', () => this.showVersionHistory());
-        if (downloadBtn) downloadBtn.addEventListener('click', () => this.downloadReport());
+        
+        // 下载按钮和下拉菜单
+        if (downloadBtn) {
+            downloadBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.toggleDownloadDropdown();
+            });
+        }
+        
+        // 下载选项点击事件
+        const downloadOptions = document.querySelectorAll('.download-option');
+        downloadOptions.forEach(option => {
+            option.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const format = option.dataset.format;
+                this.downloadReport(format);
+                this.toggleDownloadDropdown();
+            });
+        });
+        
+        // 点击外部关闭下拉菜单
+        document.addEventListener('click', (e) => {
+            const dropdown = document.getElementById('downloadDropdown');
+            const downloadBtn = document.getElementById('downloadReport');
+            if (dropdown && !dropdown.contains(e.target) && !downloadBtn.contains(e.target)) {
+                dropdown.classList.remove('show');
+            }
+        });
         
         console.log('[Editor] ✅ 事件绑定完成');
         
@@ -786,7 +851,32 @@ class ReportEditor {
         }, duration);
     }
     
-    downloadReport() {
+    
+    toggleDownloadDropdown() {
+        const dropdown = document.getElementById('downloadDropdown');
+        if (dropdown) {
+            dropdown.classList.toggle('show');
+        }
+    }
+    
+    async downloadReport(format = 'html') {
+        try {
+            if (format === 'html') {
+                this.downloadHTML();
+            } else if (format === 'pdf') {
+                await this.downloadPDF();
+            } else if (format === 'image') {
+                await this.downloadImage();
+            } else if (format === 'markdown') {
+                await this.downloadMarkdown();
+            }
+        } catch (error) {
+            console.error('下载报告失败:', error);
+            this.showNotification(`下载失败: ${error.message}`, 'error');
+        }
+    }
+    
+    downloadHTML() {
         try {
             // 临时移除编辑器工具栏
             const toolbar = document.getElementById('editorToolbar');
@@ -839,11 +929,245 @@ class ReportEditor {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
             
-            this.showNotification('报告下载成功', 'success', 3000);
+            this.showNotification('HTML报告下载成功', 'success', 3000);
             
         } catch (error) {
-            console.error('下载报告失败:', error);
-            this.showNotification(`下载失败: ${error.message}`, 'error');
+            console.error('下载HTML失败:', error);
+            throw error;
+        }
+    }
+    
+    async downloadPDF() {
+        const collapsedElements = [];
+        let originalButtonText = '';
+        
+        try {
+            // 展开所有折叠内容
+            const collapsedItems = document.querySelectorAll('.collapsed');
+            collapsedItems.forEach(elem => {
+                collapsedElements.push(elem);
+                elem.classList.remove('collapsed');
+            });
+            
+            const detailsElements = document.querySelectorAll('details:not([open])');
+            detailsElements.forEach(elem => {
+                collapsedElements.push({ elem, type: 'details' });
+                elem.setAttribute('open', '');
+            });
+            
+            const hiddenElements = document.querySelectorAll('.hidden:not(script):not(style)');
+            hiddenElements.forEach(elem => {
+                if (elem.textContent.trim() || elem.querySelector('img, svg, canvas')) {
+                    collapsedElements.push({ elem, type: 'hidden' });
+                    elem.classList.remove('hidden');
+                }
+            });
+            
+            // 临时移除工具栏
+            const toolbar = document.getElementById('editorToolbar');
+            if (toolbar) toolbar.remove();
+            
+            // 移除编辑模式
+            document.body.classList.remove('edit-mode-active');
+            const editableElements = document.querySelectorAll('[contenteditable="true"]');
+            editableElements.forEach(el => {
+                el.removeAttribute('contenteditable');
+                el.classList.remove('editable');
+            });
+            
+            // 获取HTML内容
+            let htmlContent = document.documentElement.outerHTML;
+            
+            // 替换相对路径为绝对URL
+            htmlContent = htmlContent.replace(/src="\/static\//g, 'src="http://127.0.0.1:5000/static/');
+            htmlContent = htmlContent.replace(/href="\/static\//g, 'href="http://127.0.0.1:5000/static/');
+            
+            this.showNotification('正在生成PDF，请稍候...', 'info', 2000);
+            
+            // 调用后端API生成PDF
+            const response = await fetch('/api/export_pdf', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    html: htmlContent,
+                    filename: `report_${this.workspaceId}_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.pdf`
+                })
+            });
+            
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `report_${this.workspaceId}_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                
+                this.showNotification('✅ PDF已导出（高质量版本）', 'success', 3000);
+            } else {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'PDF生成失败');
+            }
+            
+        } catch (error) {
+            console.error('PDF导出失败:', error);
+            this.showNotification(`PDF导出失败: ${error.message}`, 'error');
+            throw error;
+        } finally {
+            // 恢复折叠状态
+            collapsedElements.forEach(item => {
+                if (item.type === 'details') {
+                    item.elem.removeAttribute('open');
+                } else if (item.type === 'hidden') {
+                    item.elem.classList.add('hidden');
+                } else if (item.classList) {
+                    item.classList.add('collapsed');
+                }
+            });
+            
+            // 恢复工具栏和编辑状态
+            if (!document.getElementById('editorToolbar')) {
+                this.createToolbar();
+                this.bindEvents();
+            }
+        }
+    }
+    
+    async downloadImage() {
+        if (!window.html2canvas) {
+            this.showNotification('图片导出功能需要加载 html2canvas 库', 'error');
+            return;
+        }
+        
+        const collapsedElements = [];
+        
+        try {
+            this.showNotification('正在生成图片，请稍候...', 'info', 2000);
+            
+            // 展开所有折叠内容
+            const collapsedItems = document.querySelectorAll('.collapsed');
+            collapsedItems.forEach(elem => {
+                collapsedElements.push(elem);
+                elem.classList.remove('collapsed');
+            });
+            
+            const detailsElements = document.querySelectorAll('details:not([open])');
+            detailsElements.forEach(elem => {
+                collapsedElements.push({ elem, type: 'details' });
+                elem.setAttribute('open', '');
+            });
+            
+            const hiddenElements = document.querySelectorAll('.hidden:not(script):not(style)');
+            hiddenElements.forEach(elem => {
+                if (elem.textContent.trim() || elem.querySelector('img, svg, canvas')) {
+                    collapsedElements.push({ elem, type: 'hidden' });
+                    elem.classList.remove('hidden');
+                }
+            });
+            
+            // 临时移除工具栏
+            const toolbar = document.getElementById('editorToolbar');
+            if (toolbar) toolbar.style.display = 'none';
+            
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            const canvas = await html2canvas(document.body, {
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#ffffff',
+                scale: 2
+            });
+            
+            if (toolbar) toolbar.style.display = '';
+            
+            const url = canvas.toDataURL('image/png');
+            const a = document.createElement('a');
+            a.download = `report_${this.workspaceId}_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.png`;
+            a.href = url;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            this.showNotification('图片下载成功', 'success', 3000);
+            
+        } catch (error) {
+            console.error('图片导出失败:', error);
+            this.showNotification(`图片导出失败: ${error.message}`, 'error');
+            throw error;
+        } finally {
+            // 恢复折叠状态
+            collapsedElements.forEach(item => {
+                if (item.type === 'details') {
+                    item.elem.removeAttribute('open');
+                } else if (item.type === 'hidden') {
+                    item.elem.classList.add('hidden');
+                } else if (item.classList) {
+                    item.classList.add('collapsed');
+                }
+            });
+        }
+    }
+    
+    async downloadMarkdown() {
+        try {
+            this.showNotification('正在转换为Markdown格式...', 'info', 2000);
+            
+            // 临时移除工具栏
+            const toolbar = document.getElementById('editorToolbar');
+            if (toolbar) toolbar.remove();
+            
+            // 移除编辑模式
+            document.body.classList.remove('edit-mode-active');
+            const editableElements = document.querySelectorAll('[contenteditable="true"]');
+            editableElements.forEach(el => {
+                el.removeAttribute('contenteditable');
+                el.classList.remove('editable');
+            });
+            
+            const htmlContent = document.documentElement.outerHTML;
+            
+            const response = await fetch('/api/export_md', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    html: htmlContent,
+                    filename: `report_${this.workspaceId}_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.md`
+                })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Markdown导出失败');
+            }
+            
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `report_${this.workspaceId}_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.md`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            this.showNotification('Markdown格式导出成功', 'success', 3000);
+            
+        } catch (error) {
+            console.error('Markdown导出失败:', error);
+            this.showNotification(`Markdown导出失败: ${error.message}`, 'error');
+            throw error;
+        } finally {
+            // 恢复工具栏和编辑状态
+            if (!document.getElementById('editorToolbar')) {
+                this.createToolbar();
+                this.bindEvents();
+            }
         }
     }
     
