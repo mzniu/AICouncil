@@ -349,47 +349,38 @@ class ReportEditor {
         console.log('[Editor] 进入编辑模式...');
         this.isEditMode = true;
         
-        // 查找主容器 - 使用更智能的选择器，排除工具栏
-        let mainContainer = document.querySelector('.container');
+        // **改进方案**: 处理body下所有非工具栏的顶级元素
+        // 这样无论报告结构如何（.header + .container，还是单一.container），都能全部处理
+        const bodyChildren = Array.from(document.body.children).filter(el =>
+            el.id !== 'editorToolbar' &&
+            !el.classList.contains('editor-toolbar') &&
+            el.tagName !== 'SCRIPT' &&
+            el.tagName !== 'STYLE'
+        );
         
-        if (!mainContainer) {
-            // 如果没有.container，找到第一个不是工具栏的大型div
-            const bodyChildren = Array.from(document.body.children);
-            mainContainer = bodyChildren.find(el => 
-                el.id !== 'editorToolbar' && 
-                !el.classList.contains('editor-toolbar') &&
-                el.tagName === 'DIV' &&
-                el.children.length > 0  // 必须有子元素
-            );
-        }
+        console.log(`[Editor] 找到 ${bodyChildren.length} 个顶级内容元素`);
         
-        if (!mainContainer) {
-            mainContainer = document.querySelector('main');
-        }
+        // 保存原始内容（保存body副本用于取消）
+        this.originalContent = document.body.cloneNode(true);
         
-        if (!mainContainer) {
-            console.error('[Editor] 找不到主容器元素');
-            this.showNotification('无法进入编辑模式：找不到报告容器', 'error');
-            return;
-        }
-        
-        console.log('[Editor] 主容器:', mainContainer.tagName, mainContainer.className || '(无class)');
-        console.log('[Editor] 主容器子元素数量:', mainContainer.children.length);
-        
-        // 保存原始内容（仅保存主容器）
-        this.originalContent = mainContainer.cloneNode(true);
-        
-        // 处理主容器内的所有顶级子元素
-        console.log('[Editor] 开始处理主容器的所有子元素...');
-        
+        // 处理所有顶级内容元素
         let processedCount = 0;
-        Array.from(mainContainer.children).forEach((el, index) => {
-            console.log(`[Editor] [${index}] 处理元素:`, el.tagName, el.className || '(无class)');
+        let totalEditableCount = 0;
+        
+        bodyChildren.forEach((el, index) => {
+            console.log(`[Editor] [${index}] 处理元素:`, el.tagName, el.className || '(无class)', `子元素: ${el.children.length}`);
+            
+            // 递归处理每个顶级元素的子元素
+            Array.from(el.querySelectorAll('*')).forEach(child => {
+                this.makeElementEditable(child);
+            });
+            // 也处理顶级元素自身
             this.makeElementEditable(el);
+            
             processedCount++;
         });
         
-        console.log(`[Editor] 所有可编辑元素已标记，共处理 ${processedCount} 个顶级元素`);
+        console.log(`[Editor] 共处理 ${processedCount} 个顶级元素`);
         
         // 统计实际被标记为可编辑的元素数量
         const editableElements = document.querySelectorAll('[contenteditable="true"]');
@@ -539,10 +530,9 @@ class ReportEditor {
     }
     
     extractReportData() {
-        // **关键修复**: 保存完整的HTML文档，而不仅仅是body内容
-        // 这样可以保留<head>中的CSS、JS引用和meta标签
+        // **关键修复**: 保存完整的HTML文档，但要移除编辑器工具栏
         
-        // 临时移除contenteditable属性，避免保存编辑状态
+        // 1. 临时移除contenteditable属性，避免保存编辑状态
         const editableElements = document.querySelectorAll('[contenteditable="true"]');
         editableElements.forEach(el => {
             el.setAttribute('data-was-editable', 'true');
@@ -550,10 +540,29 @@ class ReportEditor {
             el.classList.remove('editable-active');
         });
         
-        // 获取完整的HTML文档
+        // 2. 临时移除编辑器工具栏（保存时不应包含）
+        const toolbar = document.getElementById('editorToolbar');
+        const toolbarParent = toolbar?.parentNode;
+        const toolbarNextSibling = toolbar?.nextSibling;
+        if (toolbar) {
+            toolbar.remove();
+        }
+        
+        // 3. 移除edit-mode-active类
+        document.body.classList.remove('edit-mode-active');
+        
+        // 4. 获取完整的HTML文档
         const fullHtml = document.documentElement.outerHTML;
         
-        // 恢复contenteditable属性
+        // 5. 恢复工具栏
+        if (toolbar && toolbarParent) {
+            toolbarParent.insertBefore(toolbar, toolbarNextSibling);
+        }
+        
+        // 6. 恢复edit-mode-active类
+        document.body.classList.add('edit-mode-active');
+        
+        // 7. 恢复contenteditable属性
         document.querySelectorAll('[data-was-editable="true"]').forEach(el => {
             el.setAttribute('contenteditable', 'true');
             el.classList.add('editable-active');
