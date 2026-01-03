@@ -231,14 +231,29 @@ def run_backend(issue, backend, model, rounds, planners, auditors, agent_configs
 
 @app.route('/api/stop', methods=['POST'])
 def stop_discussion():
-    global current_process, is_running
+    global current_process, is_running, discussion_events, backend_logs, final_report
+    
+    # 立即重置运行状态，确保前端能快速响应
+    was_running = is_running
+    is_running = False
+    
     if current_process:
         try:
             cleanup()
-            is_running = False
+            # 清理所有状态数据，为下次讨论做准备
+            discussion_events = []
+            backend_logs = []
+            # 保留 final_report 以便查看最后的报告
+            logger.info("[app] 讨论已停止，状态已重置")
             return jsonify({"status": "ok", "message": "已强制停止后台进程"})
         except Exception as e:
+            logger.error(f"[app] 停止讨论失败: {e}")
             return jsonify({"status": "error", "message": str(e)}), 500
+    elif was_running:
+        # 没有进程但标志位是运行中，可能是打包环境中的线程，也重置状态
+        logger.info("[app] 重置僵尸运行状态")
+        return jsonify({"status": "ok", "message": "状态已重置"})
+    
     return jsonify({"status": "error", "message": "没有正在运行的讨论"}), 400
 
 @app.route('/api/status', methods=['GET'])
