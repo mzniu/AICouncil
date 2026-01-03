@@ -337,6 +337,7 @@ class ReportEditor {
     }
     
     toggleEditMode() {
+        console.log('[Editor] toggleEditMode 被调用，当前模式:', this.isEditMode ? '编辑' : '查看');
         if (this.isEditMode) {
             this.exitEditMode();
         } else {
@@ -345,6 +346,7 @@ class ReportEditor {
     }
     
     enterEditMode() {
+        console.log('[Editor] 进入编辑模式...');
         this.isEditMode = true;
         
         // 查找主容器，支持多种可能的选择器
