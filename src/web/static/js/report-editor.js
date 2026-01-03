@@ -177,6 +177,15 @@ class ReportEditor {
                     <span>版本历史</span>
                 </button>
                 
+                <button id="downloadReport" class="btn btn-success" title="下载报告">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    <span>下载报告</span>
+                </button>
+                
                 <div class="toolbar-status" id="editorStatus">
                     <span class="status-indicator"></span>
                     <span class="status-text">查看模式</span>
@@ -194,18 +203,21 @@ class ReportEditor {
         const saveBtn = document.getElementById('saveReport');
         const cancelBtn = document.getElementById('cancelEdit');
         const historyBtn = document.getElementById('versionHistory');
+        const downloadBtn = document.getElementById('downloadReport');
         
         console.log('[Editor] 找到的按钮:', {
             toggleBtn: !!toggleBtn,
             saveBtn: !!saveBtn,
             cancelBtn: !!cancelBtn,
-            historyBtn: !!historyBtn
+            historyBtn: !!historyBtn,
+            downloadBtn: !!downloadBtn
         });
         
         if (toggleBtn) toggleBtn.addEventListener('click', () => this.toggleEditMode());
         if (saveBtn) saveBtn.addEventListener('click', () => this.saveReport());
         if (cancelBtn) cancelBtn.addEventListener('click', () => this.cancelEdit());
         if (historyBtn) historyBtn.addEventListener('click', () => this.showVersionHistory());
+        if (downloadBtn) downloadBtn.addEventListener('click', () => this.downloadReport());
         
         console.log('[Editor] ✅ 事件绑定完成');
         
@@ -754,6 +766,10 @@ class ReportEditor {
     }
     
     showNotification(message, type = 'info', duration = 5000) {
+        // 移除已存在的通知
+        const existingNotifications = document.querySelectorAll('.notification');
+        existingNotifications.forEach(n => n.remove());
+        
         const notification = document.createElement('div');
         notification.className = `notification notification-${type}`;
         notification.textContent = message;
@@ -768,6 +784,67 @@ class ReportEditor {
             notification.classList.remove('show');
             setTimeout(() => notification.remove(), 300);
         }, duration);
+    }
+    
+    downloadReport() {
+        try {
+            // 临时移除编辑器工具栏
+            const toolbar = document.getElementById('editorToolbar');
+            const toolbarParent = toolbar ? toolbar.parentNode : null;
+            const toolbarNextSibling = toolbar ? toolbar.nextSibling : null;
+            
+            if (toolbar) {
+                toolbar.remove();
+            }
+            
+            // 移除编辑模式类
+            document.body.classList.remove('edit-mode-active');
+            
+            // 移除所有 contenteditable 属性
+            const editableElements = document.querySelectorAll('[contenteditable="true"]');
+            editableElements.forEach(el => {
+                el.removeAttribute('contenteditable');
+                el.classList.remove('editable');
+            });
+            
+            // 获取完整的 HTML
+            const fullHtml = document.documentElement.outerHTML;
+            
+            // 恢复工具栏
+            if (toolbar && toolbarParent) {
+                toolbarParent.insertBefore(toolbar, toolbarNextSibling);
+            }
+            
+            // 恢复编辑状态
+            if (this.isEditMode) {
+                document.body.classList.add('edit-mode-active');
+                editableElements.forEach(el => {
+                    el.setAttribute('contenteditable', 'true');
+                    el.classList.add('editable');
+                });
+            }
+            
+            // 创建 Blob 并下载
+            const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            
+            // 生成文件名: report_工作区ID_时间戳.html
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+            a.download = `report_${this.workspaceId}_${timestamp}.html`;
+            
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            this.showNotification('报告下载成功', 'success', 3000);
+            
+        } catch (error) {
+            console.error('下载报告失败:', error);
+            this.showNotification(`下载失败: ${error.message}`, 'error');
+        }
     }
     
     formatDate(timestamp) {
