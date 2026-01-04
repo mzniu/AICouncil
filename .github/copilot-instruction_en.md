@@ -4,29 +4,20 @@
 
 AICouncil is a multi-agent deliberation system that simulates a council ("元老院") where AI agents debate complex issues through structured rounds. The architecture follows a strict **role-based blind evaluation** pattern:
 
-- **Leader** (议长): Decomposes issues, orchestrates discussion flow, synthesizes final reports. Adapts strategy based on round context (intermediate vs final round)
+- **Leader** (议长): Decomposes issues, orchestrates discussion flow, synthesizes final reports
 - **Planners** (策论家): Generate solution proposals in parallel (blind evaluation - no cross-agent visibility)
 - **Auditors** (监察官): Critically review planner proposals in parallel (blind evaluation)
-- **Devil's Advocate** (质疑官): Challenges Leader's decomposition and summaries with critical analysis, identifies logical gaps, missing perspectives, and potential biases. Triggers Leader revision when critical issues are found
-- **Reporter** (记录员): Generates polished HTML reports from discussion results. Integrates DA feedback naturally into solutions without exposing internal discussion process
+- **Reporter** (记录员): Tracks and documents the entire deliberation process
 
 **Critical Design Principle**: Agents operate in **blind evaluation mode** - each agent cannot see outputs from other agents in the same role tier until the Leader synthesizes them. This is enforced through independent LangChain execution contexts.
 **Critical Principle**: Don't commit and push the code.
 ## Core Workflow
 
 1. **Planning Phase**: Leader decomposes issue into `key_questions` and designs report structure
-   - Devil's Advocate challenges the decomposition
-   - Leader revises if critical issues are found (closed-loop)
 2. **Iterative Discussion** (configurable rounds): 
    - Planners generate proposals → Auditors critique → Leader synthesizes
-   - Devil's Advocate challenges Leader's summary each round
    - Each role tier executes in parallel using `ThreadPoolExecutor`
-3. **Final Round Special Handling**:
-   - Leader uses `is_final_round=True` prompt (focuses on global synthesis, not next-round direction)
-   - Devil's Advocate provides final challenge
-   - **Mandatory Final Revision**: Leader must revise summary based on DA feedback before report generation
-4. **Synthesis Phase**: Leader's revised summary → Reporter generates HTML report with embedded ECharts
-   - Reporter integrates DA insights naturally without exposing discussion process
+3. **Synthesis Phase**: Leader creates final summary → Reporter generates HTML report with embedded ECharts
 
 **Search Integration**: Agents can trigger web searches mid-execution using `[SEARCH: query]` tags. The system detects these, fetches results via multi-engine search (Baidu/Bing/Yahoo/Mojeek/DuckDuckGo), and re-injects results into the agent's context for a second pass. Search is implemented as a **Requests-First architecture** (Yahoo/Mojeek use pure requests; Baidu/Bing fall back to DrissionPage for JavaScript rendering).
 
@@ -150,18 +141,6 @@ Implement in [src/utils/search_utils.py](src/utils/search_utils.py) following th
 2. Add prompt template in [src/agents/langchain_agents.py](src/agents/langchain_agents.py)
 3. Update `run_full_cycle()` to orchestrate new role in parallel
 4. Add frontend panel in [src/web/templates/index.html](src/web/templates/index.html)
-
-### Devil's Advocate Integration Pattern
-The DA role follows a **challenge → revision closed-loop**:
-1. **Decomposition Stage**: `make_devils_advocate_chain(cfg, stage="decomposition")` → challenges Leader's issue breakdown
-2. **Summary Stage**: `make_devils_advocate_chain(cfg, stage="summary")` → challenges each round's synthesis
-3. **Revision Trigger**: If `critical_issues` non-empty OR "严重" in `overall_assessment`, Leader must revise
-4. **Final Round**: Mandatory revision regardless of severity (ensures report quality)
-
-### Leader Round-Aware Prompting
-Leader adapts behavior based on round context:
-- `make_leader_chain(cfg, is_final_round=False)`: Intermediate rounds - includes `next_round_focus` field
-- `make_leader_chain(cfg, is_final_round=True)`: Final round - focuses on global synthesis, `next_round_focus=null`
 
 ### Model Adapter Extension
 Add new backend in [src/agents/model_adapter.py](src/agents/model_adapter.py):

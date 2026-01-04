@@ -316,7 +316,165 @@ def make_auditor_chain(model_config: Dict[str, Any]):
     return prompt | llm
 
 
-def make_leader_chain(model_config: Dict[str, Any]):
+def _get_leader_prompt_for_intermediate_round() -> str:
+    """中间轮次的prompt - 包含"下一轮讨论方向"要求"""
+    return """
+        **IMPORTANT: You MUST respond in the SAME LANGUAGE as the input "输入信息" (e.g., if the input is in Chinese, your entire response must be in Chinese).**
+        **CRITICAL: Your internal thinking/reasoning process MUST also be in the SAME LANGUAGE as the input.**
+
+        你是本次讨论的议长（组织者）。
+        任务：
+        1) 拆解用户议题，提取核心目标与关键问题；
+        2) 为本次议题设计一份最终报告的结构（report_design）。**核心要求：大纲必须紧扣用户原始问题，确保每个模块都能为回答该问题提供实质性贡献，严禁偏离主题**；
+        3) 在每轮结束后，根据多位策论家/监察官的JSON输出进行去重、汇总与判定；
+        4) 删除与议题无关的内容；
+        5) 规划下一轮讨论的重点方向；
+        6) 仅以JSON格式输出汇总结果。
+        
+        **事实准确性原则**：作为议长，你必须确保对议题的拆解和汇总基于客观事实。**严禁胡编乱造**，严禁虚构行业背景或虚假共识。
+        
+        **联网搜索优先原则**：作为议长，**强烈建议你在拆解议题阶段优先搜索行业背景或最新动态**，以确保讨论方向的专业性。
+        
+        **联网搜索技能**：如果你需要了解议题的背景知识或行业标准，可以在输出 JSON 之前，先输出 `[SEARCH: 具体的搜索查询语句]`。
+        **搜索建议**：
+        1. 请使用**自然语言短语**（如 `[SEARCH: 2025年人工智能行业标准]`）。
+        2. **严禁将关键词拆得过细**（不要使用空格分隔每一个词）。
+        3. **极简原则**：搜索词必须控制在 **20个字以内**。请提炼最核心的关键词短语，**严禁直接复制背景或长句**。
+        4. **严禁包含无意义的填充词**（如"内容"、"汇总"、"列表"、"有哪些"）。
+        
+        **注意**：
+        - **问题导向**：在设计 `report_design` 时，请反复检查：如果按照这个大纲生成报告，是否能完整、直接地回答用户最初提出的问题？
+        - 如果输入中包含 `original_goal`，请务必在 `decomposition` 中保留该核心目标，不要随意修改。
+        - 如果输入中包含 `previous_decomposition`，请参考之前的报告大纲设计（report_design），除非有极其重要的理由，否则**严禁大幅修改大纲结构**，以保持议事的一致性。你可以在原有大纲基础上进行微调或深化。
+        - **质疑官反馈（重要）**：如果输入中包含 `devils_advocate_feedback` 或 `last_round_da_challenge`，请务必认真对待其中的批判性意见。如果质疑合理，请在本次输出中进行针对性修正（如调整大纲、补充遗漏点、修正逻辑偏差等）。
+        
+        严格遵守以下 JSON 格式，不要输出任何其他文字：
+        {{
+            "round": 1,
+            "decomposition": {{
+                "core_goal": "本次议题的核心目标",
+                "key_questions": ["关键问题1", "关键问题2"],
+                "boundaries": "讨论边界",
+                "report_design": {{
+                    "模块名1": "该模块应如何直接回答用户问题的描述",
+                    "模块名2": "该模块应如何直接回答用户问题的描述"
+                }}
+            }},
+            "instructions": "本轮协作指令（如：请策论家聚焦XX方向）",
+            "is_final_round": false,
+            "next_round_focus": "下一轮应重点讨论的方向和需要深入的问题",
+            "da_feedback_response": "对质疑官反馈的回应（如有）",
+            "summary": {{
+                "consensus": ["共识结论1", "共识结论2"],
+                "controversies": ["争议点1", "争议点2"]
+            }}
+        }}
+        
+        注意：
+        - decomposition 必须是一个对象（dict），不能是字符串。
+        - summary 必须是一个对象（dict），包含 consensus 和 controversies 两个列表。
+        - **next_round_focus 是必填项**，请提供明确的下轮讨论方向。
+        - is_final_round 必须设置为 false。
+        - 如果是首次拆解议题，summary 部分可以为空列表。
+        
+        当前时间：{current_time}
+        输入信息（议题或上轮方案与审核意见）：{inputs}
+        """
+
+
+def _get_leader_prompt_for_final_round() -> str:
+    """最后一轮的prompt - 强调全局整合和报告准备"""
+    return """
+        **IMPORTANT: You MUST respond in the SAME LANGUAGE as the input "输入信息" (e.g., if the input is in Chinese, your entire response must be in Chinese).**
+        **CRITICAL: Your internal thinking/reasoning process MUST also be in the SAME LANGUAGE as the input.**
+
+        你是本次讨论的议长（组织者）。
+        
+        🏁 **这是最后一轮讨论！** 🏁
+        
+        任务：
+        1) 基于所有轮次的讨论，进行**全局性总结**，整合核心发现；
+        2) 提炼最关键的结论和建议，为最终报告提供高质量素材；
+        3) 识别并标注未完全解决的关键问题（如有）；
+        4) 删除与议题无关的内容；
+        5) **不需要**规划下一轮讨论方向（因为已经是最后一轮）；
+        6) 仅以JSON格式输出汇总结果。
+        
+        **事实准确性原则**：作为议长，你必须确保对议题的拆解和汇总基于客观事实。**严禁胡编乱造**，严禁虚构行业背景或虚假共识。
+        
+        **联网搜索技能**：如果你需要了解议题的背景知识或行业标准，可以在输出 JSON 之前，先输出 `[SEARCH: 具体的搜索查询语句]`。
+        **搜索建议**：
+        1. 请使用**自然语言短语**（如 `[SEARCH: 2025年人工智能行业标准]`）。
+        2. **严禁将关键词拆得过细**（不要使用空格分隔每一个词）。
+        3. **极简原则**：搜索词必须控制在 **20个字以内**。请提炼最核心的关键词短语，**严禁直接复制背景或长句**。
+        4. **严禁包含无意义的填充词**（如"内容"、"汇总"、"列表"、"有哪些"）。
+        
+        **最后一轮的特殊要求**：
+        - **全局视角**：不仅要总结本轮，更要**横向整合所有轮次的关键发现**；
+        - **结论导向**：聚焦于"我们最终得出了什么结论"，而非"下一步该做什么"；
+        - **报告准备**：summary 部分应该为 Reporter 提供结构清晰、可直接使用的核心素材；
+        - **未解决问题**：如果有关键问题未完全解决，请在 controversies 中明确标注。
+        
+        **注意**：
+        - 如果输入中包含 `original_goal`，请务必在 `decomposition` 中保留该核心目标，不要随意修改。
+        - 如果输入中包含 `previous_decomposition`，请参考之前的报告大纲设计（report_design），除非有极其重要的理由，否则**严禁大幅修改大纲结构**，以保持议事的一致性。
+        - **质疑官反馈（重要）**：如果输入中包含 `last_round_da_challenge`，请务必认真对待其中的批判性意见。如果质疑合理，请在本次输出中进行针对性修正。
+        
+        严格遵守以下 JSON 格式，不要输出任何其他文字：
+        {{
+            "round": 1,
+            "decomposition": {{
+                "core_goal": "本次议题的核心目标",
+                "key_questions": ["关键问题1", "关键问题2"],
+                "boundaries": "讨论边界",
+                "report_design": {{
+                    "模块名1": "该模块应如何直接回答用户问题的描述",
+                    "模块名2": "该模块应如何直接回答用户问题的描述"
+                }}
+            }},
+            "instructions": "本轮协作指令（如：请策论家聚焦XX方向）",
+            "is_final_round": true,
+            "next_round_focus": null,
+            "da_feedback_response": "对质疑官反馈的回应（如有）",
+            "summary": {{
+                "consensus": ["全局性共识结论1", "全局性共识结论2"],
+                "controversies": ["未完全解决的关键问题1", "未完全解决的关键问题2"]
+            }}
+        }}
+        
+        注意：
+        - decomposition 必须是一个对象（dict），不能是字符串。
+        - summary 必须是一个对象（dict），包含 consensus 和 controversies 两个列表。
+        - **is_final_round 必须设置为 true**。
+        - **next_round_focus 必须设置为 null**（不要填写任何内容）。
+        - summary 中的 consensus 应该是跨轮次的全局性结论。
+        
+        当前时间：{current_time}
+        输入信息（议题或上轮方案与审核意见）：{inputs}
+        """
+
+
+def make_leader_chain(model_config: Dict[str, Any], is_final_round: bool = False):
+    """创建议长链
+    
+    Args:
+        model_config: 模型配置
+        is_final_round: 是否为最后一轮（影响prompt策略）
+    """
+    llm = AdapterLLM(backend_config=ModelConfig(**model_config))
+    
+    # 根据轮次选择prompt
+    if is_final_round:
+        prompt_text = _get_leader_prompt_for_final_round()
+    else:
+        prompt_text = _get_leader_prompt_for_intermediate_round()
+    
+    prompt = PromptTemplate.from_template(prompt_text)
+    return prompt | llm
+
+
+# 保留原来的函数签名作为过渡（向后兼容，已废弃）
+def make_leader_chain_legacy(model_config: Dict[str, Any]):
     llm = AdapterLLM(backend_config=ModelConfig(**model_config))
     prompt = PromptTemplate.from_template(
         """
@@ -523,11 +681,11 @@ def make_reporter_chain(model_config: Dict[str, Any]):
         你是首席方案架构师。你的任务是根据议事过程的完整记录，提炼并整合出一套最终的、具备极高可操作性的建议方案。
         
         **核心要求**：
-        1. **禁止累述**：不要提及“策论家A说了什么”、“监察官B质疑了什么”，直接给出最终达成的共识方案。
+        1. **禁止累述**：不要提及"策论家A说了什么"、"监察官B质疑了什么"、"质疑官提出了什么问题"等过程细节，直接给出最终达成的共识方案。
         2. **输出格式**：必须输出一个完整的、自包含的 HTML 页面代码（包含 <!DOCTYPE html>, <html>, <head>, <style>, <body>）。
         3. **禁止 Markdown**：绝对不要将 HTML 代码包裹在 ```html 或 ``` 等 Markdown 代码块标签中，直接输出 HTML 源码。
         4. **视觉设计**：使用现代、简约、专业的 UI 设计。利用 CSS 构建清晰的卡片布局、步骤条或信息图表。
-        5. **质疑与修正（重要）**：如果议事记录中包含“质疑官”（Devil's Advocate）的反馈，请在报告中体现这些关键质疑以及最终方案是如何回应或解决这些质疑的。这能显著提升报告的严谨性和说服力。
+        5. **方案整合（重要）**：如果议事记录中包含"质疑官"（Devil's Advocate）的反馈，请将其作为优化方案的参考资料，自然地整合到最终方案中。**不要在报告中专门突出或罗列质疑内容**（如设置专门的"质疑与回应"章节），而应该直接呈现经过充分讨论和优化后的解决方案。最终报告应该是一个完整、严谨、可执行的方案，而不是讨论过程的记录。
         6. **交互式编辑器支持（重要）**：
            - **引入编辑器资源**：在 HTML 的 <head> 中添加以下内容（用于支持报告编辑功能）：
              ```html
@@ -708,7 +866,8 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
     
     # 初始化各角色的 Chain
     leader_cfg = agent_configs.get("leader") or model_config
-    leader_chain = make_leader_chain(leader_cfg)
+    # 初始拆解阶段明确使用中间轮次行为（因为不是最后一轮）
+    leader_chain = make_leader_chain(leader_cfg, is_final_round=False)
     
     devils_advocate_cfg = agent_configs.get("devils_advocate") or model_config
     devils_advocate_decomposition_chain = make_devils_advocate_chain(devils_advocate_cfg, stage="decomposition")
@@ -987,6 +1146,11 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
 
         # 4. Leader Summary & Next Instructions
         logger.info(f"[round {r}] 议长正在汇总本轮结果...")
+        
+        # 根据是否为最后一轮动态创建Leader chain
+        is_final_round = (r == max_rounds)
+        current_leader_chain = make_leader_chain(leader_cfg, is_final_round=is_final_round)
+        
         inputs = {
             "original_goal": decomposition['core_goal'],
             "previous_decomposition": decomposition,
@@ -1002,7 +1166,7 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
             logger.info(f"[round {r}] 议长正在调用模型进行汇总 (尝试 {attempt + 1}/{max_retries})...")
             try:
                 current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                out, search_res = stream_agent_output(leader_chain, {"inputs": json.dumps(inputs, ensure_ascii=False), "current_time": current_time_str}, "议长", "Leader")
+                out, search_res = stream_agent_output(current_leader_chain, {"inputs": json.dumps(inputs, ensure_ascii=False), "current_time": current_time_str}, "议长", "Leader")
                 if search_res:
                     all_search_references.append(search_res)
                 
@@ -1087,6 +1251,59 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
                         "recommendations": ["请检查模型配置和输出格式"]
                     }
                     history[-1]["devils_advocate"] = da_result
+
+        # 最后一轮强制修正：议长根据质疑官反馈进行最终打磨
+        if r == max_rounds and da_result:
+            logger.info(f"[round {r}] 🏁 最后一轮：议长正在根据质疑官反馈进行最终修正...")
+            send_web_event("agent_action", agent_name="议长", role_type="Leader", content="正在根据质疑官反馈进行最终修正...", chunk_id=str(uuid.uuid4()))
+            
+            revision_inputs = {
+                "original_summary": final_summary,
+                "devils_advocate_feedback": da_result,
+                "core_goal": decomposition['core_goal'],
+                "all_rounds_history": history  # 提供完整历史以便全局整合
+            }
+            
+            for attempt in range(max_retries):
+                logger.info(f"[round {r}] 议长正在进行最终修正 (尝试 {attempt + 1}/{max_retries})...")
+                try:
+                    current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    # 使用最后一轮的chain（已经在前面创建了current_leader_chain）
+                    out, search_res = stream_agent_output(
+                        current_leader_chain, 
+                        {"inputs": json.dumps(revision_inputs, ensure_ascii=False), "current_time": current_time_str}, 
+                        "议长", 
+                        "Leader"
+                    )
+                    if search_res:
+                        all_search_references.append(search_res)
+                    
+                    cleaned = clean_json_string(out)
+                    if not cleaned:
+                        raise ValueError("议长最终修正输出为空或不包含 JSON")
+                        
+                    parsed = json.loads(cleaned)
+                    if "decomposition" not in parsed:
+                        parsed["decomposition"] = decomposition
+                    else:
+                        parsed["decomposition"]["core_goal"] = decomposition["core_goal"]
+                    
+                    revised_summary = schemas.LeaderSummary(**parsed)
+                    final_summary = revised_summary.dict()
+                    
+                    # 更新history中的summary
+                    history[-1]["summary"] = final_summary
+                    history[-1]["revision_trigger"] = "final_round_mandatory_revision"
+                    
+                    logger.info(f"[round {r}] 议长最终修正成功 (尝试 {attempt + 1})")
+                    send_web_event("agent_action", agent_name="议长", role_type="Leader", content=f"✅ 最终修正完成", chunk_id=str(uuid.uuid4()))
+                    break
+                except Exception as e:
+                    logger.warning(f"[round {r}] 议长最终修正尝试 {attempt + 1} 失败: {e}")
+                    logger.error(traceback.format_exc())
+                    if attempt == max_retries - 1:
+                        logger.warning(f"[round {r}] 议长最终修正失败，保留原总结")
+                        send_web_event("agent_action", agent_name="议长", role_type="Leader", content=f"⚠️ 最终修正失败，保留原总结", chunk_id=str(uuid.uuid4()))
 
         # 保存本轮汇总后的 history
         with open(os.path.join(workspace_path, "history.json"), "w", encoding="utf-8") as f:
