@@ -36,7 +36,9 @@ class LeaderSummary(BaseModel):
     round: int
     decomposition: Decomposition
     instructions: str
+    is_final_round: bool  # 标识是否为最后一轮
     summary: Dict[str, List[str]]
+    next_round_focus: Optional[str] = None  # 下一轮讨论重点（仅非最后一轮填充）
     da_feedback_response: Optional[str] = None # 对质疑官反馈的回应（如有）
 
 # Devil's Advocate (质疑官) schema
