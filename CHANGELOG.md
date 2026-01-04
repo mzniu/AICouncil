@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- 🎯 **质疑官 (Devil's Advocate) 角色**
+  - **闭环质疑机制**：在议题拆解阶段和每轮总结后，质疑官对议长的输出进行严格审查
+  - **强制修正流程**：议长必须在下一轮总结中包含 `da_feedback_response` 字段，明确回应质疑官的批评
+  - **三级严重度分类**：Critical (严重)、Warning (警告)、Minor (提示)，按风险等级展示
+  - **结构化输出**：使用 Pydantic 模型 (`DecompositionChallenge`, `SummaryChallenge`) 确保输出质量
+  - **专业化 UI**：基于 Tailwind CSS 的卡片式渲染，使用颜色编码（红色/橙色/蓝色）区分严重程度
+  - **Reporter 集成**：最终报告新增"质疑与修正"专栏，完整记录批判性思考过程
+  - **盲点检测提示词**：质疑官使用专门的 prompt 模板，专注于逻辑一致性、数据可信度、方法论缺陷等维度
+  - **并行执行优化**：质疑官与监察官同步运行，不影响整体性能
+
 - ✏️ **交互式报告编辑器 (MVP)**
   - **所见即所得编辑**：直接在浏览器中编辑报告内容，支持标题、段落、列表等文本元素
   - **版本控制**：自动创建版本快照，支持查看历史版本、预览和恢复

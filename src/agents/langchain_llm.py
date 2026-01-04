@@ -80,7 +80,7 @@ class AdapterLLM(LLM):
                                 continue
 
                             # 调试：记录每个 chunk 的关键信息
-                            logger.debug(f"[{mtype}] Processing chunk: type={chunk_type}, keys={list(chunk.keys())}, has_yielded={has_yielded_incremental}")
+                            # logger.debug(f"[{mtype}] Processing chunk: type={chunk_type}, keys={list(chunk.keys())}, has_yielded={has_yielded_incremental}")
                             
                             # 调试：记录包含 output 或 response 的 chunk，这可能是导致重复的原因
                             if "output" in chunk or "response" in chunk:
