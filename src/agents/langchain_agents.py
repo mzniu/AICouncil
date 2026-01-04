@@ -346,6 +346,7 @@ def make_leader_chain(model_config: Dict[str, Any]):
         - **问题导向**：在设计 `report_design` 时，请反复检查：如果按照这个大纲生成报告，是否能完整、直接地回答用户最初提出的问题？
         - 如果输入中包含 `original_goal`，请务必在 `decomposition` 中保留该核心目标，不要随意修改。
         - 如果输入中包含 `previous_decomposition`，请参考之前的报告大纲设计（report_design），除非有极其重要的理由，否则**严禁大幅修改大纲结构**，以保持议事的一致性。你可以在原有大纲基础上进行微调或深化。
+        - **质疑官反馈（重要）**：如果输入中包含 `devils_advocate_feedback` 或 `last_round_da_challenge`，请务必认真对待其中的批判性意见。如果质疑合理，请在本次输出中进行针对性修正（如调整大纲、补充遗漏点、修正逻辑偏差等）。
         
         严格遵守以下 JSON 格式，不要输出任何其他文字：
         {{
@@ -360,6 +361,7 @@ def make_leader_chain(model_config: Dict[str, Any]):
                 }}
             }},
             "instructions": "本轮协作指令（如：请策论家聚焦XX方向）",
+            "da_feedback_response": "对质疑官反馈的回应（如有）",
             "summary": {{
                 "consensus": ["共识结论1", "共识结论2"],
                 "controversies": ["争议点1", "争议点2"]
@@ -378,6 +380,140 @@ def make_leader_chain(model_config: Dict[str, Any]):
     return prompt | llm
 
 
+def make_devils_advocate_chain(model_config: Dict[str, Any], stage: str = "summary"):
+    """创建Devil's Advocate链 - 批判性思维引擎
+    
+    Args:
+        model_config: 模型配置
+        stage: 质疑阶段 ("decomposition" | "summary")
+    """
+    llm = AdapterLLM(backend_config=ModelConfig(**model_config))
+    
+    if stage == "decomposition":
+        prompt = PromptTemplate.from_template(
+            """你是资深的批判性思维专家（质疑官），专门发现问题分解中的盲点。
+
+**IMPORTANT: You MUST respond in the SAME LANGUAGE as the input.**
+**CRITICAL: Your internal thinking/reasoning process MUST also be in the SAME LANGUAGE as the input.**
+
+当前议题：
+{issue}
+
+议长的问题分解：
+核心目标：{core_goal}
+关键问题：{key_questions}
+边界条件：{boundaries}
+
+当前时间：{current_time}
+
+你的任务：
+1. **识别遗漏维度** - 哪些重要维度未被包含？
+   - 时间维度（短期vs长期）
+   - 利益相关方（谁受影响？）
+   - 约束条件（资源、法规、技术）
+   - 风险维度（what-if场景）
+
+2. **质疑核心假设** - 分解背后的隐含假设是什么？这些假设可靠吗？
+   - 例如："假设我们有足够的资源"
+   - 例如："假设现状会持续"
+
+3. **提供替代框架** - 是否有完全不同但可能更好的分解方式？
+   - 例如：按时间线分解 vs 按利益相关方分解
+   - 例如：自上而下 vs 自下而上
+
+4. **极端场景测试** - 在极端情况下，这个分解框架是否仍然有效？
+
+要求：
+- 每个质疑都要有清晰的推理逻辑
+- 提供建设性的替代视角，而非单纯否定
+- 如果分解合理，也要明确说明
+
+输出严格的JSON格式（不要输出任何其他文字）：
+{{
+    "round": 0,
+    "stage": "decomposition",
+    "decomposition_challenge": {{
+        "missing_dimensions": ["遗漏维度1", "遗漏维度2"],
+        "hidden_assumptions": ["隐含假设1", "隐含假设2"],
+        "alternative_frameworks": ["替代框架1", "替代框架2"],
+        "extreme_scenario_issues": ["极端场景问题1", "极端场景问题2"]
+    }},
+    "overall_assessment": "对拆解的整体评价",
+    "critical_issues": ["严重问题1", "严重问题2"],
+    "recommendations": ["改进建议1", "改进建议2"]
+}}
+
+记住：你的价值在于发现议长可能忽视的盲点，帮助完善问题框架。
+"""
+        )
+    else:  # stage == "summary"
+        prompt = PromptTemplate.from_template(
+            """你是逻辑严密性专家（质疑官），负责验证议长总结的质量。
+
+**IMPORTANT: You MUST respond in the SAME LANGUAGE as the input.**
+**CRITICAL: Your internal thinking/reasoning process MUST also be in the SAME LANGUAGE as the input.**
+
+第{round}轮讨论 - 总结验证阶段
+
+方案簇（Synthesizer归纳）：
+{synthesis_clusters}
+
+议长的总结：
+{leader_summary}
+
+历史讨论记录：
+{history}
+
+你的任务：
+1. **逻辑一致性检查**
+   - 总结中是否有前后矛盾？
+   - 结论是否有逻辑跳跃（从A直接跳到C，缺少B）？
+   - 因果关系是否成立？
+
+2. **完整性检查**
+   - Synthesizer识别的关键观点是否都在总结中体现？
+   - 哪些重要内容被遗漏？
+   - 是否平衡对待了所有方案簇？
+
+3. **合理性检查**
+   - 是否过度乐观（忽视风险）或过度悲观（忽视机会）？
+   - 优先级判断是否合理？
+   - 时间预估是否现实？
+
+4. **一致性检查**
+   - 本轮总结与上一轮是否矛盾？
+   - 是否解决了之前识别的问题？
+
+5. **决策支持性检查**
+   - 总结是否提供了足够的信息供决策？
+   - 是否明确了下一步行动？
+
+要求：
+- 对比总结与原始材料，识别偏差
+- 明确指出哪些遗漏/矛盾是critical级别
+- 如果总结质量高，也要明确肯定
+
+输出严格的JSON格式（不要输出任何其他文字）：
+{{
+    "round": {round},
+    "stage": "summary",
+    "summary_challenge": {{
+        "logical_gaps": ["逻辑缺陷1", "逻辑缺陷2"],
+        "missing_points": ["遗漏要点1", "遗漏要点2"],
+        "inconsistencies": ["矛盾点1", "矛盾点2"],
+        "optimism_bias": "是否存在过度乐观的判断"
+    }},
+    "overall_assessment": "对总结的整体评价",
+    "critical_issues": ["严重问题1", "严重问题2"],
+    "recommendations": ["改进建议1", "改进建议2"]
+}}
+
+记住：你不是挑剔，而是确保最终决策建立在可靠的基础上。
+"""
+    )
+    return prompt | llm
+
+
 def make_reporter_chain(model_config: Dict[str, Any]):
     llm = AdapterLLM(backend_config=ModelConfig(**model_config))
     prompt = PromptTemplate.from_template(
@@ -391,7 +527,8 @@ def make_reporter_chain(model_config: Dict[str, Any]):
         2. **输出格式**：必须输出一个完整的、自包含的 HTML 页面代码（包含 <!DOCTYPE html>, <html>, <head>, <style>, <body>）。
         3. **禁止 Markdown**：绝对不要将 HTML 代码包裹在 ```html 或 ``` 等 Markdown 代码块标签中，直接输出 HTML 源码。
         4. **视觉设计**：使用现代、简约、专业的 UI 设计。利用 CSS 构建清晰的卡片布局、步骤条或信息图表。
-        5. **交互式编辑器支持（重要）**：
+        5. **质疑与修正（重要）**：如果议事记录中包含“质疑官”（Devil's Advocate）的反馈，请在报告中体现这些关键质疑以及最终方案是如何回应或解决这些质疑的。这能显著提升报告的严谨性和说服力。
+        6. **交互式编辑器支持（重要）**：
            - **引入编辑器资源**：在 HTML 的 <head> 中添加以下内容（用于支持报告编辑功能）：
              ```html
              <meta name="workspace-id" content="">
@@ -421,7 +558,7 @@ def make_reporter_chain(model_config: Dict[str, Any]):
              ```
              **注意**：workspace-id的content留空即可，系统会自动填充实际的会话ID。
            - **数据属性标记**：为可编辑章节添加 `data-section-id` 属性，例如：`<div class="card" data-section-id="section-1">`
-        6. **数据可视化（强烈推荐）**：
+        7. **数据可视化（强烈推荐）**：
            - **使用 ECharts 图表**：在报告中适当位置添加数据可视化图表，让报告更加直观和专业。
            - **引入方式**：在 HTML 的 <head> 中添加：`<script src="/static/vendor/echarts.min.js"></script>`
            - **推荐图表类型**：
@@ -438,7 +575,7 @@ def make_reporter_chain(model_config: Dict[str, Any]):
              * **重要**：图表容器必须设置固定高度（建议400-500px），避免PDF导出时布局错乱
              * **布局提示**：在图表外层添加容器样式 `page-break-inside: avoid; margin: 30px 0;` 防止分页截断
         
-        6. **流程图与架构图（Mermaid 支持）**：
+        8. **流程图与架构图（Mermaid 支持）**：
            - **使用 Mermaid 图表**：在需要展示流程、架构、时序、状态机等结构化信息时，使用 Mermaid 语法。
            - **引入方式**：在 HTML 的 <head> 中添加：
              ```html
@@ -522,9 +659,9 @@ def make_reporter_chain(model_config: Dict[str, Any]):
                .citation-tooltip small {{ color: #64748b; display: block; margin-bottom: 8px; border-bottom: 1px solid #f1f5f9; padding-bottom: 4px; }}
                .citation-tooltip p {{ margin: 0; color: #475569; }}
                ```
-        8. **结构遵循**：请务必遵循议长设计的报告结构（report_design）进行内容组织。
-        9. **语言一致性**：报告的所有内容（包括标题、按钮、标签、正文）必须使用与原始议题相同的语言。
-        10. **引用与参考资料（严禁虚构链接）**：
+        10. **结构遵循**：请务必遵循议长设计的报告结构（report_design）进行内容组织。
+        11. **语言一致性**：报告的所有内容（包括标题、按钮、标签、正文）必须使用与原始议题相同的语言。
+        12. **引用与参考资料（严禁虚构链接）**：
             - **真实性原则**：**严禁胡编乱造任何链接、数据或事实**。
             - **行内引用**：仅引用"联网搜索参考资料"中提供的真实 URL。**严禁虚构类似 `https://developer.aliyun.com/article/xxxxxx` 这种占位符链接**。
             - **引用格式**：在报告正文中引用到联网搜索提供的信息时，请务必使用上述 **高级引用格式**。
@@ -534,7 +671,7 @@ def make_reporter_chain(model_config: Dict[str, Any]):
               * **重复引用处理**：如果同一信源在报告中多次使用，后续引用应继续使用首次出现时分配的编号。
               * **示例**：假设联网搜索返回表格中 #5 的结果在报告中首次被引用，应该标记为 [1]；表格中 #2 的结果在报告中第二个被引用，应标记为 [2]。
             - **末尾列表**：在报告末尾添加"参考资料"章节，按照 [1], [2], [3]... 的引用编号顺序列出所有参考链接。建议使用列表或表格形式，包含标题、来源和链接。
-        11. **禁止废话**：不要包含任何关于报告生成过程的描述（如"基于多轮讨论形成"、"本报告整合自..."）、版权声明、讲解时长建议或任何前言/后记。直接从报告标题和正文内容开始。
+        13. **禁止废话**：不要包含任何关于报告生成过程的描述（如"基于多轮讨论形成"、"本报告整合自..."）、版权声明、讲解时长建议或任何前言/后记。直接从报告标题和正文内容开始。
         
         请确保 HTML 代码在 <iframe> 中能完美渲染。
         
@@ -572,6 +709,10 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
     # 初始化各角色的 Chain
     leader_cfg = agent_configs.get("leader") or model_config
     leader_chain = make_leader_chain(leader_cfg)
+    
+    devils_advocate_cfg = agent_configs.get("devils_advocate") or model_config
+    devils_advocate_decomposition_chain = make_devils_advocate_chain(devils_advocate_cfg, stage="decomposition")
+    devils_advocate_summary_chain = make_devils_advocate_chain(devils_advocate_cfg, stage="summary")
     
     reporter_cfg = agent_configs.get("reporter") or model_config
     reporter_chain = make_reporter_chain(reporter_cfg)
@@ -624,12 +765,103 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
             logger.warning(f"[cycle] 议长拆解尝试 {attempt + 1} 失败: {e}")
             logger.error(traceback.format_exc())
 
+    # Devil's Advocate 质疑初始拆解
+    logger.info("[cycle] 质疑官正在验证问题拆解...")
+    decomposition_da_result = None
+    for attempt in range(max_retries):
+        logger.info(f"[cycle] 质疑官正在调用模型进行拆解质疑 (尝试 {attempt + 1}/{max_retries})...")
+        try:
+            current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            da_prompt_vars = {
+                "issue": issue_text,
+                "core_goal": decomposition.get("core_goal", ""),
+                "key_questions": json.dumps(decomposition.get("key_questions", []), ensure_ascii=False),
+                "boundaries": decomposition.get("boundaries", ""),
+                "current_time": current_time_str
+            }
+            
+            out, search_res = stream_agent_output(
+                devils_advocate_decomposition_chain, 
+                da_prompt_vars, 
+                "质疑官", 
+                "devils_advocate", 
+                event_type="agent_action"
+            )
+            if search_res:
+                all_search_references.append(search_res)
+            
+            cleaned = clean_json_string(out)
+            if not cleaned:
+                raise ValueError("质疑官输出为空或不包含 JSON")
+                
+            parsed = json.loads(cleaned)
+            da_obj = schemas.DevilsAdvocateSchema(**parsed)
+            decomposition_da_result = da_obj.dict()
+            logger.info(f"[cycle] 质疑官验证拆解成功 (尝试 {attempt + 1})")
+            
+            # 保存拆解质疑结果
+            with open(os.path.join(workspace_path, "decomposition_challenge.json"), "w", encoding="utf-8") as f:
+                json.dump(decomposition_da_result, f, ensure_ascii=False, indent=4)
+            break
+        except Exception as e:
+            logger.warning(f"[cycle] 质疑官验证拆解尝试 {attempt + 1} 失败: {e}")
+            logger.error(traceback.format_exc())
+            if attempt == max_retries - 1:
+                decomposition_da_result = {
+                    "round": 0,
+                    "stage": "decomposition",
+                    "decomposition_challenge": {
+                        "missing_dimensions": [],
+                        "hidden_assumptions": [],
+                        "alternative_frameworks": [],
+                        "extreme_scenario_issues": []
+                    },
+                    "overall_assessment": f"验证失败: {str(e)}",
+                    "critical_issues": ["质疑官执行异常"],
+                    "recommendations": ["请检查模型配置和输出格式"]
+                }
+
+    # 议长根据质疑进行修正（如果存在严重问题）
+    if decomposition_da_result and (decomposition_da_result.get("critical_issues") or "严重" in decomposition_da_result.get("overall_assessment", "")):
+        logger.info("[cycle] 议长正在根据质疑官的反馈修正问题拆解...")
+        send_web_event("agent_action", agent_name="议长", role_type="Leader", content="正在根据质疑官的反馈修正问题拆解...", chunk_id=str(uuid.uuid4()))
+        
+        revision_inputs = {
+            "issue": issue_text,
+            "previous_decomposition": decomposition,
+            "devils_advocate_feedback": decomposition_da_result
+        }
+        
+        for attempt in range(max_retries):
+            try:
+                current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                out, search_res = stream_agent_output(leader_chain, {"inputs": json.dumps(revision_inputs, ensure_ascii=False), "current_time": current_time_str}, "议长", "Leader")
+                
+                cleaned = clean_json_string(out)
+                if not cleaned:
+                    raise ValueError("议长修正输出为空或不包含 JSON")
+                    
+                parsed = json.loads(cleaned)
+                summary = schemas.LeaderSummary(**parsed)
+                decomposition = summary.decomposition.dict()
+                
+                # 更新保存的拆解结果
+                with open(os.path.join(workspace_path, "decomposition_revised.json"), "w", encoding="utf-8") as f:
+                    json.dump(decomposition, f, ensure_ascii=False, indent=4)
+                
+                logger.info(f"[cycle] 议长修正拆解成功 (尝试 {attempt + 1})")
+                break
+            except Exception as e:
+                logger.warning(f"[cycle] 议长修正拆解尝试 {attempt + 1} 失败: {e}")
+                logger.error(traceback.format_exc())
+
     history = []
     current_instructions = f"议题: {issue_text}\n核心目标: {decomposition['core_goal']}\n关键问题: {decomposition['key_questions']}"
     
     last_plans_map = {i: None for i in range(1, num_planners + 1)}
     last_audits = []
     user_interventions = []
+    last_da_result = decomposition_da_result  # 初始质疑为拆解阶段的质疑
 
     for r in range(1, max_rounds + 1):
         logger.info(f"=== 开始第 {r} 轮讨论 ===")
@@ -761,7 +993,8 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
             "plans": plans,
             "audits": audits,
             "previous_instructions": current_instructions,
-            "user_interventions": user_interventions
+            "user_interventions": user_interventions,
+            "last_round_da_challenge": last_da_result
         }
         
         final_summary = None
@@ -804,6 +1037,56 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
             "audits": audits,
             "summary": final_summary
         })
+
+        # Devil's Advocate 阶段 - 验证总结质量
+        logger.info(f"[round {r}] 质疑官正在验证总结质量...")
+        da_result = None
+        synthesis_clusters = "（待实现Synthesizer后填充）"  # Phase 1暂时使用占位符
+        
+        for attempt in range(max_retries):
+            logger.info(f"[round {r}] 质疑官正在调用模型进行质疑 (尝试 {attempt + 1}/{max_retries})...")
+            try:
+                da_prompt_vars = {
+                    "round": r,
+                    "synthesis_clusters": synthesis_clusters,
+                    "leader_summary": json.dumps(final_summary, ensure_ascii=False),
+                    "history": json.dumps(history[-3:], ensure_ascii=False) if len(history) >= 3 else json.dumps(history, ensure_ascii=False)  # 只传递最近3轮历史
+                }
+                
+                out, search_res = stream_agent_output(devils_advocate_summary_chain, da_prompt_vars, "质疑官", "devils_advocate", event_type="agent_action")
+                if search_res:
+                    all_search_references.append(search_res)
+                
+                cleaned = clean_json_string(out)
+                if not cleaned:
+                    raise ValueError("质疑官输出为空或不包含 JSON")
+                    
+                parsed = json.loads(cleaned)
+                da_obj = schemas.DevilsAdvocateSchema(**parsed)
+                da_result = da_obj.dict()
+                logger.info(f"[round {r}] 质疑官验证成功 (尝试 {attempt + 1})")
+                
+                # 将DA结果附加到本轮history
+                history[-1]["devils_advocate"] = da_result
+                break
+            except Exception as e:
+                logger.warning(f"[round {r}] 质疑官验证尝试 {attempt + 1} 失败: {e}")
+                logger.error(traceback.format_exc())
+                if attempt == max_retries - 1:
+                    da_result = {
+                        "round": r,
+                        "stage": "summary",
+                        "summary_challenge": {
+                            "logical_gaps": [],
+                            "missing_points": [],
+                            "inconsistencies": [],
+                            "optimism_bias": None
+                        },
+                        "overall_assessment": f"验证失败: {str(e)}",
+                        "critical_issues": ["质疑官执行异常"],
+                        "recommendations": ["请检查模型配置和输出格式"]
+                    }
+                    history[-1]["devils_advocate"] = da_result
 
         # 保存本轮汇总后的 history
         with open(os.path.join(workspace_path, "history.json"), "w", encoding="utf-8") as f:
@@ -866,6 +1149,7 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
             "round": h["round"],
             "plans": [{"id": p.get("id"), "text": p.get("text")} for p in h.get("plans", [])],
             "audits": [{"auditor_id": a.get("auditor_id"), "reviews": a.get("reviews")} for a in h.get("audits", [])],
+            "devils_advocate": h.get("devils_advocate"),
             "summary": h.get("summary")
         })
 
@@ -879,6 +1163,7 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
     final_data = {
         "issue": issue_text,
         "decomposition": decomposition,
+        "decomposition_challenge": decomposition_da_result,
         "history": simplified_history,
         "final_summary": last_summary
     }

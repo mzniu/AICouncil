@@ -178,3 +178,21 @@ laywright Installation**: PDF export requires Playwright browser automation. If 
 - Use `/api/status` endpoint to check real-time discussion state
 - Test search engines individually with `tests/test_final_search.py --engine baidu --query "测试"`
 - For schema validation issues, check `discussion_events` array in frontend for raw LLM outputs
+
+## Git Commit Guidelines
+- Write clear, descriptive commit messages summarizing changes, only one sentence
+- DON'T commit and push code without user's consent
+- DON'T add before pushing
+
+
+## Coding Strategies
+- Follow existing code patterns for consistency
+- Write modular functions with single responsibilities
+- Add comments for complex logic sections
+- Write unit tests for new features or bug fixes
+- Review changes before committing to avoid unintended modifications
+- Use existing utility functions where applicable
+
+## Testing Strategies
+- Run unit tests in `tests/` directory using `pytest`
+- Run baseline tests after major changes to ensure no regressions 

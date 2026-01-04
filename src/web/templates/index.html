@@ -13,6 +13,7 @@
         .role-planner { border-left: 4px solid #10b981; }
         .role-auditor { border-left: 4px solid #f59e0b; }
         .role-reporter { border-left: 4px solid #8b5cf6; }
+        .role-devils_advocate { border-left: 4px solid #ef4444; background-color: #fef2f2; }
         .markdown-body h1 { font-size: 1.5rem; font-weight: bold; margin-top: 1rem; }
         .markdown-body h2 { font-size: 1.25rem; font-weight: bold; margin-top: 0.75rem; }
         .markdown-body p { margin-bottom: 0.5rem; }
@@ -1884,7 +1885,8 @@
                     'Leader': '👨‍⚖️',
                     'Planner': '💡',
                     'Auditor': '🔍',
-                    'Reporter': '📝'
+                    'Reporter': '📝',
+                    'devils_advocate': '⚠️'
                 };
                 return icons[role] || '👤';
             }
@@ -2140,7 +2142,163 @@
                         </div>
                     `;
                 }
-                // 4. 通用 JSON 展示 (Tree-like)
+                // 4. Devil's Advocate 质疑官输出
+                else if (data.stage && (data.decomposition_challenge || data.summary_challenge)) {
+                    const stageText = data.stage === 'decomposition' ? '问题拆解验证' : '总结验证';
+                    const stageIcon = data.stage === 'decomposition' ? '🎯' : '📋';
+                    
+                    // 确定严重程度等级
+                    const hasCritical = data.critical_issues && data.critical_issues.length > 0;
+                    const severityClass = hasCritical ? 'border-red-300 bg-red-50' : 'border-amber-200 bg-amber-50';
+                    const headerClass = hasCritical ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700';
+                    
+                    html += `
+                        <div class="${severityClass} p-4 rounded-xl border-2 space-y-4 shadow-lg">
+                            <!-- 标题栏 -->
+                            <div class="${headerClass} -m-4 mb-3 p-3 rounded-t-xl border-b-2 ${hasCritical ? 'border-red-300' : 'border-amber-300'}">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-lg">${stageIcon}</span>
+                                        <span class="font-bold text-sm uppercase tracking-wide">${stageText}</span>
+                                        ${data.round !== undefined ? `<span class="text-xs opacity-75">Round ${data.round}</span>` : ''}
+                                    </div>
+                                    ${hasCritical ? `<span class="px-2 py-1 bg-red-200 text-red-800 rounded-full text-[10px] font-bold uppercase">⚠️ Critical</span>` : ''}
+                                </div>
+                            </div>
+                            
+                            <!-- 整体评价 -->
+                            ${data.overall_assessment ? `
+                                <div class="bg-white/60 p-3 rounded-lg border ${hasCritical ? 'border-red-200' : 'border-amber-200'}">
+                                    <div class="text-[11px] font-bold ${hasCritical ? 'text-red-600' : 'text-amber-600'} uppercase mb-2 flex items-center">
+                                        <span class="mr-1">💭</span> 整体评价
+                                    </div>
+                                    <div class="text-sm text-slate-700 leading-relaxed">${data.overall_assessment}</div>
+                                </div>
+                            ` : ''}
+                            
+                            <!-- 问题拆解质疑 -->
+                            ${data.decomposition_challenge ? `
+                                <div class="space-y-3">
+                                    ${data.decomposition_challenge.missing_dimensions && data.decomposition_challenge.missing_dimensions.length > 0 ? `
+                                        <div class="bg-white/80 p-3 rounded-lg border border-purple-200">
+                                            <div class="text-[11px] font-bold text-purple-600 uppercase mb-2 flex items-center">
+                                                <span class="mr-1">🔍</span> 遗漏维度
+                                            </div>
+                                            <ul class="list-disc ml-4 text-sm text-slate-700 space-y-1">
+                                                ${data.decomposition_challenge.missing_dimensions.map(d => `<li>${d}</li>`).join('')}
+                                            </ul>
+                                        </div>
+                                    ` : ''}
+                                    
+                                    ${data.decomposition_challenge.hidden_assumptions && data.decomposition_challenge.hidden_assumptions.length > 0 ? `
+                                        <div class="bg-white/80 p-3 rounded-lg border border-indigo-200">
+                                            <div class="text-[11px] font-bold text-indigo-600 uppercase mb-2 flex items-center">
+                                                <span class="mr-1">💡</span> 隐含假设
+                                            </div>
+                                            <ul class="list-disc ml-4 text-sm text-slate-700 space-y-1">
+                                                ${data.decomposition_challenge.hidden_assumptions.map(a => `<li>${a}</li>`).join('')}
+                                            </ul>
+                                        </div>
+                                    ` : ''}
+                                    
+                                    ${data.decomposition_challenge.alternative_frameworks && data.decomposition_challenge.alternative_frameworks.length > 0 ? `
+                                        <div class="bg-white/80 p-3 rounded-lg border border-blue-200">
+                                            <div class="text-[11px] font-bold text-blue-600 uppercase mb-2 flex items-center">
+                                                <span class="mr-1">🔄</span> 替代框架
+                                            </div>
+                                            <ul class="list-disc ml-4 text-sm text-slate-700 space-y-1">
+                                                ${data.decomposition_challenge.alternative_frameworks.map(f => `<li>${f}</li>`).join('')}
+                                            </ul>
+                                        </div>
+                                    ` : ''}
+                                    
+                                    ${data.decomposition_challenge.extreme_scenario_issues && data.decomposition_challenge.extreme_scenario_issues.length > 0 ? `
+                                        <div class="bg-white/80 p-3 rounded-lg border border-rose-200">
+                                            <div class="text-[11px] font-bold text-rose-600 uppercase mb-2 flex items-center">
+                                                <span class="mr-1">⚡</span> 极端场景问题
+                                            </div>
+                                            <ul class="list-disc ml-4 text-sm text-slate-700 space-y-1">
+                                                ${data.decomposition_challenge.extreme_scenario_issues.map(i => `<li>${i}</li>`).join('')}
+                                            </ul>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            ` : ''}
+                            
+                            <!-- 总结质疑 -->
+                            ${data.summary_challenge ? `
+                                <div class="space-y-3">
+                                    ${data.summary_challenge.logical_gaps && data.summary_challenge.logical_gaps.length > 0 ? `
+                                        <div class="bg-white/80 p-3 rounded-lg border border-red-200">
+                                            <div class="text-[11px] font-bold text-red-600 uppercase mb-2 flex items-center">
+                                                <span class="mr-1">🔗</span> 逻辑缺口
+                                            </div>
+                                            <ul class="list-disc ml-4 text-sm text-slate-700 space-y-1">
+                                                ${data.summary_challenge.logical_gaps.map(g => `<li>${g}</li>`).join('')}
+                                            </ul>
+                                        </div>
+                                    ` : ''}
+                                    
+                                    ${data.summary_challenge.missing_points && data.summary_challenge.missing_points.length > 0 ? `
+                                        <div class="bg-white/80 p-3 rounded-lg border border-orange-200">
+                                            <div class="text-[11px] font-bold text-orange-600 uppercase mb-2 flex items-center">
+                                                <span class="mr-1">📌</span> 遗漏要点
+                                            </div>
+                                            <ul class="list-disc ml-4 text-sm text-slate-700 space-y-1">
+                                                ${data.summary_challenge.missing_points.map(p => `<li>${p}</li>`).join('')}
+                                            </ul>
+                                        </div>
+                                    ` : ''}
+                                    
+                                    ${data.summary_challenge.inconsistencies && data.summary_challenge.inconsistencies.length > 0 ? `
+                                        <div class="bg-white/80 p-3 rounded-lg border border-pink-200">
+                                            <div class="text-[11px] font-bold text-pink-600 uppercase mb-2 flex items-center">
+                                                <span class="mr-1">⚡</span> 矛盾之处
+                                            </div>
+                                            <ul class="list-disc ml-4 text-sm text-slate-700 space-y-1">
+                                                ${data.summary_challenge.inconsistencies.map(i => `<li>${i}</li>`).join('')}
+                                            </ul>
+                                        </div>
+                                    ` : ''}
+                                    
+                                    ${data.summary_challenge.optimism_bias ? `
+                                        <div class="bg-white/80 p-3 rounded-lg border border-yellow-200">
+                                            <div class="text-[11px] font-bold text-yellow-700 uppercase mb-2 flex items-center">
+                                                <span class="mr-1">⚖️</span> 偏见识别
+                                            </div>
+                                            <div class="text-sm text-slate-700">${data.summary_challenge.optimism_bias}</div>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            ` : ''}
+                            
+                            <!-- 严重问题 -->
+                            ${data.critical_issues && data.critical_issues.length > 0 ? `
+                                <div class="bg-red-100 p-3 rounded-lg border-2 border-red-300">
+                                    <div class="text-[11px] font-bold text-red-700 uppercase mb-2 flex items-center">
+                                        <span class="mr-1">🚨</span> 严重问题
+                                    </div>
+                                    <ul class="list-disc ml-4 text-sm text-red-800 space-y-1 font-medium">
+                                        ${data.critical_issues.map(i => `<li>${i}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            ` : ''}
+                            
+                            <!-- 改进建议 -->
+                            ${data.recommendations && data.recommendations.length > 0 ? `
+                                <div class="bg-green-50 p-3 rounded-lg border border-green-200">
+                                    <div class="text-[11px] font-bold text-green-700 uppercase mb-2 flex items-center">
+                                        <span class="mr-1">✅</span> 改进建议
+                                    </div>
+                                    <ul class="list-decimal ml-4 text-sm text-green-800 space-y-1">
+                                        ${data.recommendations.map(r => `<li>${r}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }
+                // 5. 通用 JSON 展示 (Tree-like)
                 else {
                     html += `<pre class="bg-slate-50 p-3 rounded-lg text-xs overflow-x-auto border border-slate-200 text-slate-600"><code>${JSON.stringify(data, null, 2)}</code></pre>`;
                 }
