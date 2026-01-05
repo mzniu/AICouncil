@@ -18,6 +18,20 @@
   - **Auditor**: Conducts critical reviews of the Planner's solutions, pointing out potential risks and loopholes.
   - **Reporter**: Records the deliberation process in real-time to ensure no information is missed.
 - **🔍 Enhanced Search**: Integrates multi-engine parallel search including **Google** (official API), Bing, Baidu, DuckDuckGo, Yahoo, and Mojeek. Features a **Requests-First** architecture for high performance, with **intelligent relevance validation** and **query optimization** (automatically bypassing irrelevant search engine noise). **Google Custom Search API** provides high-quality results with direct access from China (free tier: 100 queries/day). Yahoo, Mojeek, and Google are pure HTTP implementations requiring no browser dependencies for stable operation.
+
+---
+## 🚩 Highlights — 1.1.0
+
+- 👹 **Devil's Advocate (closed-loop challenge)**:
+   - The Devil's Advocate role issues structured challenges and blind-spot lists during the decomposition stage and after each round summary, labeled by severity (Critical / Warning / Minor). The `Leader` must explicitly respond in subsequent summaries.
+   - A final-round forced revision is triggered when critical issues are present to ensure the delivered report has closed the loop and meets quality standards.
+
+- 🔄 **User-driven report revision & versioning**:
+   - A floating "💬 Revision Feedback" panel allows users to submit modification requests directly from the report view.
+   - The system backs up the original report as `report_v0.html` before the first revision; subsequent revisions are saved as `report_v1.html`, `report_v2.html`, etc. A version selector is available in the report header for easy comparison and rollback.
+   - A new `Report Auditor` agent analyzes feedback, drafts suggested revisions, and supports one-click apply & preview.
+
+See `CHANGELOG.md` for full details.
 - **💻 Real-time Monitoring Panel**: A Flask-based web interface that displays agent thinking processes, search progress, and debate flows in real-time. Supports **Maximize/Restore** for better readability.
 - **📄 Deep Report Generation**: Automatically generates structured HTML deliberation reports, supporting one-click copy and a **consolidated download menu** (HTML / long image / PDF).
 - **📊 Rich Chart Support**: Reports support **ECharts** data visualization (bar charts, pie charts, radar charts, etc.) and **Mermaid** diagrams (flowcharts, sequence diagrams, Gantt charts, class diagrams, state diagrams, etc.). All chart libraries are deployed locally (`/static/vendor/`), avoiding CDN dependencies and working in offline and iframe scenarios.

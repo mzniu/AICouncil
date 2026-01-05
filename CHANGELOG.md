@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+
+- 👹 **质疑官（Devil's Advocate）闭环质疑机制**
+  - 在议题拆解阶段和每轮总结后，`质疑官` 对议长的输出进行严格审查，识别盲点与逻辑假设。
+  - 引入严重度分类（Critical / Warning / Minor），并要求议长在下一轮中明确回应质疑（`da_feedback_response` 字段）。
+  - 最终轮为强制修订：若存在关键问题，议长必须在最终汇总前完成修订。
+
+- 🔄 **用户参与式报告修订与版本管理**
+  - 报告底部新增“💬 修订反馈”浮动面板，支持用户直接在浏览器提交修改要求。
+  - 报告保存为多版本（`report_v0.html` 为原始版本，`report_v1.html`、`v2`... 为修订版），并在报告标题栏提供版本选择下拉框。
+  - 提供 `Report Auditor` 智能体以自动处理用户反馈并生成修订建议，支持一键应用与预览。
+
+### Changed
+
+- 📝 **Reporter 输出优化**：最终报告不再直接暴露内部角色讨论细节（如“质疑官提出…”），而是将反馈自然整合为更专业的建议文本。
+
+### Fixed
+
+- 🐛 修复报告修订时覆盖原始报告的问题（新增原始备份 `report_v0.html`）。
+- 🐛 修复历史工作区加载时版本选择下拉框不显示的问题。
 
 ### Added
 
