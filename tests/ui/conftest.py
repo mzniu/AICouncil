@@ -6,10 +6,16 @@ import pytest
 import subprocess
 import time
 import os
+import sys
 import shutil
 import glob
 from pathlib import Path
+from datetime import datetime
 from playwright.sync_api import sync_playwright, Browser, Page, BrowserContext
+
+# 添加当前目录到 Python 路径
+sys.path.insert(0, str(Path(__file__).parent))
+from report_generator import TestReportGenerator
 
 
 # ==================== Flask服务器 Fixture ====================
@@ -26,27 +32,32 @@ def flask_server():
     env = os.environ.copy()
     env['FLASK_ENV'] = 'testing'
     env['TESTING'] = 'true'
+    env['FLASK_DEBUG'] = '0'  # 禁用 debug 模式避免 reloader
     
-    # 启动Flask服务器
+    # 启动Flask服务器（不捕获输出避免管道阻塞）
     print("\n🚀 启动Flask测试服务器...")
     process = subprocess.Popen(
         ['python', 'src/web/app.py'],
         env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,  # 直接丢弃输出
+        stderr=subprocess.DEVNULL,
         cwd=os.getcwd()
     )
     
-    # 等待服务器启动（最多10秒）
+    # 等待服务器启动（增加到20秒，因为首次加载 Playwright 较慢）
     base_url = 'http://127.0.0.1:5000'
-    for i in range(10):
+    max_retries = 20
+    for i in range(max_retries):
         try:
             import requests
-            response = requests.get(base_url, timeout=1)
+            response = requests.get(base_url, timeout=2)
             if response.status_code == 200:
                 print(f"✅ Flask服务器启动成功: {base_url}")
+                time.sleep(1)  # 额外等待确保完全就绪
                 break
-        except Exception:
+        except Exception as e:
+            if i == max_retries - 1:
+                print(f"❌ Flask服务器启动超时: {e}")
             time.sleep(1)
     else:
         process.terminate()
@@ -57,7 +68,21 @@ def flask_server():
     # 测试结束后关闭服务器
     print("\n🛑 关闭Flask测试服务器...")
     process.terminate()
-    process.wait(timeout=5)
+    try:
+        # 等待进程优雅退出
+        process.wait(timeout=5)
+        print("✅ Flask服务器已关闭")
+    except subprocess.TimeoutExpired:
+        print("⚠️ 强制终止Flask服务器")
+        process.kill()
+        process.wait()
+    
+    # 额外等待确保端口释放
+    time.sleep(2)
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()  # 强制终止
 
 
 # ==================== 浏览器 Fixtures ====================
@@ -138,6 +163,7 @@ def page(context: BrowserContext, flask_server: str):
     
     yield page
     
+    # 简单清理：仅关闭页面（Flask服务器是session级别，无需每次停止讨论）
     # 测试失败时截图
     if hasattr(page, '_test_failed'):
         screenshot_path = f"tests/ui/screenshots/{page._test_name}.png"
@@ -145,6 +171,108 @@ def page(context: BrowserContext, flask_server: str):
         print(f"📸 测试失败截图: {screenshot_path}")
     
     page.close()
+
+
+@pytest.fixture(scope="class")
+def completed_discussion_page(browser_type, flask_server: str):
+    """
+    Class级别fixture：启动一次完整讨论并等待报告生成
+    多个测试可以共享这个讨论结果，避免重复启动
+    
+    Args:
+        browser_type: pytest-playwright提供的browser_type fixture
+        flask_server: Flask服务器地址
+    
+    Returns:
+        Page: 包含完整讨论结果的页面对象
+    """
+    from pages.home_page import HomePage
+    import time
+    
+    test_issue = "如何提高UI测试的自动化覆盖率"  # 固定议题避免scope冲突
+    
+    print("\n🚀 [Class Fixture] 启动共享讨论会话...")
+    
+    # 使用browser_type创建browser、context和page
+    browser = browser_type.launch(headless=False, slow_mo=50)
+    context = playwright_browser.new_context()
+    page = context.new_page()
+    
+    try:
+        # 导航到首页
+        page.goto(flask_server, wait_until="domcontentloaded")
+        page.wait_for_load_state("networkidle", timeout=10000)
+        
+        # 等待关键元素
+        page.wait_for_selector('#issue-input', state='visible', timeout=10000)
+        page.wait_for_selector('#start-btn', state='visible', timeout=5000)
+        
+        # 启动讨论
+        home = HomePage(page)
+        print(f"📝 [Class Fixture] 配置议题: {test_issue}")
+        home.configure_and_start_discussion(
+            issue=test_issue,
+            backend="deepseek",
+            rounds=1,
+            planners=1,
+            auditors=1
+        )
+        
+        # 等待报告生成完成（完整流程）
+        print("⏳ [Class Fixture] 等待讨论完成并生成报告（预计5-10分钟）...")
+        page.wait_for_function(
+            """() => {
+                const reportIframe = document.getElementById('report-iframe');
+                if (!reportIframe) return false;
+                const iframeDoc = reportIframe.srcdoc;
+                return iframeDoc && iframeDoc.length > 5000 && 
+                       iframeDoc.includes('</html>') && 
+                       iframeDoc.includes('<body');
+            }""",
+            timeout=600000  # 10分钟
+        )
+        print("✅ [Class Fixture] 讨论完成，报告已生成")
+        
+        # 返回页面对象供测试使用
+        yield page
+        
+    finally:
+        # 清理
+        print("\n🧹 [Class Fixture] 清理共享会话...")
+        try:
+            import requests
+            requests.post(f"{flask_server}/api/stop", timeout=3)
+            time.sleep(2)
+        except:
+            pass
+        
+        page.close()
+        context.close()
+        browser.close()
+
+
+@pytest.fixture
+def stop_discussion_cleanup(flask_server: str):
+    """
+    提供讨论停止清理功能的fixture
+    在测试结束后自动停止讨论并恢复UI状态
+    
+    Usage:
+        def test_example(authenticated_page, stop_discussion_cleanup):
+            # 测试代码...
+            # 结束时自动调用清理
+    """
+    yield  # 测试执行
+    
+    # Teardown: 停止讨论
+    import requests
+    try:
+        response = requests.post(f"{flask_server}/api/stop", timeout=3)
+        if response.status_code == 200:
+            print("🧹 清理：已停止讨论")
+            time.sleep(2)  # 等待UI更新
+    except Exception as e:
+        print(f"⚠️ 清理失败: {e}")
 
 
 @pytest.fixture
@@ -176,7 +304,6 @@ def authenticated_page(page: Page, flask_server: str):
             print("⚠️ 检测到运行中的讨论，通过API停止...")
             # 直接调用停止API
             import requests
-            import time
             try:
                 response = requests.post(f"{flask_server}/api/stop", timeout=5)
                 if response.status_code == 200:
@@ -338,10 +465,10 @@ def mock_api_responses(page: Page):
     return page
 
 
-@pytest.fixture
+@pytest.fixture(scope="class")
 def test_issue_text():
     """
-    提供测试用议题文本
+    提供测试用议题文本（class级别，可用于共享fixture）
     """
     return "如何提高UI测试的自动化覆盖率"
 
@@ -357,3 +484,147 @@ def test_config():
         "planners": 1,
         "auditors": 1,
     }
+
+
+# ==================== 测试报告生成 Hooks ====================
+
+# 全局报告生成器实例
+_report_generator = None
+
+
+def pytest_configure(config):
+    """Pytest配置钩子 - 初始化报告生成器"""
+    global _report_generator
+    _report_generator = TestReportGenerator()
+    _report_generator.start_time = datetime.now()
+
+
+def pytest_runtest_makereport(item, call):
+    """
+    测试执行后钩子 - 收集测试结果
+    """
+    global _report_generator
+    
+    if call.when == "call":  # 只在测试主体执行后收集
+        outcome = "passed" if call.excinfo is None else "failed"
+        
+        # 收集测试信息
+        result = {
+            "name": item.nodeid,
+            "status": outcome,
+            "duration": call.duration,
+            "markers": [m.name for m in item.iter_markers()]
+        }
+        
+        # 如果测试失败，收集错误信息
+        if call.excinfo:
+            result["message"] = str(call.excinfo.value)
+            result["traceback"] = str(call.excinfo.getrepr())
+        
+        # 收集截图和视频（如果存在）
+        screenshots_dir = Path(__file__).parent / "screenshots"
+        videos_dir = Path(__file__).parent / "videos"
+        
+        # 查找最新的截图（按修改时间）
+        if screenshots_dir.exists():
+            screenshots = list(screenshots_dir.glob("*.png"))
+            if screenshots:
+                latest_screenshot = max(screenshots, key=lambda p: p.stat().st_mtime)
+                # 检查是否在测试执行期间创建
+                if latest_screenshot.stat().st_mtime >= call.start:
+                    result["screenshot"] = str(latest_screenshot)
+        
+        # 查找最新的视频
+        if videos_dir.exists():
+            videos = list(videos_dir.glob("*.webm"))
+            if videos:
+                latest_video = max(videos, key=lambda p: p.stat().st_mtime)
+                if latest_video.stat().st_mtime >= call.start:
+                    result["video"] = str(latest_video)
+        
+        if _report_generator:
+            _report_generator.add_test_result(result)
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """
+    测试会话结束钩子 - 生成最终报告
+    """
+    global _report_generator
+    
+    if _report_generator:
+        _report_generator.end_time = datetime.now()
+        _report_generator.set_session_info(
+            _report_generator.start_time,
+            _report_generator.end_time
+        )
+        
+        try:
+            report_path = _report_generator.generate_html()
+            print(f"\n" + "="*70)
+            print(f"📊 测试报告: {report_path}")
+            print(f"="*70)
+        except Exception as e:
+            print(f"\n❌ 生成测试报告失败: {e}")
+
+
+# ==================== 优化测试 Fixtures ====================
+
+@pytest.fixture(scope="class")
+def class_shared_page(playwright_browser, flask_server: str):
+    """
+    提供class级别共享的page，用于优化测试（TestDiscussionOptimized使用）
+    整个测试类只创建一次page，避免重复加载和关闭
+    """
+    context = playwright_browser.new_context()
+    page = context.new_page()
+    
+    # 导航到Flask服务器
+    page.goto(flask_server, wait_until="domcontentloaded")
+    
+    # 等待关键元素加载完成
+    page.wait_for_selector('#issue-input', state='visible', timeout=10000)
+    page.wait_for_selector('#start-btn', state='visible', timeout=5000)
+    
+    yield page
+    
+    # 测试类完成后清理
+    try:
+        import requests
+        requests.post(f"{flask_server}/api/stop", timeout=2)
+    except:
+        pass
+    
+    page.close()
+    context.close()
+
+
+# ==================== 优化测试 Fixtures ====================
+
+@pytest.fixture(scope="class")
+def class_shared_page(playwright_browser, flask_server: str):
+    """
+    提供class级别共享的page，用于优化测试（TestDiscussionOptimized使用）
+    整个测试类只创建一次page，避免重复加载和关闭
+    """
+    context = playwright_browser.new_context()
+    page = context.new_page()
+    
+    # 导航到Flask服务器
+    page.goto(flask_server, wait_until="domcontentloaded")
+    
+    # 等待关键元素加载完成
+    page.wait_for_selector('#issue-input', state='visible', timeout=10000)
+    page.wait_for_selector('#start-btn', state='visible', timeout=5000)
+    
+    yield page
+    
+    # 测试类完成后清理
+    try:
+        import requests
+        requests.post(f"{flask_server}/api/stop", timeout=2)
+    except:
+        pass
+    
+    page.close()
+    context.close()
