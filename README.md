@@ -63,6 +63,8 @@
    - 在模型配置中填入您的 API 密钥：
      - **DeepSeek**: 推荐使用 deepseek-chat（性价比高）
      - **OpenAI**: 支持 GPT-4 系列模型
+     - **Azure OpenAI**: 支持中国区和全球区部署
+     - **Anthropic**: Claude 3.5 Sonnet 等模型
      - **OpenRouter**: 支持多种第三方模型
    - 点击「保存设置」
 
