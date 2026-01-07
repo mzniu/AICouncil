@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ report_title }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+        .test-item {
+            transition: all 0.2s;
+        }
+        .test-item:hover {
+            transform: translateX(4px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        .status-passed { background: #d1fae5; color: #065f46; }
+        .status-failed { background: #fee2e2; color: #991b1b; }
+        .status-skipped { background: #fef3c7; color: #92400e; }
+        .status-error { background: #ede9fe; color: #5b21b6; }
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        .collapsible-content.expanded {
+            max-height: 2000px;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-6 shadow-lg">
+        <div class="container mx-auto px-6">
+            <h1 class="text-3xl font-bold">🧪 {{ report_title }}</h1>
+            <p class="text-indigo-100 mt-2">生成时间: {{ timestamp }}</p>
+        </div>
+    </header>
+
+    <!-- Summary Cards -->
+    <div class="container mx-auto px-6 py-8">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <!-- Total Tests -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-medium">总测试数</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2" id="total-tests">0</p>
+                    </div>
+                    <div class="bg-blue-100 rounded-full p-3">
+                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Passed Tests -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-medium">通过</p>
+                        <p class="text-3xl font-bold text-green-600 mt-2" id="passed-tests">0</p>
+                    </div>
+                    <div class="bg-green-100 rounded-full p-3">
+                        <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Failed Tests -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-medium">失败</p>
+                        <p class="text-3xl font-bold text-red-600 mt-2" id="failed-tests">0</p>
+                    </div>
+                    <div class="bg-red-100 rounded-full p-3">
+                        <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pass Rate -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-medium">通过率</p>
+                        <p class="text-3xl font-bold text-indigo-600 mt-2" id="pass-rate">{{ pass_rate }}</p>
+                    </div>
+                    <div class="bg-indigo-100 rounded-full p-3">
+                        <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <!-- Status Distribution Pie Chart -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-semibold mb-4">测试状态分布</h3>
+                <div id="status-chart" style="height: 300px;"></div>
+            </div>
+
+            <!-- Duration Ranking Bar Chart -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-semibold mb-4">执行时长排行（Top 15）</h3>
+                <div id="duration-chart" style="height: 300px;"></div>
+            </div>
+        </div>
+
+        <!-- Session Info -->
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+            <h3 class="text-lg font-semibold mb-4">📅 会话信息</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                    <span class="text-gray-500">开始时间:</span>
+                    <span class="ml-2 font-medium">{{ start_time }}</span>
+                </div>
+                <div>
+                    <span class="text-gray-500">结束时间:</span>
+                    <span class="ml-2 font-medium">{{ end_time }}</span>
+                </div>
+                <div>
+                    <span class="text-gray-500">总耗时:</span>
+                    <span class="ml-2 font-medium">{{ duration }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Test Results -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="p-6 border-b">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-semibold">📋 测试用例详情</h3>
+                    <div class="flex gap-2">
+                        <input type="text" id="search-input" placeholder="搜索测试用例..." 
+                               class="px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <select id="status-filter" class="px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="all">所有状态</option>
+                            <option value="passed">通过</option>
+                            <option value="failed">失败</option>
+                            <option value="skipped">跳过</option>
+                            <option value="error">错误</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div id="test-results-container" class="divide-y">
+                <!-- Test results will be injected here by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 数据注入
+        const summaryData = {{ summary_json }};
+        const testResults = {{ test_results_json }};
+        const chartData = {{ chart_data_json }};
+
+        // 更新统计卡片
+        document.getElementById('total-tests').textContent = summaryData.total;
+        document.getElementById('passed-tests').textContent = summaryData.passed;
+        document.getElementById('failed-tests').textContent = summaryData.failed;
+
+        // 渲染饼图 - 测试状态分布
+        const statusChart = echarts.init(document.getElementById('status-chart'));
+        statusChart.setOption({
+            tooltip: {
+                trigger: 'item',
+                formatter: '{b}: {c} ({d}%)'
+            },
+            legend: {
+                orient: 'vertical',
+                right: '10%',
+                top: 'center'
+            },
+            series: [{
+                type: 'pie',
+                radius: ['40%', '70%'],
+                avoidLabelOverlap: false,
+                label: {
+                    show: true,
+                    formatter: '{b}: {c}'
+                },
+                data: chartData.status_distribution
+            }]
+        });
+
+        // 渲染柱状图 - 执行时长排行
+        const durationChart = echarts.init(document.getElementById('duration-chart'));
+        const durationNames = chartData.duration_ranking.map(item => item.name);
+        const durationValues = chartData.duration_ranking.map(item => item.value);
+        const durationColors = chartData.duration_ranking.map(item => {
+            const colorMap = {
+                'passed': '#10b981',
+                'failed': '#ef4444',
+                'skipped': '#f59e0b',
+                'error': '#8b5cf6'
+            };
+            return colorMap[item.status] || '#6366f1';
+        });
+
+        durationChart.setOption({
+            tooltip: {
+                trigger: 'axis',
+                axisPointer: { type: 'shadow' },
+                formatter: '{b}<br/>耗时: {c}s'
+            },
+            xAxis: {
+                type: 'category',
+                data: durationNames,
+                axisLabel: {
+                    rotate: 45,
+                    interval: 0,
+                    fontSize: 10
+                }
+            },
+            yAxis: {
+                type: 'value',
+                name: '秒'
+            },
+            series: [{
+                type: 'bar',
+                data: durationValues,
+                itemStyle: {
+                    color: (params) => durationColors[params.dataIndex]
+                }
+            }]
+        });
+
+        // 渲染测试结果列表
+        function renderTestResults(results) {
+            const container = document.getElementById('test-results-container');
+            container.innerHTML = '';
+
+            results.forEach((result, index) => {
+                const testItem = document.createElement('div');
+                testItem.className = 'test-item p-6';
+                testItem.innerHTML = `
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-3 mb-2">
+                                <span class="status-badge status-${result.status}">${result.status.toUpperCase()}</span>
+                                <span class="text-sm text-gray-500">${result.duration.toFixed(2)}s</span>
+                                ${result.markers && result.markers.length > 0 ? 
+                                    result.markers.map(m => `<span class="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded">${m}</span>`).join('') 
+                                    : ''}
+                            </div>
+                            <h4 class="font-medium text-gray-900">${result.name}</h4>
+                            ${result.message ? `
+                                <div class="mt-3 p-3 bg-red-50 rounded border border-red-200">
+                                    <p class="text-sm text-red-800 font-medium">❌ ${result.message}</p>
+                                    ${result.traceback ? `
+                                        <button onclick="toggleTraceback(${index})" class="mt-2 text-xs text-red-600 hover:underline">
+                                            查看堆栈信息
+                                        </button>
+                                        <div id="traceback-${index}" class="collapsible-content mt-2">
+                                            <pre class="text-xs text-red-700 whitespace-pre-wrap overflow-auto max-h-64">${result.traceback}</pre>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            ` : ''}
+                            ${result.screenshot_data ? `
+                                <details class="mt-3">
+                                    <summary class="cursor-pointer text-sm text-indigo-600 hover:underline">📸 查看截图</summary>
+                                    <img src="${result.screenshot_data}" alt="Test screenshot" class="mt-2 max-w-full rounded border">
+                                </details>
+                            ` : ''}
+                            ${result.video_data ? `
+                                <details class="mt-3">
+                                    <summary class="cursor-pointer text-sm text-indigo-600 hover:underline">🎬 查看视频</summary>
+                                    <video src="${result.video_data}" controls class="mt-2 max-w-full rounded border"></video>
+                                </details>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+                container.appendChild(testItem);
+            });
+        }
+
+        // 切换堆栈信息显示
+        function toggleTraceback(index) {
+            const element = document.getElementById(`traceback-${index}`);
+            element.classList.toggle('expanded');
+        }
+
+        // 搜索和过滤
+        let filteredResults = testResults;
+
+        function applyFilters() {
+            const searchTerm = document.getElementById('search-input').value.toLowerCase();
+            const statusFilter = document.getElementById('status-filter').value;
+
+            filteredResults = testResults.filter(result => {
+                const matchesSearch = result.name.toLowerCase().includes(searchTerm);
+                const matchesStatus = statusFilter === 'all' || result.status === statusFilter;
+                return matchesSearch && matchesStatus;
+            });
+
+            renderTestResults(filteredResults);
+        }
+
+        document.getElementById('search-input').addEventListener('input', applyFilters);
+        document.getElementById('status-filter').addEventListener('change', applyFilters);
+
+        // 初始渲染
+        renderTestResults(testResults);
+
+        // 响应式图表
+        window.addEventListener('resize', () => {
+            statusChart.resize();
+            durationChart.resize();
+        });
+    </script>
+</body>
+</html>
