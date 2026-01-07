@@ -451,6 +451,9 @@
                     <div class="bg-purple-600 text-white px-4 py-3 flex justify-between items-center">
                         <h3 class="font-bold flex items-center text-base">
                             <span class="mr-2">📜</span> <span data-i18n="final_report_title">最终议事报告</span>
+                            <!-- 版本选择下拉框 -->
+                            <select id="report-version-select" class="hidden ml-3 text-xs bg-purple-500 border border-purple-400 rounded px-2 py-1 text-white cursor-pointer hover:bg-purple-400 transition" onchange="loadReportVersion(this.value)">
+                            </select>
                         </h3>
                         <div id="report-actions" class="flex items-center space-x-2">
                             <button onclick="openReportInNewTab()" class="text-xs bg-emerald-500/90 hover:bg-emerald-600 px-2 py-1 rounded transition disabled:opacity-50 disabled:cursor-not-allowed" data-i18n="btn_open_editor" title="在新标签页中打开报告（支持编辑器）">📝 编辑器</button>
@@ -1219,10 +1222,226 @@
                 }
             }
 
+            // 注入修订面板到报告HTML中
+            function injectRevisionPanel(html) {
+                // 获取当前workspace_id
+                const workspaceId = currentSessionId || 'unknown';
+                
+                const revisionPanelHtml = `
+<!-- 报告修订面板 -->
+<div id="revision-panel" style="
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+    z-index: 10000;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+">
+    <!-- 折叠/展开按钮 -->
+    <button id="revision-toggle" onclick="toggleRevisionPanel()" style="
+        position: absolute;
+        top: -40px;
+        right: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 8px 8px 0 0;
+        cursor: pointer;
+        font-size: 14px;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+    ">
+        💬 修订反馈
+    </button>
+    
+    <div id="revision-content" style="display: none; padding: 20px; max-width: 1200px; margin: 0 auto;">
+        <div style="display: flex; gap: 20px; align-items: flex-start;">
+            <!-- 输入区域 -->
+            <div style="flex: 1;">
+                <h3 style="color: white; margin: 0 0 10px 0; font-size: 16px;">📝 请输入您的修改要求</h3>
+                <textarea id="revision-feedback" placeholder="例如：&#10;• 第二章节需要补充更多实施细节&#10;• 风险分析部分过于乐观，请增加潜在风险&#10;• 请将结论部分精简为3个要点" style="
+                    width: 100%;
+                    height: 80px;
+                    padding: 12px;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    resize: vertical;
+                    font-family: inherit;
+                    box-sizing: border-box;
+                "></textarea>
+            </div>
+            
+            <!-- 按钮区域 -->
+            <div style="display: flex; flex-direction: column; gap: 10px; min-width: 150px;">
+                <button onclick="submitRevision()" id="btn-submit-revision" style="
+                    background: white;
+                    color: #667eea;
+                    border: none;
+                    padding: 12px 20px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: 600;
+                ">
+                    📤 提交修订
+                </button>
+                <button onclick="confirmSatisfied()" style="
+                    background: rgba(255,255,255,0.2);
+                    color: white;
+                    border: 2px solid white;
+                    padding: 10px 20px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-size: 14px;
+                ">
+                    ✅ 满意
+                </button>
+            </div>
+        </div>
+        
+        <!-- 状态显示 -->
+        <div id="revision-status" style="display: none; margin-top: 15px; padding: 12px; background: rgba(255,255,255,0.1); border-radius: 8px; color: white;">
+            <span id="revision-status-text">处理中...</span>
+        </div>
+        
+        <!-- 修订结果显示 -->
+        <div id="revision-result" style="display: none; margin-top: 15px; padding: 15px; background: rgba(255,255,255,0.95); border-radius: 8px; color: #333; max-height: 200px; overflow-y: auto;">
+        </div>
+    </div>
+</div>
+
+<script>
+const WORKSPACE_ID = "${workspaceId}";
+let panelCollapsed = true;
+
+function toggleRevisionPanel() {
+    const content = document.getElementById('revision-content');
+    const toggle = document.getElementById('revision-toggle');
+    
+    if (panelCollapsed) {
+        content.style.display = 'block';
+        toggle.innerHTML = '✕ 关闭';
+        panelCollapsed = false;
+    } else {
+        content.style.display = 'none';
+        toggle.innerHTML = '💬 修订反馈';
+        panelCollapsed = true;
+    }
+}
+
+async function submitRevision() {
+    const feedback = document.getElementById('revision-feedback').value.trim();
+    if (!feedback) {
+        alert('请输入修改要求');
+        return;
+    }
+    
+    const statusDiv = document.getElementById('revision-status');
+    const statusText = document.getElementById('revision-status-text');
+    const resultDiv = document.getElementById('revision-result');
+    const submitBtn = document.getElementById('btn-submit-revision');
+    
+    // 显示加载状态
+    statusDiv.style.display = 'block';
+    statusText.innerHTML = '⏳ 报告审核官正在处理您的修订要求...';
+    resultDiv.style.display = 'none';
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '⏳ 处理中...';
+    
+    try {
+        // 获取当前报告HTML（不包含修订面板）
+        const panelEl = document.getElementById('revision-panel');
+        if (panelEl) panelEl.remove();
+        const reportContent = document.documentElement.outerHTML;
+        
+        const response = await fetch('/api/revise_report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                workspace_id: WORKSPACE_ID,
+                user_feedback: feedback,
+                current_html: reportContent
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            // 显示修订结果
+            statusDiv.style.display = 'none';
+            resultDiv.style.display = 'block';
+            
+            let changesHtml = '<h4 style="margin:0 0 10px 0;color:#667eea;">✅ 修订完成（版本 ' + data.version + '）</h4>';
+            changesHtml += '<p style="margin:0 0 10px 0;"><strong>概要：</strong>' + data.revision_summary + '</p>';
+            
+            if (data.changes_made && data.changes_made.length > 0) {
+                changesHtml += '<p style="margin:0 0 5px 0;"><strong>修改内容：</strong></p><ul style="margin:0;padding-left:20px;">';
+                data.changes_made.forEach(function(c) {
+                    changesHtml += '<li>' + c + '</li>';
+                });
+                changesHtml += '</ul>';
+            }
+            
+            if (data.warnings && data.warnings.length > 0) {
+                changesHtml += '<p style="margin:10px 0 5px 0;color:#f59e0b;"><strong>⚠️ 注意：</strong></p><ul style="margin:0;padding-left:20px;color:#f59e0b;">';
+                data.warnings.forEach(function(w) {
+                    changesHtml += '<li>' + w + '</li>';
+                });
+                changesHtml += '</ul>';
+            }
+            
+            changesHtml += '<p style="margin:15px 0 0 0;"><button onclick="applyRevision()" style="background:#667eea;color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;">🔄 应用修订</button></p>';
+            
+            resultDiv.innerHTML = changesHtml;
+            
+            // 保存修订后的HTML
+            window._revisedHtml = data.revised_html;
+            
+        } else {
+            statusText.innerHTML = '❌ 修订失败：' + data.message;
+        }
+        
+    } catch (error) {
+        statusText.innerHTML = '❌ 请求失败：' + error.message;
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '📤 提交修订';
+    }
+}
+
+function applyRevision() {
+    if (window._revisedHtml) {
+        // 通知父窗口更新报告
+        if (window.parent && window.parent !== window) {
+            window.parent.postMessage({ type: 'revision_applied', html: window._revisedHtml }, '*');
+        }
+    }
+}
+
+function confirmSatisfied() {
+    if (confirm('确认对当前报告满意？')) {
+        document.getElementById('revision-panel').style.display = 'none';
+    }
+}
+<\/script>
+`;
+                
+                // 在</body>之前注入
+                if (html.includes('</body>')) {
+                    return html.replace('</body>', revisionPanelHtml + '</body>');
+                }
+                return html + revisionPanelHtml;
+            }
+
             function handleFinalReport(reportHtml) {
                 // **方案A修复**: 使用缓存避免重复替换导致的闪烁
                 // 如果缓存与新内容相同，直接返回（避免无限循环）
                 if (cachedReportHtml === reportHtml) {
+                    // 即使内容相同，也要检查版本（首次加载时）
+                    fetchReportVersions();
                     return;
                 }
                 
@@ -1232,7 +1451,7 @@
                         const baseUrl = window.location.origin;
                         
                         // 执行路径替换（只执行一次）
-                        const processedHtml = reportHtml
+                        let processedHtml = reportHtml
                             .replace(
                                 /src=["']\/static\/vendor\/echarts\.min\.js["']/g,
                                 `src="${baseUrl}/static/vendor/echarts.min.js"`
@@ -1250,6 +1469,11 @@
                                 `src="${baseUrl}/static/js/report-editor.js"`
                             );
                         
+                        // 注入修订面板（如果还没有）
+                        if (!processedHtml.includes('revision-panel')) {
+                            processedHtml = injectRevisionPanel(processedHtml);
+                        }
+                        
                         // 只在处理后的内容与当前 srcdoc 不同时才更新
                         if (reportIframe.srcdoc !== processedHtml) {
                             reportIframe.srcdoc = processedHtml;
@@ -1257,6 +1481,8 @@
                             cachedReportHtml = reportHtml;
                             // 不在这里隐藏 loading，由 updateStatusUI 根据 is_running 状态统一处理
                             setLayoutMode('report');
+                            // 检查并更新版本选择下拉框
+                            fetchReportVersions();
                         }
                     } else {
                         // 处理空白或加载中的状态
@@ -1414,6 +1640,9 @@
                     return;
                 }
 
+                // 设置运行状态
+                isRunning = true;
+                
                 // 重置输入框高度
                 const issueInput = document.getElementById('issue-input');
                 issueInput.style.height = 'auto';
@@ -1454,10 +1683,14 @@
                     if (data.status === 'ok') {
                         console.log('讨论已启动');
                     } else {
+                        isRunning = false;
+                        updateStatusUI({ is_running: false });
                         showAlert(t('msg_start_failed') + ': ' + data.message, t('title_error'), 'error');
                     }
                 } catch (error) {
                     console.error('Start error:', error);
+                    isRunning = false;
+                    updateStatusUI({ is_running: false });
                     showAlert(t('msg_request_failed'), t('title_error'), 'error');
                 }
             }
@@ -2322,6 +2555,77 @@
                 lastLogCount = 0;
             }
 
+            // ==================== 报告版本管理 ====================
+            async function fetchReportVersions() {
+                if (!currentSessionId) return;
+                
+                try {
+                    const response = await fetch(`/api/report_versions?workspace_id=${currentSessionId}`);
+                    const data = await response.json();
+                    
+                    const select = document.getElementById('report-version-select');
+                    if (!select) return;
+                    
+                    // 如果只有一个版本或没有版本，隐藏下拉框
+                    if (!data.versions || data.versions.length <= 1) {
+                        select.classList.add('hidden');
+                        return;
+                    }
+                    
+                    // 清空并填充选项
+                    select.innerHTML = '';
+                    data.versions.forEach((v, idx) => {
+                        const option = document.createElement('option');
+                        option.value = v.filename;
+                        option.textContent = v.label;
+                        // 默认选中当前版本（report.html）
+                        if (v.filename === 'report.html') {
+                            option.selected = true;
+                        }
+                        select.appendChild(option);
+                    });
+                    
+                    // 显示下拉框
+                    select.classList.remove('hidden');
+                    
+                } catch (error) {
+                    console.error('获取报告版本失败:', error);
+                }
+            }
+
+            async function loadReportVersion(filename) {
+                if (!currentSessionId || !filename) return;
+                
+                try {
+                    const response = await fetch(`/api/report_content?workspace_id=${currentSessionId}&filename=${encodeURIComponent(filename)}`);
+                    const data = await response.json();
+                    
+                    if (data.status === 'success' && data.content) {
+                        // 更新iframe内容
+                        let html = data.content;
+                        
+                        // 处理静态资源路径（与handleFinalReport相同的逻辑）
+                        const baseUrl = window.location.origin;
+                        html = html
+                            .replace(/src=["']\/static\/vendor\/echarts\.min\.js["']/g, `src="${baseUrl}/static/vendor/echarts.min.js"`)
+                            .replace(/href=["']\/static\//g, `href="${baseUrl}/static/`);
+                        
+                        // 注入修订面板
+                        if (!html.includes('revision-panel')) {
+                            html = injectRevisionPanel(html);
+                        }
+                        
+                        reportIframe.srcdoc = html;
+                        cachedReportHtml = data.content; // 更新缓存
+                    } else {
+                        showAlert(data.message || '加载报告版本失败', '错误', 'error');
+                    }
+                } catch (error) {
+                    console.error('加载报告版本失败:', error);
+                    showAlert('加载报告版本失败', '错误', 'error');
+                }
+            }
+
             function openReportInNewTab() {
                 if (!currentSessionId) {
                     showAlert('报告尚未生成，无法打开编辑器', '提示');
@@ -2824,6 +3128,23 @@
                 fetch('/api/status').then(r => r.json()).then(data => {
                     if (data.browser_found === false) {
                         showAlert(t('msg_browser_missing'), t('title_hint'), 'warning');
+                    }
+                });
+                
+                // 监听报告修订应用消息
+                window.addEventListener('message', (event) => {
+                    if (event.data && event.data.type === 'revision_applied' && event.data.html) {
+                        // 重新注入修订面板并更新iframe
+                        let newHtml = event.data.html;
+                        if (!newHtml.includes('revision-panel')) {
+                            newHtml = injectRevisionPanel(newHtml);
+                        }
+                        const reportFrame = document.getElementById('report-iframe');
+                        if (reportFrame) {
+                            reportFrame.srcdoc = newHtml;
+                        }
+                        // 更新版本选择下拉框（新增版本）
+                        fetchReportVersions();
                     }
                 });
                 
