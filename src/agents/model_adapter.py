@@ -254,6 +254,69 @@ def call_openrouter(model: str, prompt: str, timeout: int = 120, max_retries: in
     raise RuntimeError(f"OpenRouter API request failed after {max_retries} attempts: {last_exception}")
 
 
+def call_azure_openai(deployment: str, prompt: str, timeout: int = 60, max_retries: int = 3, stream: bool = False):
+    """
+    调用 Azure OpenAI API（支持中国区和全球区）
+    
+    Args:
+        deployment: Azure OpenAI 部署名称（不是模型名）
+        prompt: 输入提示词
+        timeout: 请求超时时间（秒）
+        max_retries: 最大重试次数
+        stream: 是否流式输出
+    
+    Azure 中国区和全球区差异：
+    - 中国区 endpoint: https://{resource}.openai.azure.cn
+    - 全球区 endpoint: https://{resource}.openai.azure.com
+    - 认证方式：使用 api-key header（不是 Authorization: Bearer）
+    - URL 格式：/openai/deployments/{deployment}/chat/completions?api-version={version}
+    """
+    if not config.AZURE_OPENAI_API_KEY:
+        raise ValueError("AZURE_OPENAI_API_KEY not configured")
+    if not config.AZURE_OPENAI_ENDPOINT:
+        raise ValueError("AZURE_OPENAI_ENDPOINT not configured")
+    
+    # 构建 Azure OpenAI URL
+    url = (f"{config.AZURE_OPENAI_ENDPOINT}/openai/deployments/{deployment}"
+           f"/chat/completions?api-version={config.AZURE_OPENAI_API_VERSION}")
+    
+    headers = {
+        "api-key": config.AZURE_OPENAI_API_KEY,  # Azure 使用 api-key，不是 Authorization
+        "Content-Type": "application/json"
+    }
+    
+    clean_prompt = "".join(c for c in prompt if c.isprintable() or c in "\n\r\t")
+    logger.info(f"Azure OpenAI prompt length: {len(clean_prompt)} characters")
+    
+    payload = {
+        "messages": [{"role": "user", "content": clean_prompt}],
+        "stream": stream
+    }
+    
+    last_exception = None
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"Azure OpenAI API call starting (attempt {attempt + 1}/{max_retries}, deployment={deployment}, stream={stream})...")
+            resp = requests.post(url, json=payload, headers=headers, timeout=timeout, stream=stream)
+            logger.info(f"Azure OpenAI API response received (status: {resp.status_code})")
+            
+            if resp.status_code != 200:
+                logger.error(f"Azure OpenAI Error Body: {resp.text}")
+                
+            resp.raise_for_status()
+            if stream:
+                return resp
+            data = resp.json()
+            return data["choices"][0]["message"]["content"]
+        except RequestException as e:
+            last_exception = e
+            logger.warning(f"Azure OpenAI API attempt {attempt + 1} failed: {e}. Retrying...")
+            if attempt < max_retries - 1:
+                time.sleep(2 * (attempt + 1))
+    
+    raise RuntimeError(f"Azure OpenAI API request failed after {max_retries} attempts: {last_exception}")
+
+
 def get_openrouter_models():
     """获取 OpenRouter 支持的模型列表。"""
     url = f"{config.OPENROUTER_BASE_URL.replace('/chat/completions', '')}/models"
@@ -315,6 +378,13 @@ def call_model(agent_id: str, prompt: str, model_config: dict = None, stream: bo
     elif mtype == "openrouter":
         reasoning = model_config.get("reasoning")
         res = call_openrouter(mname, prompt, stream=stream, reasoning=reasoning)
+        if stream:
+            return res
+        out = res
+    elif mtype == "azure":
+        # Azure OpenAI: 使用部署名称（deployment name），不是模型名
+        deployment = mname or config.AZURE_OPENAI_DEPLOYMENT_NAME
+        res = call_azure_openai(deployment, prompt, stream=stream)
         if stream:
             return res
         out = res
