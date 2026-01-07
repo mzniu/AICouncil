@@ -76,3 +76,26 @@ class DevilsAdvocateSchema(BaseModel):
     overall_assessment: str  # 整体评价
     critical_issues: List[str]  # 必须解决的关键问题
     recommendations: List[str]  # 改进建议
+
+
+# 报告审核官 schema（用户参与式修订）
+class ContentCheck(BaseModel):
+    """内容准确性检查"""
+    conclusion_consistency: bool  # 结论是否与议长总结一致
+    key_points_coverage: bool  # 关键要点是否覆盖
+    data_accuracy: bool  # 数据是否来自讨论内容
+
+class StructureCheck(BaseModel):
+    """结构完整性检查"""
+    follows_report_design: bool  # 是否遵循议长大纲
+    logical_coherence: bool  # 逻辑是否连贯
+
+class ReportRevisionResult(BaseModel):
+    """报告审核官修订结果"""
+    revision_summary: str  # 修订概要（告诉用户改了什么）
+    changes_made: List[str]  # 具体修改列表
+    unchanged_reasons: Optional[List[str]] = None  # 未修改的原因（如超出范围）
+    warnings: Optional[List[str]] = None  # 警告（如偏离原始讨论）
+    content_check: ContentCheck  # 内容检查结果
+    structure_check: StructureCheck  # 结构检查结果
+    revised_html: str  # 修订后的完整HTML
