@@ -16,7 +16,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.agents.langchain_agents import generate_report_from_workspace, run_full_cycle
+from src.agents.langchain_agents import generate_report_from_workspace, run_full_cycle, make_report_auditor_chain, stream_agent_output, clean_json_string
+from src.agents import schemas
 from src import config_manager as config
 from src.utils import pdf_exporter
 from src.utils import md_exporter
@@ -842,6 +843,438 @@ def export_md():
             "message": f"导出失败: {str(e)}"
         }), 500
 
+
+# ==================== 报告版本管理API ====================
+
+@app.route('/api/report_versions', methods=['GET'])
+def list_report_versions():
+    """获取当前工作区的所有报告版本"""
+    global current_session_id
+    
+    workspace_id = request.args.get('workspace_id') or current_session_id
+    if not workspace_id:
+        return jsonify({"versions": []})
+    
+    workspace_path = get_workspace_dir() / workspace_id
+    if not workspace_path.exists():
+        return jsonify({"versions": []})
+    
+    versions = []
+    
+    # 检查主报告
+    main_report = workspace_path / "report.html"
+    if main_report.exists():
+        stat = main_report.stat()
+        versions.append({
+            "filename": "report.html",
+            "label": "当前版本",
+            "modified": stat.st_mtime
+        })
+    
+    # 检查修订版本
+    for v_file in sorted(workspace_path.glob("report_v*.html")):
+        stat = v_file.stat()
+        version_num = v_file.stem.replace("report_v", "")
+        # v0 是原始版本，其他是修订版
+        if version_num == "0":
+            label = "原始版本"
+        else:
+            label = f"修订版 {version_num}"
+        versions.append({
+            "filename": v_file.name,
+            "label": label,
+            "modified": stat.st_mtime
+        })
+    
+    return jsonify({"versions": versions, "workspace_id": workspace_id})
+
+
+@app.route('/api/report_content', methods=['GET'])
+def fetch_report_content():
+    """获取指定版本的报告内容"""
+    global current_session_id
+    
+    workspace_id = request.args.get('workspace_id') or current_session_id
+    filename = request.args.get('filename', 'report.html')
+    
+    if not workspace_id:
+        return jsonify({"status": "error", "message": "缺少workspace_id"}), 400
+    
+    workspace_path = get_workspace_dir() / workspace_id
+    report_path = workspace_path / filename
+    
+    if not report_path.exists():
+        return jsonify({"status": "error", "message": f"报告不存在: {filename}"}), 404
+    
+    # 安全检查：确保文件在workspace内
+    try:
+        report_path.resolve().relative_to(workspace_path.resolve())
+    except ValueError:
+        return jsonify({"status": "error", "message": "非法文件路径"}), 400
+    
+    with open(report_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    return jsonify({"status": "success", "content": content, "filename": filename})
+
+
+# ==================== 报告修订API ====================
+
+@app.route('/api/revise_report', methods=['POST'])
+def revise_report():
+    """用户参与式报告修订 - 由报告审核官处理修改请求"""
+    try:
+        data = request.json
+        workspace_id = data.get('workspace_id')
+        user_feedback = data.get('user_feedback')
+        current_html = data.get('current_html')
+        
+        if not workspace_id:
+            return jsonify({"status": "error", "message": "缺少workspace_id"}), 400
+        if not user_feedback:
+            return jsonify({"status": "error", "message": "请输入修改要求"}), 400
+        if not current_html:
+            return jsonify({"status": "error", "message": "缺少当前报告内容"}), 400
+        
+        # 加载原始议长总结作为参照
+        workspace_path = pathlib.Path(get_workspace_dir()) / workspace_id
+        history_path = workspace_path / "history.json"
+        
+        if not history_path.exists():
+            return jsonify({"status": "error", "message": f"找不到议事历史: {workspace_id}"}), 404
+        
+        with open(history_path, 'r', encoding='utf-8') as f:
+            history = json.load(f)
+        
+        # 提取最后一轮的议长总结
+        leader_summary = None
+        for item in reversed(history):
+            if item.get("summary"):
+                leader_summary = item["summary"]
+                break
+        
+        if not leader_summary:
+            return jsonify({"status": "error", "message": "找不到议长总结"}), 404
+        
+        logger.info(f"[revise_report] 开始处理修订请求，workspace: {workspace_id}")
+        logger.info(f"[revise_report] 用户反馈: {user_feedback[:100]}...")
+        
+        # 使用与 rereport 相同的方式获取模型配置
+        global current_config
+        selected_backend = current_config.get('backend', 'deepseek') if current_config else 'deepseek'
+        
+        # 根据选择的后端确定模型
+        if selected_backend == 'deepseek':
+            model_name = config.DEEPSEEK_MODEL
+        elif selected_backend == 'openrouter':
+            model_name = config.OPENROUTER_MODEL
+        elif selected_backend == 'openai':
+            model_name = config.OPENAI_MODEL
+        elif selected_backend == 'aliyun':
+            model_name = config.ALIYUN_MODEL
+        else:
+            model_name = config.MODEL_NAME
+        
+        model_config = {
+            "type": selected_backend,
+            "model": model_name
+        }
+        logger.info(f"[revise_report] 使用模型配置: {model_config}")
+        
+        # 创建报告审核官chain
+        auditor_chain = make_report_auditor_chain(model_config)
+        
+        # 调用审核官进行修订
+        prompt_vars = {
+            "leader_summary": json.dumps(leader_summary, ensure_ascii=False, indent=2),
+            "current_html": current_html,
+            "user_feedback": user_feedback
+        }
+        
+        try:
+            # 使用stream_agent_output获取输出
+            out, search_res = stream_agent_output(
+                auditor_chain, 
+                prompt_vars, 
+                "报告审核官", 
+                "report_auditor",
+                event_type="agent_action"
+            )
+            
+            # 清理JSON并解析
+            cleaned = clean_json_string(out)
+            if not cleaned:
+                raise ValueError("审核官输出为空或不包含JSON")
+            
+            result = json.loads(cleaned)
+            revision_obj = schemas.ReportRevisionResult(**result)
+            revision_result = revision_obj.dict()
+            
+            logger.info(f"[revise_report] 修订成功: {revision_result['revision_summary']}")
+            
+            # 首次修订时，先保存原始版本
+            main_report_path = workspace_path / "report.html"
+            original_backup_path = workspace_path / "report_v0.html"
+            if not original_backup_path.exists() and main_report_path.exists():
+                # 复制原始报告到 v0
+                import shutil
+                shutil.copy2(main_report_path, original_backup_path)
+                logger.info(f"[revise_report] 已备份原始报告: {original_backup_path}")
+            
+            # 保存修订版本（从v1开始）
+            existing_versions = list(workspace_path.glob("report_v*.html"))
+            # 排除v0（原始版本），计算修订版本数
+            revision_versions = [f for f in existing_versions if f.stem != "report_v0"]
+            revision_count = len(revision_versions) + 1
+            revision_path = workspace_path / f"report_v{revision_count}.html"
+            
+            with open(revision_path, 'w', encoding='utf-8') as f:
+                f.write(revision_result['revised_html'])
+            
+            # 同时更新主报告
+            with open(main_report_path, 'w', encoding='utf-8') as f:
+                f.write(revision_result['revised_html'])
+            
+            logger.info(f"[revise_report] 已保存修订版本: {revision_path}")
+            
+            return jsonify({
+                "status": "success",
+                "revision_summary": revision_result['revision_summary'],
+                "changes_made": revision_result['changes_made'],
+                "unchanged_reasons": revision_result.get('unchanged_reasons', []),
+                "warnings": revision_result.get('warnings', []),
+                "content_check": revision_result['content_check'],
+                "structure_check": revision_result['structure_check'],
+                "revised_html": revision_result['revised_html'],
+                "version": revision_count
+            })
+            
+        except Exception as e:
+            logger.error(f"[revise_report] 审核官处理失败: {e}")
+            traceback.print_exc()
+            return jsonify({
+                "status": "error",
+                "message": f"修订处理失败: {str(e)}"
+            }), 500
+        
+    except Exception as e:
+        logger.error(f"[revise_report] API错误: {e}")
+        traceback.print_exc()
+        return jsonify({
+            "status": "error",
+            "message": f"服务器错误: {str(e)}"
+        }), 500
+
+
+def _get_revision_panel_html(workspace_id: str) -> str:
+    """生成报告修订面板的HTML代码"""
+    return f'''
+<!-- 报告修订面板 -->
+<div id="revision-panel" style="
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+    z-index: 10000;
+    transition: transform 0.3s ease;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+">
+    <!-- 折叠/展开按钮 -->
+    <button id="revision-toggle" onclick="toggleRevisionPanel()" style="
+        position: absolute;
+        top: -40px;
+        right: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 8px 8px 0 0;
+        cursor: pointer;
+        font-size: 14px;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+    ">
+        💬 修订反馈
+    </button>
+    
+    <div id="revision-content" style="padding: 20px; max-width: 1200px; margin: 0 auto;">
+        <div style="display: flex; gap: 20px; align-items: flex-start;">
+            <!-- 输入区域 -->
+            <div style="flex: 1;">
+                <h3 style="color: white; margin: 0 0 10px 0; font-size: 16px;">📝 请输入您的修改要求</h3>
+                <textarea id="revision-feedback" placeholder="例如：
+• 第二章节需要补充更多实施细节
+• 风险分析部分过于乐观，请增加潜在风险
+• 请将结论部分精简为3个要点
+• 添加一个成本对比表格" style="
+                    width: 100%;
+                    height: 80px;
+                    padding: 12px;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    resize: vertical;
+                    font-family: inherit;
+                "></textarea>
+            </div>
+            
+            <!-- 按钮区域 -->
+            <div style="display: flex; flex-direction: column; gap: 10px; min-width: 150px;">
+                <button onclick="submitRevision()" id="btn-submit-revision" style="
+                    background: white;
+                    color: #667eea;
+                    border: none;
+                    padding: 12px 20px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: 600;
+                    transition: all 0.2s;
+                ">
+                    📤 提交修订
+                </button>
+                <button onclick="confirmSatisfied()" style="
+                    background: rgba(255,255,255,0.2);
+                    color: white;
+                    border: 2px solid white;
+                    padding: 10px 20px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    transition: all 0.2s;
+                ">
+                    ✅ 满意
+                </button>
+            </div>
+        </div>
+        
+        <!-- 状态显示 -->
+        <div id="revision-status" style="display: none; margin-top: 15px; padding: 12px; background: rgba(255,255,255,0.1); border-radius: 8px; color: white;">
+            <span id="revision-status-text">处理中...</span>
+        </div>
+        
+        <!-- 修订结果显示 -->
+        <div id="revision-result" style="display: none; margin-top: 15px; padding: 15px; background: rgba(255,255,255,0.95); border-radius: 8px; color: #333; max-height: 200px; overflow-y: auto;">
+        </div>
+    </div>
+</div>
+
+<script>
+const WORKSPACE_ID = "{workspace_id}";
+let panelCollapsed = true;
+
+function toggleRevisionPanel() {{
+    const panel = document.getElementById('revision-panel');
+    const content = document.getElementById('revision-content');
+    const toggle = document.getElementById('revision-toggle');
+    
+    if (panelCollapsed) {{
+        content.style.display = 'block';
+        toggle.innerHTML = '✕ 关闭';
+        panelCollapsed = false;
+    }} else {{
+        content.style.display = 'none';
+        toggle.innerHTML = '💬 修订反馈';
+        panelCollapsed = true;
+    }}
+}}
+
+// 默认折叠
+document.addEventListener('DOMContentLoaded', function() {{
+    document.getElementById('revision-content').style.display = 'none';
+}});
+
+async function submitRevision() {{
+    const feedback = document.getElementById('revision-feedback').value.trim();
+    if (!feedback) {{
+        alert('请输入修改要求');
+        return;
+    }}
+    
+    const statusDiv = document.getElementById('revision-status');
+    const statusText = document.getElementById('revision-status-text');
+    const resultDiv = document.getElementById('revision-result');
+    const submitBtn = document.getElementById('btn-submit-revision');
+    
+    // 显示加载状态
+    statusDiv.style.display = 'block';
+    statusText.innerHTML = '⏳ 报告审核官正在处理您的修订要求...';
+    resultDiv.style.display = 'none';
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '⏳ 处理中...';
+    
+    try {{
+        const response = await fetch('/api/revise_report', {{
+            method: 'POST',
+            headers: {{ 'Content-Type': 'application/json' }},
+            body: JSON.stringify({{
+                workspace_id: WORKSPACE_ID,
+                user_feedback: feedback,
+                current_html: document.documentElement.outerHTML
+            }})
+        }});
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {{
+            // 显示修订结果
+            statusDiv.style.display = 'none';
+            resultDiv.style.display = 'block';
+            
+            let changesHtml = '<h4 style="margin:0 0 10px 0;color:#667eea;">✅ 修订完成</h4>';
+            changesHtml += '<p style="margin:0 0 10px 0;"><strong>概要：</strong>' + data.revision_summary + '</p>';
+            
+            if (data.changes_made && data.changes_made.length > 0) {{
+                changesHtml += '<p style="margin:0 0 5px 0;"><strong>修改内容：</strong></p><ul style="margin:0;padding-left:20px;">';
+                data.changes_made.forEach(c => {{
+                    changesHtml += '<li>' + c + '</li>';
+                }});
+                changesHtml += '</ul>';
+            }}
+            
+            if (data.warnings && data.warnings.length > 0) {{
+                changesHtml += '<p style="margin:10px 0 5px 0;color:#f59e0b;"><strong>⚠️ 注意：</strong></p><ul style="margin:0;padding-left:20px;color:#f59e0b;">';
+                data.warnings.forEach(w => {{
+                    changesHtml += '<li>' + w + '</li>';
+                }});
+                changesHtml += '</ul>';
+            }}
+            
+            changesHtml += '<p style="margin:15px 0 0 0;"><button onclick="applyRevision()" style="background:#667eea;color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;">🔄 应用修订并刷新页面</button></p>';
+            
+            resultDiv.innerHTML = changesHtml;
+            
+            // 保存修订后的HTML供应用
+            window._revisedHtml = data.revised_html;
+            
+        }} else {{
+            statusText.innerHTML = '❌ 修订失败：' + data.message;
+        }}
+        
+    }} catch (error) {{
+        statusText.innerHTML = '❌ 请求失败：' + error.message;
+    }} finally {{
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '📤 提交修订';
+    }}
+}}
+
+function applyRevision() {{
+    // 刷新页面以显示新版本
+    window.location.reload();
+}}
+
+function confirmSatisfied() {{
+    if (confirm('确认对当前报告满意？\\n\\n点击确认后，修订面板将关闭。您仍可以通过导出功能保存报告。')) {{
+        document.getElementById('revision-panel').style.display = 'none';
+        alert('✅ 感谢您的确认！您可以通过页面上的导出按钮保存报告。');
+    }}
+}}
+</script>
+'''
+
+
 # ==================== 报告查看路由 ====================
 
 @app.route('/report/<workspace_id>')
@@ -866,6 +1299,12 @@ def view_report(workspace_id):
                     f'<head>\n    <meta name="workspace-id" content="{workspace_id}">'
                 )
                 logger.info(f"[view_report] 已动态注入 workspace-id: {workspace_id}")
+        
+        # 注入修订面板（在</body>之前）
+        revision_panel = _get_revision_panel_html(workspace_id)
+        if '</body>' in html_content:
+            html_content = html_content.replace('</body>', f'{revision_panel}</body>')
+            logger.info(f"[view_report] 已注入修订面板")
         
         from flask import Response
         return Response(html_content, mimetype='text/html')
@@ -1121,4 +1560,8 @@ def get_report_edit_history(workspace_id):
 # ============================================================
 
 if __name__ == '__main__':
-    app.run(port=5000, debug=True)
+    # 从环境变量读取 debug 模式设置，测试环境下禁用以加快启动
+    debug_mode = os.environ.get('FLASK_DEBUG', '1') == '1'
+    # 测试环境需要多线程支持以处理 Playwright 的并发请求
+    threaded = os.environ.get('FLASK_THREADED', 'true').lower() == 'true'
+    app.run(port=5000, debug=debug_mode, use_reloader=debug_mode, threaded=threaded)
