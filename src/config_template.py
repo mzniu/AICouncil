@@ -45,6 +45,12 @@ AZURE_OPENAI_ENDPOINT = os.getenv('AZURE_OPENAI_ENDPOINT', '')
 AZURE_OPENAI_API_VERSION = os.getenv('AZURE_OPENAI_API_VERSION', '2024-12-01-preview')
 AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME', 'gpt-4o')
 
+# Anthropic API configuration
+ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
+ANTHROPIC_BASE_URL = os.getenv('ANTHROPIC_BASE_URL', 'https://api.anthropic.com')
+ANTHROPIC_MODEL = os.getenv('ANTHROPIC_MODEL', 'claude-3-5-sonnet-20241022')
+ANTHROPIC_API_VERSION = os.getenv('ANTHROPIC_API_VERSION', '2023-06-01')
+
 # Search API configuration (Tavily is recommended for LLM search)
 TAVILY_API_KEY = os.getenv('TAVILY_API_KEY', '')
 
