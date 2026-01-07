@@ -26,7 +26,7 @@
 - **💾 阵型预设**：支持保存、加载和管理常用的元老院配置（包括后端模型、议事轮数、智能体数量等），方便快速启动不同场景的议事。
 - **✋ 用户介入**：支持在议事过程中随时输入指令，实时引导智能体的讨论方向。
 - **📊 进度可视化**：实时显示当前议事轮数及详细状态。进度条逻辑经过优化，议事结束即达 100%，无需等待报告生成。
-- **🤖 广泛的模型支持**：原生支持 DeepSeek、OpenAI、Aliyun (Qwen)、OpenRouter 及本地 Ollama 模型。
+- **🤖 广泛的模型支持**：原生支持 **DeepSeek**、**OpenAI**、**Azure OpenAI**（中国区/全球区）、**Aliyun (Qwen)**、**OpenRouter** 及本地 **Ollama** 模型。
 
 ---
 
@@ -188,8 +188,29 @@ pip install -r requirements-optional.txt
    ```
 2. 编辑 `src/config.py`，填入您的 API 密钥及相关配置：
    ```python
+   # DeepSeek API（推荐，性价比高）
    DEEPSEEK_API_KEY = "您的密钥"
+   DEEPSEEK_MODEL = "deepseek-chat"  # 或 deepseek-reasoner
+   
+   # OpenAI API
    OPENAI_API_KEY = "您的密钥"
+   OPENAI_MODEL = "gpt-4o"
+   
+   # Azure OpenAI（支持中国区和全球区）
+   AZURE_OPENAI_API_KEY = "您的Azure密钥"
+   AZURE_OPENAI_ENDPOINT = "https://your-resource.openai.azure.cn"  # 中国区
+   # AZURE_OPENAI_ENDPOINT = "https://your-resource.openai.azure.com"  # 全球区
+   AZURE_OPENAI_API_VERSION = "2024-12-01-preview"
+   AZURE_OPENAI_DEPLOYMENT_NAME = "gpt-4o"  # 您的部署名称
+   
+   # Aliyun (Qwen)
+   ALIYUN_API_KEY = "您的密钥"
+   ALIYUN_MODEL = "qwen-plus"
+   
+   # OpenRouter（支持多种第三方模型）
+   OPENROUTER_API_KEY = "您的密钥"
+   OPENROUTER_MODEL = "google/gemini-3-flash-preview"
+   
    # ... 其他配置
    ```
 或者您也可以在项目根目录下创建 `.env` 文件，程序会自动读取环境变量。
