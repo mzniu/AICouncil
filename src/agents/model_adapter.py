@@ -317,6 +317,68 @@ def call_azure_openai(deployment: str, prompt: str, timeout: int = 60, max_retri
     raise RuntimeError(f"Azure OpenAI API request failed after {max_retries} attempts: {last_exception}")
 
 
+def call_anthropic(model: str, prompt: str, timeout: int = 60, max_retries: int = 3, stream: bool = False):
+    """
+    调用 Anthropic Claude API
+    
+    Args:
+        model: Claude 模型名称（如 claude-3-5-sonnet-20241022）
+        prompt: 输入提示词
+        timeout: 请求超时时间（秒）
+        max_retries: 最大重试次数
+        stream: 是否流式输出
+    
+    Anthropic API 特点：
+    - Endpoint: https://api.anthropic.com/v1/messages
+    - 认证方式：x-api-key header
+    - API版本：通过 anthropic-version header 指定
+    """
+    if not config.ANTHROPIC_API_KEY:
+        raise ValueError("ANTHROPIC_API_KEY not configured")
+    
+    url = f"{config.ANTHROPIC_BASE_URL}/v1/messages"
+    
+    headers = {
+        "x-api-key": config.ANTHROPIC_API_KEY,
+        "anthropic-version": getattr(config, 'ANTHROPIC_API_VERSION', '2023-06-01'),
+        "Content-Type": "application/json"
+    }
+    
+    clean_prompt = "".join(c for c in prompt if c.isprintable() or c in "\n\r\t")
+    logger.info(f"Anthropic API prompt length: {len(clean_prompt)} characters")
+    
+    payload = {
+        "model": model or config.ANTHROPIC_MODEL,
+        "messages": [{"role": "user", "content": clean_prompt}],
+        "max_tokens": 4096,
+        "stream": stream
+    }
+    
+    last_exception = None
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"Anthropic API call starting (attempt {attempt + 1}/{max_retries}, model={model}, stream={stream})...")
+            resp = requests.post(url, json=payload, headers=headers, timeout=timeout, stream=stream)
+            logger.info(f"Anthropic API response received (status: {resp.status_code})")
+            
+            if resp.status_code != 200:
+                logger.error(f"Anthropic Error Body: {resp.text}")
+                
+            resp.raise_for_status()
+            if stream:
+                return resp
+            data = resp.json()
+            # Anthropic 返回格式: {"content": [{"type": "text", "text": "..."}]}
+            return data["content"][0]["text"]
+        except RequestException as e:
+            last_exception = e
+            logger.warning(f"Anthropic API attempt {attempt + 1} failed: {e}. Retrying...")
+            if attempt < max_retries - 1:
+                time.sleep(2 * (attempt + 1))
+    
+    raise RuntimeError(f"Anthropic API request failed after {max_retries} attempts: {last_exception}")
+
+
 def get_openrouter_models():
     """获取 OpenRouter 支持的模型列表。"""
     url = f"{config.OPENROUTER_BASE_URL.replace('/chat/completions', '')}/models"
@@ -385,6 +447,12 @@ def call_model(agent_id: str, prompt: str, model_config: dict = None, stream: bo
         # Azure OpenAI: 使用部署名称（deployment name），不是模型名
         deployment = mname or config.AZURE_OPENAI_DEPLOYMENT_NAME
         res = call_azure_openai(deployment, prompt, stream=stream)
+        if stream:
+            return res
+        out = res
+    elif mtype == "anthropic":
+        # Anthropic Claude API
+        res = call_anthropic(mname, prompt, stream=stream)
         if stream:
             return res
         out = res

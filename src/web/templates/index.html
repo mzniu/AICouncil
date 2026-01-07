@@ -262,6 +262,7 @@
                         <option value="deepseek">DeepSeek</option>
                         <option value="openai">OpenAI</option>
                         <option value="azure">Azure OpenAI</option>
+                        <option value="anthropic">Anthropic (Claude)</option>
                         <option value="openrouter">OpenRouter</option>
                         <option value="aliyun">Aliyun</option>
                         <option value="ollama">Ollama</option>
@@ -629,6 +630,12 @@
                                 <input type="text" id="settings-azure-deployment" placeholder="gpt-4o" 
                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
                                 <p class="text-xs text-slate-500 mt-1">您在Azure创建的部署名称（不是模型名）</p>
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-slate-500 uppercase">Anthropic API Key</label>
+                                <input type="password" id="settings-key-anthropic" placeholder="sk-ant-..." 
+                                       class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
+                                <p class="text-xs text-slate-500 mt-1">Claude API密钥（获取地址: console.anthropic.com）</p>
                             </div>
                             <div class="space-y-1">
                                 <label class="text-xs font-bold text-slate-500 uppercase">OpenRouter API Key</label>
@@ -3409,6 +3416,7 @@ function confirmSatisfied() {
                             document.getElementById('settings-key-azure').value = cfg.AZURE_OPENAI_API_KEY || '';
                             document.getElementById('settings-azure-endpoint').value = cfg.AZURE_OPENAI_ENDPOINT || '';
                             document.getElementById('settings-azure-deployment').value = cfg.AZURE_OPENAI_DEPLOYMENT_NAME || '';
+                            document.getElementById('settings-key-anthropic').value = cfg.ANTHROPIC_API_KEY || '';
                             document.getElementById('settings-key-openrouter').value = cfg.OPENROUTER_API_KEY || '';
                             document.getElementById('settings-key-aliyun').value = cfg.ALIYUN_API_KEY || '';
                             document.getElementById('settings-key-tavily').value = cfg.TAVILY_API_KEY || '';
@@ -3444,6 +3452,7 @@ function confirmSatisfied() {
                     AZURE_OPENAI_API_KEY: document.getElementById('settings-key-azure').value.trim(),
                     AZURE_OPENAI_ENDPOINT: document.getElementById('settings-azure-endpoint').value.trim(),
                     AZURE_OPENAI_DEPLOYMENT_NAME: document.getElementById('settings-azure-deployment').value.trim(),
+                    ANTHROPIC_API_KEY: document.getElementById('settings-key-anthropic').value.trim(),
                     OPENROUTER_API_KEY: document.getElementById('settings-key-openrouter').value.trim(),
                     ALIYUN_API_KEY: document.getElementById('settings-key-aliyun').value.trim(),
                     TAVILY_API_KEY: document.getElementById('settings-key-tavily').value.trim(),

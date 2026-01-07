@@ -26,7 +26,7 @@
 - **💾 阵型预设**：支持保存、加载和管理常用的元老院配置（包括后端模型、议事轮数、智能体数量等），方便快速启动不同场景的议事。
 - **✋ 用户介入**：支持在议事过程中随时输入指令，实时引导智能体的讨论方向。
 - **📊 进度可视化**：实时显示当前议事轮数及详细状态。进度条逻辑经过优化，议事结束即达 100%，无需等待报告生成。
-- **🤖 广泛的模型支持**：原生支持 **DeepSeek**、**OpenAI**、**Azure OpenAI**（中国区/全球区）、**Aliyun (Qwen)**、**OpenRouter** 及本地 **Ollama** 模型。
+- **🤖 广泛的模型支持**：原生支持 **DeepSeek**、**OpenAI**、**Azure OpenAI**（中国区/全球区）、**Anthropic (Claude)**、**Aliyun (Qwen)**、**OpenRouter** 及本地 **Ollama** 模型。
 
 ---
 
@@ -203,6 +203,10 @@ pip install -r requirements-optional.txt
    AZURE_OPENAI_API_VERSION = "2024-12-01-preview"
    AZURE_OPENAI_DEPLOYMENT_NAME = "gpt-4o"  # 您的部署名称
    
+   # Anthropic Claude API
+   ANTHROPIC_API_KEY = "您的Anthropic密钥"  # 获取地址：console.anthropic.com
+   ANTHROPIC_MODEL = "claude-3-5-sonnet-20241022"  # 推荐模型
+   
    # Aliyun (Qwen)
    ALIYUN_API_KEY = "您的密钥"
    ALIYUN_MODEL = "qwen-plus"
@@ -331,7 +335,7 @@ AICouncil/
 - [x] **增强型搜索**：集成 DrissionPage 支持多引擎（Baidu, Bing, DuckDuckGo, Yahoo, Mojeek）并行搜索。
 - [x] **UI 交互升级**：全站移除原生弹窗，采用 Tailwind CSS 自定义模态框。
 - [x] **历史记录管理**：支持议事记录的持久化存储、回溯及物理删除。
-- [x] **模型适配**：支持 DeepSeek, OpenAI, OpenRouter, Ollama 等主流模型。
+- [x] **模型适配**：支持 DeepSeek, OpenAI, Azure OpenAI, Anthropic (Claude), OpenRouter, Ollama 等主流模型。
 - [x] **报告导出**：支持 HTML 报告生成、长图导出及 PDF 导出功能。
 - [x] **用户介入模式**：允许用户在议事过程中随时"插话"，引导辩论方向。
 - [x] **多语言支持**：实现前端界面的国际化 (i18n)。
