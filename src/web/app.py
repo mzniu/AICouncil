@@ -556,6 +556,9 @@ def handle_config():
             "config": {
                 "DEEPSEEK_API_KEY": config.DEEPSEEK_API_KEY,
                 "OPENAI_API_KEY": config.OPENAI_API_KEY,
+                "AZURE_OPENAI_API_KEY": getattr(config, 'AZURE_OPENAI_API_KEY', ''),
+                "AZURE_OPENAI_ENDPOINT": getattr(config, 'AZURE_OPENAI_ENDPOINT', ''),
+                "AZURE_OPENAI_DEPLOYMENT_NAME": getattr(config, 'AZURE_OPENAI_DEPLOYMENT_NAME', ''),
                 "OPENROUTER_API_KEY": config.OPENROUTER_API_KEY,
                 "ALIYUN_API_KEY": config.ALIYUN_API_KEY,
                 "TAVILY_API_KEY": config.TAVILY_API_KEY,

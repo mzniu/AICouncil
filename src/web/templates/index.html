@@ -614,6 +614,23 @@
                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
                             </div>
                             <div class="space-y-1">
+                                <label class="text-xs font-bold text-slate-500 uppercase">Azure OpenAI API Key</label>
+                                <input type="password" id="settings-key-azure" placeholder="your-azure-key..." 
+                                       class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-slate-500 uppercase">Azure OpenAI Endpoint</label>
+                                <input type="text" id="settings-azure-endpoint" placeholder="https://your-resource.openai.azure.cn" 
+                                       class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
+                                <p class="text-xs text-slate-500 mt-1">中国区: .openai.azure.cn | 全球区: .openai.azure.com</p>
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-slate-500 uppercase">Azure Deployment Name</label>
+                                <input type="text" id="settings-azure-deployment" placeholder="gpt-4o" 
+                                       class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
+                                <p class="text-xs text-slate-500 mt-1">您在Azure创建的部署名称（不是模型名）</p>
+                            </div>
+                            <div class="space-y-1">
                                 <label class="text-xs font-bold text-slate-500 uppercase">OpenRouter API Key</label>
                                 <input type="password" id="settings-key-openrouter" placeholder="sk-or-..." 
                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
@@ -3389,6 +3406,9 @@ function confirmSatisfied() {
                             const cfg = data.config;
                             document.getElementById('settings-key-deepseek').value = cfg.DEEPSEEK_API_KEY || '';
                             document.getElementById('settings-key-openai').value = cfg.OPENAI_API_KEY || '';
+                            document.getElementById('settings-key-azure').value = cfg.AZURE_OPENAI_API_KEY || '';
+                            document.getElementById('settings-azure-endpoint').value = cfg.AZURE_OPENAI_ENDPOINT || '';
+                            document.getElementById('settings-azure-deployment').value = cfg.AZURE_OPENAI_DEPLOYMENT_NAME || '';
                             document.getElementById('settings-key-openrouter').value = cfg.OPENROUTER_API_KEY || '';
                             document.getElementById('settings-key-aliyun').value = cfg.ALIYUN_API_KEY || '';
                             document.getElementById('settings-key-tavily').value = cfg.TAVILY_API_KEY || '';
@@ -3421,6 +3441,9 @@ function confirmSatisfied() {
                 const keys = {
                     DEEPSEEK_API_KEY: document.getElementById('settings-key-deepseek').value.trim(),
                     OPENAI_API_KEY: document.getElementById('settings-key-openai').value.trim(),
+                    AZURE_OPENAI_API_KEY: document.getElementById('settings-key-azure').value.trim(),
+                    AZURE_OPENAI_ENDPOINT: document.getElementById('settings-azure-endpoint').value.trim(),
+                    AZURE_OPENAI_DEPLOYMENT_NAME: document.getElementById('settings-azure-deployment').value.trim(),
                     OPENROUTER_API_KEY: document.getElementById('settings-key-openrouter').value.trim(),
                     ALIYUN_API_KEY: document.getElementById('settings-key-aliyun').value.trim(),
                     TAVILY_API_KEY: document.getElementById('settings-key-tavily').value.trim(),
