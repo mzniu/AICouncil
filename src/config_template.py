@@ -51,6 +51,12 @@ ANTHROPIC_BASE_URL = os.getenv('ANTHROPIC_BASE_URL', 'https://api.anthropic.com'
 ANTHROPIC_MODEL = os.getenv('ANTHROPIC_MODEL', 'claude-3-5-sonnet-20241022')
 ANTHROPIC_API_VERSION = os.getenv('ANTHROPIC_API_VERSION', '2023-06-01')
 
+# Google Gemini API configuration
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
+GEMINI_BASE_URL = os.getenv('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com')
+GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-1.5-flash')
+GEMINI_API_VERSION = os.getenv('GEMINI_API_VERSION', 'v1beta')
+
 # Search API configuration (Tavily is recommended for LLM search)
 TAVILY_API_KEY = os.getenv('TAVILY_API_KEY', '')
 

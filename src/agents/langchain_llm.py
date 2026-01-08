@@ -48,7 +48,7 @@ class AdapterLLM(LLM):
                     content = chunk.get("response", "")
                     if content:
                         yield GenerationChunk(text=content)
-        elif mtype in ["deepseek", "aliyun", "openai", "openrouter", "azure", "anthropic"]:
+        elif mtype in ["deepseek", "aliyun", "openai", "openrouter", "azure", "anthropic", "gemini"]:
             line_count = 0
             has_yielded_incremental = False  # 跟踪是否已经通过 part/delta 输出了增量内容
             for line in response.iter_lines():
