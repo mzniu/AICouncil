@@ -13,7 +13,7 @@ class TestReportEditor:
     
     @pytest.mark.slow
     @pytest.mark.p0
-    def test_editor_loads_after_report_generation(self, authenticated_page: Page, test_issue_text: str):
+    def test_editor_loads_after_report_generation(self, authenticated_page: Page, test_issue_text: str, stop_discussion_cleanup):
         """
         RE-001: 测试编辑器加载
         
@@ -23,6 +23,7 @@ class TestReportEditor:
         - 编辑器正确加载报告内容
         
         注意：需要完整讨论流程，执行时间较长
+        使用stop_discussion_cleanup确保测试结束后停止讨论
         """
         home = HomePage(authenticated_page)
         
@@ -36,23 +37,38 @@ class TestReportEditor:
         )
         
         print("⏳ 等待报告生成...")
-        home.wait_for_report_generation(timeout=600000)
+        # 等待报告完整加载
+        authenticated_page.wait_for_function(
+            """() => {
+                const reportIframe = document.getElementById('report-iframe');
+                if (!reportIframe) return false;
+                const iframeDoc = reportIframe.srcdoc;
+                return iframeDoc && iframeDoc.length > 5000 && 
+                       iframeDoc.includes('</html>') && 
+                       iframeDoc.includes('<body');
+            }""",
+            timeout=600000  # 10分钟
+        )
         print("✅ 报告已生成")
         
-        # 切换到iframe内的编辑按钮（报告在iframe中）
-        # 实际实现中需要根据报告iframe的结构调整
-        iframe = authenticated_page.frame_locator("#report-iframe")
+        # 验证主页面中的编辑器按钮（不在iframe内）
+        # 按钮文本是 "📝 编辑器"
+        edit_btn = authenticated_page.locator("button:has-text('编辑器')")
+        assert edit_btn.count() > 0, "编辑器按钮应该存在"
+        print("✅ 编辑器按钮可见")
         
-        # 验证编辑按钮可见
-        edit_btn = iframe.locator("button:has-text('编辑')")
-        assert edit_btn.count() > 0, "编辑按钮应该存在"
-        print("✅ 编辑按钮可见")
-        
-        # 点击编辑按钮打开编辑器
-        edit_btn.first.click()
-        
-        # 等待编辑器加载（编辑器可能在主页面或新标签页）
-        authenticated_page.wait_for_timeout(2000)
+        # 点击编辑按钮打开编辑器（会在新标签页打开）
+        with authenticated_page.context.expect_page() as new_page_info:
+            edit_btn.first.click()
+            new_page = new_page_info.value
+            print("✅ 编辑器已在新标签页打开")
+            
+            # 等待新标签页加载
+            new_page.wait_for_load_state("domcontentloaded", timeout=10000)
+            print(f"✅ 编辑器页面已加载: {new_page.url}")
+            
+            # 关闭新标签页
+            new_page.close()
         
         print("🎉 RE-001测试通过：编辑器加载正常")
     

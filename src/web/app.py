@@ -376,6 +376,8 @@ def rereport():
                     model_name = getattr(config, 'AZURE_OPENAI_DEPLOYMENT_NAME', 'gpt-4o')
                 elif selected_backend == 'anthropic':
                     model_name = getattr(config, 'ANTHROPIC_MODEL', 'claude-3-5-sonnet-20241022')
+                elif selected_backend == 'gemini':
+                    model_name = getattr(config, 'GEMINI_MODEL', 'gemini-1.5-flash')
                 else:
                     model_name = config.MODEL_NAME
             else:
@@ -587,6 +589,7 @@ def handle_config():
                 "AZURE_OPENAI_ENDPOINT": getattr(config, 'AZURE_OPENAI_ENDPOINT', ''),
                 "AZURE_OPENAI_DEPLOYMENT_NAME": getattr(config, 'AZURE_OPENAI_DEPLOYMENT_NAME', ''),
                 "ANTHROPIC_API_KEY": getattr(config, 'ANTHROPIC_API_KEY', ''),
+                "GEMINI_API_KEY": getattr(config, 'GEMINI_API_KEY', ''),
                 "OPENROUTER_API_KEY": config.OPENROUTER_API_KEY,
                 "ALIYUN_API_KEY": config.ALIYUN_API_KEY,
                 "TAVILY_API_KEY": config.TAVILY_API_KEY,

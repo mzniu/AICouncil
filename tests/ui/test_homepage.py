@@ -90,13 +90,15 @@ class TestHomePage:
         print("🎉 HP-004测试通过：模型后端选择功能正常")
     
     @pytest.mark.p0
-    def test_start_button_state_during_discussion(self, authenticated_page: Page, test_issue_text: str):
+    def test_start_button_state_during_discussion(self, authenticated_page: Page, test_issue_text: str, stop_discussion_cleanup):
         """
         HP-005 (原DS-002): 测试讨论启动后按钮状态
         
         验证点:
         - 使用configure_and_start_discussion启动讨论
         - 验证按钮被禁用
+        
+        注意：使用stop_discussion_cleanup确保测试结束后停止讨论
         """
         home = HomePage(authenticated_page)
         
