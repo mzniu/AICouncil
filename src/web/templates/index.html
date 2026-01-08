@@ -600,126 +600,140 @@
                 </div>
                 
                 <div class="space-y-6 overflow-y-auto max-h-[60vh] pr-2">
-                    <section>
-                        <h4 class="text-sm font-bold text-slate-700 mb-3 flex items-center">
-                            <span class="w-1.5 h-4 bg-blue-500 rounded-full mr-2"></span> <span data-i18n="settings_api_keys">API 密钥配置</span>
+                    <!-- 模型API密钥配置区域 -->
+                    <section class="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-100">
+                        <h4 class="text-sm font-bold text-blue-800 mb-4 flex items-center">
+                            <span class="w-1.5 h-4 bg-blue-500 rounded-full mr-2"></span> 
+                            <span class="mr-1">🤖</span>
+                            <span data-i18n="settings_api_keys">模型 API 密钥配置</span>
                         </h4>
                         <div class="grid grid-cols-1 gap-4">
                             <div class="space-y-1">
-                                <label class="text-xs font-bold text-slate-500 uppercase">DeepSeek API Key</label>
+                                <label class="text-xs font-bold text-slate-600 uppercase">DeepSeek API Key</label>
                                 <input type="password" id="settings-key-deepseek" placeholder="sk-..." 
-                                       class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
+                                       class="w-full px-3 py-2 border border-blue-200 rounded-lg outline-none focus:border-blue-500 transition bg-white">
                             </div>
                             <div class="space-y-1">
-                                <label class="text-xs font-bold text-slate-500 uppercase">OpenAI API Key</label>
+                                <label class="text-xs font-bold text-slate-600 uppercase">OpenAI API Key</label>
                                 <input type="password" id="settings-key-openai" placeholder="sk-..." 
-                                       class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
+                                       class="w-full px-3 py-2 border border-blue-200 rounded-lg outline-none focus:border-blue-500 transition bg-white">
                             </div>
                             <div class="space-y-1">
-                                <label class="text-xs font-bold text-slate-500 uppercase">Azure OpenAI API Key</label>
+                                <label class="text-xs font-bold text-slate-600 uppercase">Azure OpenAI API Key</label>
                                 <input type="password" id="settings-key-azure" placeholder="your-azure-key..." 
-                                       class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
+                                       class="w-full px-3 py-2 border border-blue-200 rounded-lg outline-none focus:border-blue-500 transition bg-white">
                             </div>
                             <div class="space-y-1">
-                                <label class="text-xs font-bold text-slate-500 uppercase">Azure OpenAI Endpoint</label>
+                                <label class="text-xs font-bold text-slate-600 uppercase">Azure OpenAI Endpoint</label>
                                 <input type="text" id="settings-azure-endpoint" placeholder="https://your-resource.openai.azure.cn" 
-                                       class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
+                                       class="w-full px-3 py-2 border border-blue-200 rounded-lg outline-none focus:border-blue-500 transition bg-white">
                                 <p class="text-xs text-slate-500 mt-1">中国区: .openai.azure.cn | 全球区: .openai.azure.com</p>
                             </div>
                             <div class="space-y-1">
-                                <label class="text-xs font-bold text-slate-500 uppercase">Azure Deployment Name</label>
+                                <label class="text-xs font-bold text-slate-600 uppercase">Azure Deployment Name</label>
                                 <input type="text" id="settings-azure-deployment" placeholder="gpt-4o" 
-                                       class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
+                                       class="w-full px-3 py-2 border border-blue-200 rounded-lg outline-none focus:border-blue-500 transition bg-white">
                                 <p class="text-xs text-slate-500 mt-1">您在Azure创建的部署名称（不是模型名）</p>
                             </div>
                             <div class="space-y-1">
-                                <label class="text-xs font-bold text-slate-500 uppercase">Anthropic API Key</label>
+                                <label class="text-xs font-bold text-slate-600 uppercase">Anthropic API Key</label>
                                 <input type="password" id="settings-key-anthropic" placeholder="sk-ant-..." 
-                                       class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
+                                       class="w-full px-3 py-2 border border-blue-200 rounded-lg outline-none focus:border-blue-500 transition bg-white">
                                 <p class="text-xs text-slate-500 mt-1">Claude API密钥（获取地址: console.anthropic.com）</p>
                             </div>
                             <div class="space-y-1">
-                                <label class="text-xs font-bold text-slate-500 uppercase">Google Gemini API Key</label>
+                                <label class="text-xs font-bold text-slate-600 uppercase">Google Gemini API Key</label>
                                 <input type="password" id="settings-key-gemini" placeholder="AIza..." 
-                                       class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
+                                       class="w-full px-3 py-2 border border-blue-200 rounded-lg outline-none focus:border-blue-500 transition bg-white">
                                 <p class="text-xs text-slate-500 mt-1">Gemini API密钥（获取地址: aistudio.google.com）</p>
                             </div>
                             <div class="space-y-1">
-                                <label class="text-xs font-bold text-slate-500 uppercase">OpenRouter API Key</label>
+                                <label class="text-xs font-bold text-slate-600 uppercase">OpenRouter API Key</label>
                                 <input type="password" id="settings-key-openrouter" placeholder="sk-or-..." 
-                                       class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
+                                       class="w-full px-3 py-2 border border-blue-200 rounded-lg outline-none focus:border-blue-500 transition bg-white">
                             </div>
                             <div class="space-y-1">
-                                <label class="text-xs font-bold text-slate-500 uppercase">Aliyun API Key</label>
+                                <label class="text-xs font-bold text-slate-600 uppercase">Aliyun API Key</label>
                                 <input type="password" id="settings-key-aliyun" placeholder="sk-..." 
-                                       class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
+                                       class="w-full px-3 py-2 border border-blue-200 rounded-lg outline-none focus:border-blue-500 transition bg-white">
                             </div>
+                        </div>
+                    </section>
+
+                    <!-- 搜索引擎配置区域 -->
+                    <section class="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-100">
+                        <h4 class="text-sm font-bold text-green-800 mb-4 flex items-center">
+                            <span class="w-1.5 h-4 bg-green-500 rounded-full mr-2"></span>
+                            <span class="mr-1">🔍</span>
+                            <span data-i18n="settings_search_engines">搜索引擎配置</span>
+                        </h4>
+                        <div class="grid grid-cols-1 gap-4">
                             <div class="space-y-2">
-                                <label class="text-xs font-bold text-slate-500 uppercase" data-i18n="settings_search_engines">搜索增强引擎 (可多选)</label>
+                                <label class="text-xs font-bold text-slate-600 uppercase" data-i18n="settings_search_engines">搜索增强引擎 (可多选)</label>
                                 <div id="settings-search-providers" class="grid grid-cols-2 gap-2">
-                                    <label class="flex items-center space-x-2 p-2 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition">
-                                        <input type="checkbox" value="bing" class="search-provider-checkbox w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
+                                    <label class="flex items-center space-x-2 p-2 border border-green-200 rounded-lg hover:bg-white cursor-pointer transition bg-white/50">
+                                        <input type="checkbox" value="bing" class="search-provider-checkbox w-4 h-4 text-green-600 rounded focus:ring-green-500">
                                         <span class="text-sm text-slate-700">Bing (<span data-i18n="search_stable">不稳定</span>)</span>
                                     </label>
-                                    <label class="flex items-center space-x-2 p-2 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition">
-                                        <input type="checkbox" value="baidu" class="search-provider-checkbox w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
+                                    <label class="flex items-center space-x-2 p-2 border border-green-200 rounded-lg hover:bg-white cursor-pointer transition bg-white/50">
+                                        <input type="checkbox" value="baidu" class="search-provider-checkbox w-4 h-4 text-green-600 rounded focus:ring-green-500">
                                         <span class="text-sm text-slate-700">Baidu (<span data-i18n="search_chinese">中文</span>)</span>
                                     </label>
-                                    <label class="flex items-center space-x-2 p-2 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition">
-                                        <input type="checkbox" value="duckduckgo" class="search-provider-checkbox w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
+                                    <label class="flex items-center space-x-2 p-2 border border-green-200 rounded-lg hover:bg-white cursor-pointer transition bg-white/50">
+                                        <input type="checkbox" value="duckduckgo" class="search-provider-checkbox w-4 h-4 text-green-600 rounded focus:ring-green-500">
                                         <span class="text-sm text-slate-700">DuckDuckGo</span>
                                     </label>
-                                    <label class="flex items-center space-x-2 p-2 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition">
-                                        <input type="checkbox" value="yahoo" class="search-provider-checkbox w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
+                                    <label class="flex items-center space-x-2 p-2 border border-green-200 rounded-lg hover:bg-white cursor-pointer transition bg-white/50">
+                                        <input type="checkbox" value="yahoo" class="search-provider-checkbox w-4 h-4 text-green-600 rounded focus:ring-green-500">
                                         <span class="text-sm text-slate-700">Yahoo (<span data-i18n="search_stable_good">稳定</span>)</span>
                                     </label>
-                                    <label class="flex items-center space-x-2 p-2 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition">
-                                        <input type="checkbox" value="mojeek" class="search-provider-checkbox w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
+                                    <label class="flex items-center space-x-2 p-2 border border-green-200 rounded-lg hover:bg-white cursor-pointer transition bg-white/50">
+                                        <input type="checkbox" value="mojeek" class="search-provider-checkbox w-4 h-4 text-green-600 rounded focus:ring-green-500">
                                         <span class="text-sm text-slate-700">Mojeek (<span data-i18n="search_english">英文</span>)</span>
                                     </label>
-                                    <label class="flex items-center space-x-2 p-2 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition">
-                                        <input type="checkbox" value="google" class="search-provider-checkbox w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
+                                    <label class="flex items-center space-x-2 p-2 border border-green-200 rounded-lg hover:bg-white cursor-pointer transition bg-white/50">
+                                        <input type="checkbox" value="google" class="search-provider-checkbox w-4 h-4 text-green-600 rounded focus:ring-green-500">
                                         <span class="text-sm text-slate-700">Google (<span class="text-green-600 font-bold">API</span>)</span>
                                     </label>
-                                    <label class="flex items-center space-x-2 p-2 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition">
-                                        <input type="checkbox" value="tavily" class="search-provider-checkbox w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
+                                    <label class="flex items-center space-x-2 p-2 border border-green-200 rounded-lg hover:bg-white cursor-pointer transition bg-white/50">
+                                        <input type="checkbox" value="tavily" class="search-provider-checkbox w-4 h-4 text-green-600 rounded focus:ring-green-500">
                                         <span class="text-sm text-slate-700">Tavily (Key)</span>
                                     </label>
                                 </div>
                             </div>
                             <div class="space-y-1">
-                                <label class="text-xs font-bold text-slate-500 uppercase">Tavily API Key</label>
+                                <label class="text-xs font-bold text-slate-600 uppercase">Tavily API Key</label>
                                 <input type="password" id="settings-key-tavily" placeholder="tvly-..." 
-                                       class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
+                                       class="w-full px-3 py-2 border border-green-200 rounded-lg outline-none focus:border-green-500 transition bg-white">
                             </div>
                             <div class="space-y-1">
-                                <label class="text-xs font-bold text-slate-500 uppercase flex items-center">
+                                <label class="text-xs font-bold text-slate-600 uppercase flex items-center">
                                     <span class="mr-2">Google API Key</span>
-                                    <a href="https://developers.google.com/custom-search/v1/overview" target="_blank" class="text-blue-500 hover:text-blue-700 text-xs">
+                                    <a href="https://developers.google.com/custom-search/v1/overview" target="_blank" class="text-green-500 hover:text-green-700 text-xs">
                                         (获取 ↗️)
                                     </a>
                                 </label>
                                 <input type="password" id="settings-key-google" placeholder="AIzaSy..." 
-                                       class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
+                                       class="w-full px-3 py-2 border border-green-200 rounded-lg outline-none focus:border-green-500 transition bg-white">
                             </div>
                             <div class="space-y-1">
-                                <label class="text-xs font-bold text-slate-500 uppercase flex items-center">
+                                <label class="text-xs font-bold text-slate-600 uppercase flex items-center">
                                     <span class="mr-2">Google Search Engine ID</span>
-                                    <a href="https://programmablesearchengine.google.com/" target="_blank" class="text-blue-500 hover:text-blue-700 text-xs">
+                                    <a href="https://programmablesearchengine.google.com/" target="_blank" class="text-green-500 hover:text-green-700 text-xs">
                                         (获取 ↗️)
                                     </a>
                                 </label>
                                 <input type="text" id="settings-google-cx" placeholder="003ac4d2..." 
-                                       class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
+                                       class="w-full px-3 py-2 border border-green-200 rounded-lg outline-none focus:border-green-500 transition bg-white">
                                 <p class="text-xs text-slate-500 mt-1">
                                     💡 免费配额：100次/天 | 付费：$5/1000次 | 国内可访问
                                 </p>
                             </div>
                             <div class="space-y-1">
-                                <label class="text-xs font-bold text-slate-500 uppercase" data-i18n="settings_browser_path">浏览器可执行文件路径 (Baidu/Bing 搜索)</label>
+                                <label class="text-xs font-bold text-slate-600 uppercase" data-i18n="settings_browser_path">浏览器可执行文件路径 (Baidu/Bing 搜索)</label>
                                 <input type="text" id="settings-browser-path" placeholder="例如: C:\Program Files\Google\Chrome\Application\chrome.exe" 
                                        data-i18n-placeholder="settings_browser_path_placeholder"
-                                       class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
+                                       class="w-full px-3 py-2 border border-green-200 rounded-lg outline-none focus:border-green-500 transition bg-white">
                             </div>
                         </div>
                     </section>
