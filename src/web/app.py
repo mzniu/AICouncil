@@ -349,6 +349,9 @@ def rereport():
     
     data = request.json or {}
     selected_backend = data.get('backend') or current_config.get('backend', 'deepseek')
+    selected_model = data.get('model')  # 获取前端传递的模型
+    reasoning = data.get('reasoning')   # 获取推理配置
+    agent_configs = data.get('agent_configs')  # 获取各角色独立配置
     
     workspace_path = get_workspace_dir() / current_session_id
     if not workspace_path.exists():
@@ -359,22 +362,36 @@ def rereport():
         global is_running
         is_running = True
         try:
-            # 根据选择的后端确定模型
-            if selected_backend == 'deepseek':
-                model_name = config.DEEPSEEK_MODEL
-            elif selected_backend == 'openrouter':
-                model_name = config.OPENROUTER_MODEL
-            elif selected_backend == 'openai':
-                model_name = config.OPENAI_MODEL
-            elif selected_backend == 'aliyun':
-                model_name = config.ALIYUN_MODEL
+            # 确定模型名称：优先使用前端传递的模型，否则使用默认值
+            if not selected_model:
+                if selected_backend == 'deepseek':
+                    model_name = config.DEEPSEEK_MODEL
+                elif selected_backend == 'openrouter':
+                    model_name = config.OPENROUTER_MODEL
+                elif selected_backend == 'openai':
+                    model_name = config.OPENAI_MODEL
+                elif selected_backend == 'aliyun':
+                    model_name = config.ALIYUN_MODEL
+                elif selected_backend == 'azure':
+                    model_name = getattr(config, 'AZURE_OPENAI_DEPLOYMENT_NAME', 'gpt-4o')
+                elif selected_backend == 'anthropic':
+                    model_name = getattr(config, 'ANTHROPIC_MODEL', 'claude-3-5-sonnet-20241022')
+                else:
+                    model_name = config.MODEL_NAME
             else:
-                model_name = config.MODEL_NAME
+                model_name = selected_model
 
+            # 构建模型配置
             model_cfg = {
                 "type": selected_backend,
                 "model": model_name
             }
+            
+            # 添加推理配置
+            if reasoning:
+                model_cfg["reasoning"] = reasoning
+            
+            # 重新生成报告（注意：agent_configs不影响报告生成，因为使用的是已保存的讨论数据）
             generate_report_from_workspace(workspace_path, model_cfg)
         except Exception as e:
             print(f"重新生成报告失败: {e}")

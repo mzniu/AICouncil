@@ -1742,6 +1742,28 @@ function confirmSatisfied() {
                 if (isRunning) return;
                 
                 const backend = document.getElementById('backend-select').value;
+                const model = document.getElementById('global-model-input').value;
+                const reasoningEffort = document.getElementById('global-reasoning-input').value;
+                
+                // 收集 Agent 配置
+                const agentConfigs = {};
+                document.querySelectorAll('.agent-backend').forEach(select => {
+                    const agentId = select.dataset.agent;
+                    const agentBackend = select.value;
+                    const modelEl = document.querySelector(`.agent-model[data-agent="${agentId}"]`);
+                    const reasoningEl = document.querySelector(`.agent-reasoning[data-agent="${agentId}"]`);
+                    
+                    const agentModel = modelEl ? modelEl.value.trim() : '';
+                    const agentReasoning = reasoningEl ? reasoningEl.value : '';
+                    
+                    if (agentBackend !== 'default' || agentModel !== '' || agentReasoning !== '') {
+                        agentConfigs[agentId] = {
+                            type: agentBackend === 'default' ? backend : agentBackend,
+                            model: agentModel || undefined,
+                            reasoning: agentReasoning ? { effort: agentReasoning } : undefined
+                        };
+                    }
+                });
                 
                 // 清空旧报告内容并显示加载状态
                 if (reportIframe) {
@@ -1754,7 +1776,12 @@ function confirmSatisfied() {
                     const response = await fetch('/api/rereport', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ backend: backend })
+                        body: JSON.stringify({ 
+                            backend: backend,
+                            model: model || undefined,
+                            reasoning: reasoningEffort ? { effort: reasoningEffort } : undefined,
+                            agent_configs: Object.keys(agentConfigs).length > 0 ? agentConfigs : null
+                        })
                     });
                     const data = await response.json();
                     if (data.status !== 'ok') {
