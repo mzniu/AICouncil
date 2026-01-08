@@ -1,0 +1,30 @@
+name: test_role
+display_name: 测试角色 (Test Role)
+version: "1.0.0"
+description: 用于单元测试的示例角色
+
+stages:
+  stage1:
+    prompt_file: test_role_stage1.md
+    schema: LeaderSummary
+    input_vars: [inputs, current_time]
+    
+  stage2:
+    prompt_file: test_role_stage2.md
+    schema: PlanSchema
+    input_vars: [planner_id, issue]
+
+default_model:
+  type: deepseek
+  model: deepseek-reasoner
+
+parameters:
+  max_retries: 3
+  supports_streaming: true
+  
+tags: [test, example]
+
+ui:
+  icon: "🧪"
+  color: "#6366f1"
+  enabled: true

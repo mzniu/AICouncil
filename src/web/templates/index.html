@@ -235,6 +235,11 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                     </svg>
                 </button>
+                <button onclick="toggleRolesModal()" class="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg border border-slate-600 transition group" title="角色管理" data-i18n-title="nav_roles">
+                    <svg class="w-5 h-5 text-slate-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                    </svg>
+                </button>
                 <button onclick="togglePresetsModal()" class="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg border border-slate-600 transition group" title="元老院编制" data-i18n-title="nav_presets">
                     <svg class="w-5 h-5 text-slate-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
@@ -797,6 +802,50 @@
             </div>
         </div>
 
+        <!-- 角色管理模态框 -->
+        <div id="roles-modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[150] flex items-center justify-center">
+            <div class="bg-white w-full max-w-4xl rounded-2xl shadow-2xl p-8 m-4 max-h-[90vh] flex flex-col transform transition-all scale-100">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-black text-slate-800 flex items-center">
+                        <span class="mr-3 text-3xl">👥</span> <span data-i18n="roles_title">角色管理</span>
+                    </h2>
+                    <button onclick="toggleRolesModal()" class="text-slate-400 hover:text-slate-600 transition">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+
+                <!-- 角色列表 -->
+                <div class="flex-1 overflow-y-auto pr-2">
+                    <div id="roles-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- 动态插入角色卡片 -->
+                        <div class="text-center text-gray-400 py-8">加载中...</div>
+                    </div>
+                </div>
+
+                <!-- 角色详情面板 -->
+                <div id="role-detail-panel" class="hidden mt-6 border-t border-slate-200 pt-6 max-h-[40vh] overflow-y-auto">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h3 id="role-detail-name" class="text-xl font-bold text-slate-800"></h3>
+                            <p id="role-detail-desc" class="text-sm text-slate-600 mt-1"></p>
+                        </div>
+                        <button onclick="closeRoleDetail()" class="text-slate-400 hover:text-slate-600">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+                    <div id="role-detail-content" class="space-y-4">
+                        <!-- 详情内容动态插入 -->
+                    </div>
+                </div>
+
+                <div class="mt-6 pt-4 border-t border-slate-100 flex justify-end">
+                    <button onclick="toggleRolesModal()" class="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition" data-i18n="btn_close">
+                        关闭
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <script>
             const translations = {
                 zh: {
@@ -804,6 +853,7 @@
                     nav_subtitle: "元老院议事厅",
                     nav_toggle_logs: "切换日志显示",
                     nav_settings: "系统设置",
+                    nav_roles: "角色管理",
                     nav_presets: "元老院编制",
                     input_issue_label: "议题内容",
                     input_issue_placeholder: "请输入您想要讨论的议题（支持多行输入，Enter 发送，Shift+Enter 换行）...",
@@ -868,6 +918,17 @@
                     alert_title: "提示",
                     btn_ok: "确定",
                     settings_modal_title: "系统全局设置",
+                    roles_title: "角色管理",
+                    role_tag_core: "核心角色",
+                    role_tag_advanced: "高级角色",
+                    role_version: "版本",
+                    role_stages: "阶段",
+                    role_parameters: "参数",
+                    role_btn_detail: "查看详情",
+                    role_btn_reload: "重新加载",
+                    role_reload_success: "角色配置已重新加载",
+                    role_reload_failed: "重新加载失败",
+                    role_prompt_preview: "提示词预览",
                     settings_api_keys: "API 密钥配置",
                     settings_search_engines: "搜索增强引擎 (可多选)",
                     settings_browser_path: "浏览器可执行文件路径 (Baidu/Bing 搜索)",
@@ -1000,6 +1061,17 @@
                     alert_title: "Alert",
                     btn_ok: "OK",
                     settings_modal_title: "Global Settings",
+                    roles_title: "Role Management",
+                    role_tag_core: "Core Role",
+                    role_tag_advanced: "Advanced Role",
+                    role_version: "Version",
+                    role_stages: "Stages",
+                    role_parameters: "Parameters",
+                    role_btn_detail: "View Details",
+                    role_btn_reload: "Reload",
+                    role_reload_success: "Role configuration reloaded",
+                    role_reload_failed: "Reload failed",
+                    role_prompt_preview: "Prompt Preview",
                     settings_api_keys: "API Key Configuration",
                     settings_search_engines: "Search Engines (Multi-select)",
                     settings_browser_path: "Browser Executable Path (Baidu/Bing Search)",
@@ -3529,6 +3601,218 @@ function confirmSatisfied() {
                     showAlert(t('msg_save_failed') + ': ' + error.message, t('title_error'), 'error');
                 }
             }
+            
+            // --- 角色管理功能 ---
+
+            async function toggleRolesModal() {
+                const modal = document.getElementById('roles-modal');
+                if (modal.classList.contains('hidden')) {
+                    modal.classList.remove('hidden');
+                    await loadRolesList();
+                } else {
+                    modal.classList.add('hidden');
+                    closeRoleDetail();
+                }
+            }
+
+            async function loadRolesList(tagFilter = null) {
+                try {
+                    let url = '/api/roles';
+                    if (tagFilter) {
+                        url += `?tag=${tagFilter}`;
+                    }
+                    
+                    const response = await fetch(url);
+                    const data = await response.json();
+                    console.log('Roles API response:', data); // Debug log
+                    
+                    if (data.status === 'success') {
+                        if (!data.roles) {
+                            console.error('API returned success but no roles array:', data);
+                            showAlert('角色数据格式错误：缺少roles字段', t('title_error'), 'error');
+                            return;
+                        }
+                        renderRolesList(data.roles);
+                    } else {
+                        showAlert(t('msg_load_failed') + ': ' + (data.message || 'Unknown error'), t('title_error'), 'error');
+                    }
+                } catch (error) {
+                    console.error('Failed to load roles:', error);
+                    showAlert(t('msg_load_failed') + ': ' + error.message, t('title_error'), 'error');
+                }
+            }
+
+            function renderRolesList(roles) {
+                const listContainer = document.getElementById('roles-list');
+                if (!listContainer) return;
+
+                listContainer.innerHTML = '';
+
+                if (!roles || !Array.isArray(roles)) {
+                    console.error('renderRolesList: roles is not an array:', roles);
+                    listContainer.innerHTML = `<div class="col-span-2 text-center text-red-400 py-8">数据格式错误</div>`;
+                    return;
+                }
+
+                if (roles.length === 0) {
+                    listContainer.innerHTML = `<div class="col-span-2 text-center text-gray-400 py-8">暂无角色</div>`;
+                    return;
+                }
+
+                roles.forEach(role => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-gradient-to-br from-slate-50 to-slate-100 p-4 rounded-xl border border-slate-200 hover:shadow-lg transition group';
+                    
+                    const colorMap = {
+                        'blue': 'bg-blue-500',
+                        'green': 'bg-green-500',
+                        'purple': 'bg-purple-500',
+                        'orange': 'bg-orange-500',
+                        'red': 'bg-red-500',
+                        'pink': 'bg-pink-500',
+                        'indigo': 'bg-indigo-500'
+                    };
+                    
+                    const bgColor = colorMap[role.ui.color] || 'bg-slate-500';
+                    const tags = role.tags.map(tag => {
+                        const tagColor = tag === 'core' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600';
+                        const tagText = tag === 'core' ? t('role_tag_core') : (tag === 'advanced' ? t('role_tag_advanced') : tag);
+                        return `<span class="px-2 py-0.5 ${tagColor} rounded-full text-xs">${tagText}</span>`;
+                    }).join(' ');
+                    
+                    card.innerHTML = `
+                        <div class="flex items-start justify-between mb-3">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 ${bgColor} rounded-lg flex items-center justify-center text-white text-xl">
+                                    ${role.ui.icon}
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-slate-800">${role.display_name}</h4>
+                                    <p class="text-xs text-slate-500">${t('role_version')}: ${role.version}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-3 line-clamp-2">${role.ui.description_short}</p>
+                        <div class="flex flex-wrap gap-1 mb-3">
+                            ${tags}
+                        </div>
+                        <div class="flex justify-between items-center pt-2 border-t border-slate-200">
+                            <div class="text-xs text-slate-500">
+                                ${t('role_stages')}: ${role.stages.length}
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="showRoleDetail('${role.name}')" 
+                                        class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg transition">
+                                    ${t('role_btn_detail')}
+                                </button>
+                                <button onclick="reloadRole('${role.name}')" 
+                                        class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded-lg transition">
+                                    ${t('role_btn_reload')}
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    
+                    listContainer.appendChild(card);
+                });
+            }
+
+            async function showRoleDetail(roleName) {
+                try {
+                    const response = await fetch(`/api/roles/${roleName}`);
+                    const data = await response.json();
+                    
+                    if (data.status === 'success') {
+                        const role = data.role;
+                        
+                        document.getElementById('role-detail-name').textContent = role.display_name;
+                        document.getElementById('role-detail-desc').textContent = role.ui.description_full;
+                        
+                        let contentHtml = '';
+                        
+                        // 阶段信息
+                        if (role.stages && role.stages.length > 0) {
+                            contentHtml += `
+                                <section class="space-y-2">
+                                    <h4 class="text-sm font-bold text-slate-700">${t('role_stages')}</h4>
+                                    ${role.stages.map(stage => `
+                                        <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                            <div class="font-bold text-slate-800 mb-1">${stage.name}</div>
+                                            <div class="text-xs text-slate-600">${stage.description || '无描述'}</div>
+                                            ${stage.input_vars && stage.input_vars.length > 0 ? `
+                                                <div class="text-xs text-slate-500 mt-2">
+                                                    输入变量: ${stage.input_vars.join(', ')}
+                                                </div>
+                                            ` : ''}
+                                        </div>
+                                    `).join('')}
+                                </section>
+                            `;
+                        }
+                        
+                        // 参数信息
+                        if (role.parameters) {
+                            contentHtml += `
+                                <section class="space-y-2">
+                                    <h4 class="text-sm font-bold text-slate-700">${t('role_parameters')}</h4>
+                                    <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                        <div class="grid grid-cols-2 gap-2 text-xs">
+                                            <div><span class="text-slate-500">Temperature:</span> <span class="font-mono">${role.parameters.temperature}</span></div>
+                                            <div><span class="text-slate-500">Max Retries:</span> <span class="font-mono">${role.parameters.max_retries}</span></div>
+                                        </div>
+                                    </div>
+                                </section>
+                            `;
+                        }
+                        
+                        // 提示词预览
+                        if (role.prompt_preview) {
+                            contentHtml += `
+                                <section class="space-y-2">
+                                    <h4 class="text-sm font-bold text-slate-700">${t('role_prompt_preview')}</h4>
+                                    <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                        <pre class="text-xs text-slate-600 whitespace-pre-wrap font-mono">${role.prompt_preview}</pre>
+                                    </div>
+                                </section>
+                            `;
+                        }
+                        
+                        document.getElementById('role-detail-content').innerHTML = contentHtml;
+                        document.getElementById('role-detail-panel').classList.remove('hidden');
+                    } else {
+                        showAlert(t('msg_load_failed') + ': ' + data.message, t('title_error'), 'error');
+                    }
+                } catch (error) {
+                    console.error('Failed to load role detail:', error);
+                    showAlert(t('msg_load_failed') + ': ' + error.message, t('title_error'), 'error');
+                }
+            }
+
+            function closeRoleDetail() {
+                document.getElementById('role-detail-panel').classList.add('hidden');
+            }
+
+            async function reloadRole(roleName) {
+                try {
+                    const response = await fetch(`/api/roles/${roleName}/reload`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    const data = await response.json();
+                    
+                    if (data.status === 'success') {
+                        showAlert(t('role_reload_success'), t('title_success'));
+                        await loadRolesList(); // 重新加载角色列表
+                        closeRoleDetail(); // 关闭详情面板
+                    } else {
+                        showAlert(t('role_reload_failed') + ': ' + data.message, t('title_error'), 'error');
+                    }
+                } catch (error) {
+                    console.error('Failed to reload role:', error);
+                    showAlert(t('role_reload_failed') + ': ' + error.message, t('title_error'), 'error');
+                }
+            }
+
             // --- 编制管理功能 ---
 
             function togglePresetsModal() {

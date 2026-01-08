@@ -1,0 +1,31 @@
+name: reporter
+display_name: 记录员 (Reporter)
+version: "1.0.0"
+description: |
+  记录员角色，负责根据完整议事记录生成最终HTML报告。
+  强调可视化、交互性和专业性。
+
+stages:
+  generate:
+    prompt_file: reporter_generate.md
+    schema: null  # Reporter直接输出HTML，不使用Pydantic schema
+    input_vars:
+      - final_data
+      - search_references
+
+default_model: deepseek-chat
+
+parameters:
+  max_retries: 2
+  temperature: 0.6
+  max_tokens: 8000
+
+tags:
+  - reporting
+  - visualization
+  - final
+
+ui:
+  icon: "📝"
+  color: "#F59E0B"
+  description_short: "生成专业的可视化报告"

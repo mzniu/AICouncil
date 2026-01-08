@@ -712,6 +712,143 @@ def playwright_status():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+@app.route('/api/roles', methods=['GET'])
+def get_roles():
+    """获取所有可用角色列表"""
+    try:
+        from src.agents.role_manager import RoleManager
+        
+        rm = RoleManager()
+        tag_filter = request.args.get('tag')  # 可选的tag过滤
+        
+        if tag_filter:
+            roles = rm.list_roles(tag=tag_filter)
+        else:
+            roles = rm.list_roles()
+        
+        # 转换为JSON友好格式
+        roles_data = []
+        for role in roles:
+            role_info = {
+                "name": role.name,
+                "display_name": role.display_name,
+                "version": role.version,
+                "description": role.description,
+                "default_model": role.default_model,
+                "tags": role.tags,
+                "ui": role.ui,
+                "stages": [
+                    {
+                        "name": stage_name,
+                        "prompt_file": stage.prompt_file,
+                        "schema": stage.schema,
+                        "input_vars": stage.input_vars,
+                        "description": stage.description if hasattr(stage, 'description') else None
+                    }
+                    for stage_name, stage in role.stages.items()
+                ]
+            }
+            roles_data.append(role_info)
+        
+        return jsonify({
+            "status": "success",
+            "total": len(roles_data),
+            "roles": roles_data
+        })
+        
+    except Exception as e:
+        logger.error(f"[API] 获取角色列表失败: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/roles/<role_name>', methods=['GET'])
+def get_role_detail(role_name):
+    """获取指定角色的详细信息"""
+    try:
+        from src.agents.role_manager import RoleManager
+        
+        rm = RoleManager()
+        
+        if not rm.has_role(role_name):
+            return jsonify({"status": "error", "message": f"角色不存在: {role_name}"}), 404
+        
+        role = rm.get_role(role_name)
+        
+        # 获取角色的详细信息（包括prompt内容）
+        role_detail = {
+            "name": role.name,
+            "display_name": role.display_name,
+            "version": role.version,
+            "description": role.description,
+            "default_model": role.default_model,
+            "parameters": role.parameters,
+            "tags": role.tags,
+            "ui": role.ui,
+            "stages": []
+        }
+        
+        # 加载每个stage的prompt内容
+        for stage_name, stage in role.stages.items():
+            prompt_content = rm.load_prompt(role_name, stage_name)
+            role_detail["stages"].append({
+                "name": stage_name,
+                "prompt_file": stage.prompt_file,
+                "schema": stage.schema,
+                "input_vars": stage.input_vars,
+                "description": stage.description if hasattr(stage, 'description') else None,
+                "prompt_preview": prompt_content[:500] + "..." if len(prompt_content) > 500 else prompt_content
+            })
+        
+        # 合并所有prompt预览作为整体预览
+        all_prompts = [rm.load_prompt(role_name, stage_name) for stage_name in role.stages.keys()]
+        full_prompt = "\n\n".join(all_prompts)
+        role_detail["prompt_preview"] = full_prompt[:500] + "..." if len(full_prompt) > 500 else full_prompt
+        
+        return jsonify({
+            "status": "success",
+            "role": role_detail
+        })
+        
+    except Exception as e:
+        logger.error(f"[API] 获取角色详情失败: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/roles/<role_name>/reload', methods=['POST'])
+def reload_role(role_name):
+    """热加载指定角色（重新从文件读取配置）"""
+    try:
+        from src.agents.role_manager import RoleManager
+        
+        rm = RoleManager()
+        
+        if not rm.has_role(role_name):
+            return jsonify({"status": "error", "message": f"角色不存在: {role_name}"}), 404
+        
+        # 重新加载角色配置
+        rm.reload_role(role_name)
+        
+        # 返回更新后的角色信息
+        role = rm.get_role(role_name)
+        
+        return jsonify({
+            "status": "success",
+            "message": f"角色 {role.display_name} 已重新加载",
+            "data": {
+                "name": role.name,
+                "version": role.version,
+                "display_name": role.display_name
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"[API] 重新加载角色失败: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @app.route('/api/playwright/install', methods=['POST'])
 def install_playwright():
     """安装Playwright + Chromium"""

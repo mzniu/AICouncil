@@ -1,0 +1,40 @@
+name: leader
+display_name: 议长 (Leader)
+version: "1.0.0"
+description: |
+  元老院议长角色，负责议题拆解、讨论流程组织、共识汇总。
+  具备两种工作模式：
+  - decomposition: 中间轮次，负责拆解议题并规划下一轮讨论方向
+  - summary: 最终轮次，负责全局总结和报告准备
+
+stages:
+  decomposition:
+    prompt_file: leader_decomposition.md
+    schema: LeaderSummary
+    input_vars:
+      - inputs
+      - current_time
+  
+  summary:
+    prompt_file: leader_summary.md
+    schema: LeaderSummary
+    input_vars:
+      - inputs
+      - current_time
+
+default_model: deepseek-reasoner
+
+parameters:
+  max_retries: 2
+  temperature: 0.7
+  max_tokens: 4000
+
+tags:
+  - orchestration
+  - synthesis
+  - core
+
+ui:
+  icon: "⚖️"
+  color: "#1E40AF"
+  description_short: "组织协调讨论流程，汇总各方观点"

@@ -1,0 +1,35 @@
+name: report_auditor
+display_name: 报告审核官 (Report Auditor)
+version: "1.0.0"
+description: |
+  报告审核官角色，负责根据用户反馈修订报告内容。
+  确保修订基于原始讨论结果，严禁虚构数据。
+
+stages:
+  revision:
+    prompt_file: report_auditor_revision.md
+    schema: ReportAuditorSchema
+    input_vars:
+      - leader_summary
+      - current_html
+      - user_feedback
+
+default_model: deepseek-reasoner
+
+parameters:
+  max_retries: 2
+  temperature: 0.7
+  max_tokens: 4000
+
+tags:
+  - report
+  - revision
+  - specialized
+
+ui:
+  name: "报告审核官"
+  icon: "📝"
+  color: "#10b981"
+  description_short: "根据用户反馈修订报告"
+  description: "根据用户反馈修订报告内容，确保修改基于原始讨论"
+  group: "specialized"

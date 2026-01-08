@@ -206,701 +206,116 @@ def stream_agent_output(chain, prompt_vars, agent_name, role_type, event_type="a
     return full_content, search_results
 
 def make_planner_chain(model_config: Dict[str, Any]):
+    """创建策论家链（使用RoleManager）"""
+    from src.agents.role_manager import RoleManager
+    
     llm = AdapterLLM(backend_config=ModelConfig(**model_config))
-    prompt = PromptTemplate.from_template(
-        """
-        **IMPORTANT: You MUST respond in the SAME LANGUAGE as the input "议题/指令" (e.g., if the input is in Chinese, your entire response must be in Chinese).**
-        **CRITICAL: Your internal thinking/reasoning process MUST also be in the SAME LANGUAGE as the input.**
-
-        你是策论家（创意者）。你的任务是根据议长的指令产出或迭代可执行方案。
-        
-        **事实准确性原则**：你必须确保输出的所有数据、政策、技术细节均有据可查。**严禁胡编乱造**，严禁虚构不存在的法律法规或技术指标。
-        
-        **联网搜索优先原则**：为了确保方案的先进性与事实准确性，**强烈建议你在第一轮或面对不熟悉的领域时，优先使用搜索功能**。
-        
-        **联网搜索技能**：如果你需要了解最新的事实、数据或背景信息，可以在输出 JSON 之前，先输出 `[SEARCH: 具体的搜索查询语句]`。
-        **搜索建议**：
-        1. 请使用**自然语言短语**（如 `[SEARCH: 2025年北京房地产最新政策]`）。
-        2. **严禁将关键词拆得过细**（不要使用空格分隔每一个词）。
-        3. **极简原则**：搜索词必须控制在 **20个字以内**。请提炼最核心的关键词短语，**严禁直接复制背景或长句**。
-        4. **严禁包含无意义的填充词**（如“内容”、“汇总”、“列表”、“有哪些”）。
-        **重要：如果你决定搜索，请仅输出搜索指令并立即停止，不要输出任何 JSON 内容。** 系统返回结果后，你会重新获得机会输出最终方案。
-        注意：请务必提供具体的搜索关键词，不要直接照抄示例。每轮你只能使用一次搜索。
-        
-        盲评模式：不得参考或引用其他策论家/监察官的观点。
-        
-        如果你收到了“上一轮方案”和“监察官反馈”，请在原有方案基础上进行针对性修正和迭代，而不是推翻重来。
-        
-        严格遵守以下 JSON 格式，不要输出任何其他文字：
-        {{
-            "id": "{planner_id}",
-            "core_idea": "方案核心思路",
-            "steps": ["步骤1", "步骤2"],
-            "feasibility": {{
-                "advantages": ["优点1", "优点2"],
-                "requirements": ["资源需求1", "资源需求2"]
-            }},
-            "limitations": ["局限性1", "局限性2"]
-        }}
-        
-        议题/指令：{issue}
-        上一轮方案：{previous_plan}
-        监察官反馈：{feedback}
-        """
-    )
+    role_manager = RoleManager()
+    
+    # 从RoleManager加载prompt和配置
+    stage_name = "proposal"  # planner的stage名称
+    prompt_text = role_manager.load_prompt("planner", stage_name)
+    role_config = role_manager.get_role("planner")
+    input_vars = role_config.stages[stage_name].input_vars
+    
+    prompt = PromptTemplate(template=prompt_text, input_variables=input_vars)
     return prompt | llm
+
 
 
 def make_auditor_chain(model_config: Dict[str, Any]):
+    """创建监察官链（使用RoleManager）"""
+    from src.agents.role_manager import RoleManager
+    
     llm = AdapterLLM(backend_config=ModelConfig(**model_config))
-    prompt = PromptTemplate.from_template(
-        """
-        **IMPORTANT: You MUST respond in the SAME LANGUAGE as the input "议题背景" (e.g., if the input is in Chinese, your entire response must be in Chinese).**
-        **CRITICAL: Your internal thinking/reasoning process MUST also be in the SAME LANGUAGE as the input.**
-
-        你是一名资深监察官（质疑者），以严格、犀利、不留情面著称。你的职责是对策论家提出的方案进行深度审查，确保没有任何漏洞或风险被忽视。
-        
-        **核心审查原则**：
-        1. **严格审查**：你必须以最严苛的标准审视每个方案，不要轻易给出"合格"或"优秀"评级。
-        2. **深挖问题**：每个方案至少提出 **3-5 个质疑点**，涵盖以下维度：
-           - 逻辑漏洞：方案的推理链条是否有跳跃或矛盾？
-           - 可行性风险：资源、时间、技术、人员是否能支撑实施？
-           - 成本与收益：投入产出比是否合理？有无隐性成本被忽视？
-           - 边界条件：在极端情况或边缘场景下，方案是否仍然有效？
-           - 替代方案：是否存在更优的替代路径被忽略？
-           - 依赖风险：方案是否过度依赖某些假设或外部条件？
-        3. **具体建议**：针对每个质疑点，必须给出**具体、可操作的改进建议**，而非泛泛而谈。
-        4. **评级从严**：
-           - "优秀"：仅当方案逻辑严密、风险可控、操作性强且创新性高时给出
-           - "合格"：方案可行但存在明显改进空间
-           - "需重构"：方案核心逻辑有重大缺陷，需要大幅修改
-           - "不可行"：方案存在致命问题，无法实施
-        
-        **事实准确性原则**：你的审计意见必须基于真实的事实和数据。**严禁胡编乱造**，严禁虚构不存在的风险或标准。
-        
-        **联网搜索优先原则**：为了提供更具权威性的审计意见，**强烈建议你针对方案中的关键数据或技术路径进行搜索核实**。
-        
-        **联网搜索技能**：如果你需要核实方案中的事实、数据或可行性，可以在输出 JSON 之前，先输出 `[SEARCH: 具体的搜索查询语句]`。
-        **搜索建议**：
-        1. 请使用**自然语言短语**（如 `[SEARCH: 某某技术的最新行业标准]`）。
-        2. **严禁将关键词拆得过细**（不要使用空格分隔每一个词）。
-        3. **极简原则**：搜索词必须控制在 **20个字以内**。请提炼最核心的关键词短语，**严禁直接复制背景或长句**。
-        4. **严禁包含无意义的填充词**（如“内容”、“汇总”、“列表”、“有哪些”）。
-        **重要：如果你决定搜索，请仅输出搜索指令并立即停止，不要输出任何 JSON 内容。** 系统返回结果后，你会重新获得机会输出最终审计。
-        注意：请务必提供具体的搜索关键词，不要直接照抄示例。每轮你只能使用一次搜索。
-        
-        盲评模式：不得参考其他监察官输出。
-        ## 注意不要提出与议题无关的质疑点。
-        
-        严格遵守以下 JSON 格式，不要输出任何其他文字：
-        {{
-            "auditor_id": "{auditor_id}",
-            "reviews": [
-                {{
-                    "plan_id": "方案ID",
-                    "issues": ["质疑点1（含具体依据）", "质疑点2（含逻辑分析）", "质疑点3（含风险评估）", "质疑点4", "质疑点5"],
-                    "suggestions": ["改进建议1（具体可操作）", "改进建议2（附实施路径）", "改进建议3"],
-                    "risk_assessment": "对该方案的综合风险评估（高/中/低）及主要风险点",
-                    "rating": "评级(优秀/合格/需重构/不可行)"
-                }}
-            ],
-            "overall_ranking": "所有方案的优劣排序（从优到劣）",
-            "key_controversies": ["核心争议点1", "核心争议点2"],
-            "summary": "汇总所有方案的优劣势分析及综合建议"
-        }}
-        
-        方案列表：{plans}
-        议题背景：{issue}
-        """
-    )
+    role_manager = RoleManager()
+    
+    # 从RoleManager加载prompt和配置
+    stage_name = "review"  # auditor的stage名称
+    prompt_text = role_manager.load_prompt("auditor", stage_name)
+    role_config = role_manager.get_role("auditor")
+    input_vars = role_config.stages[stage_name].input_vars
+    
+    prompt = PromptTemplate(template=prompt_text, input_variables=input_vars)
     return prompt | llm
 
 
-def _get_leader_prompt_for_intermediate_round() -> str:
-    """中间轮次的prompt - 包含"下一轮讨论方向"要求"""
-    return """
-        **IMPORTANT: You MUST respond in the SAME LANGUAGE as the input "输入信息" (e.g., if the input is in Chinese, your entire response must be in Chinese).**
-        **CRITICAL: Your internal thinking/reasoning process MUST also be in the SAME LANGUAGE as the input.**
-
-        你是本次讨论的议长（组织者）。
-        任务：
-        1) 拆解用户议题，提取核心目标与关键问题；
-        2) 为本次议题设计一份最终报告的结构（report_design）。**核心要求：大纲必须紧扣用户原始问题，确保每个模块都能为回答该问题提供实质性贡献，严禁偏离主题**；
-        3) 在每轮结束后，根据多位策论家/监察官的JSON输出进行去重、汇总与判定；
-        4) 删除与议题无关的内容；
-        5) 规划下一轮讨论的重点方向；
-        6) 仅以JSON格式输出汇总结果。
-        
-        **事实准确性原则**：作为议长，你必须确保对议题的拆解和汇总基于客观事实。**严禁胡编乱造**，严禁虚构行业背景或虚假共识。
-        
-        **联网搜索优先原则**：作为议长，**强烈建议你在拆解议题阶段优先搜索行业背景或最新动态**，以确保讨论方向的专业性。
-        
-        **联网搜索技能**：如果你需要了解议题的背景知识或行业标准，可以在输出 JSON 之前，先输出 `[SEARCH: 具体的搜索查询语句]`。
-        **搜索建议**：
-        1. 请使用**自然语言短语**（如 `[SEARCH: 2025年人工智能行业标准]`）。
-        2. **严禁将关键词拆得过细**（不要使用空格分隔每一个词）。
-        3. **极简原则**：搜索词必须控制在 **20个字以内**。请提炼最核心的关键词短语，**严禁直接复制背景或长句**。
-        4. **严禁包含无意义的填充词**（如"内容"、"汇总"、"列表"、"有哪些"）。
-        
-        **注意**：
-        - **问题导向**：在设计 `report_design` 时，请反复检查：如果按照这个大纲生成报告，是否能完整、直接地回答用户最初提出的问题？
-        - 如果输入中包含 `original_goal`，请务必在 `decomposition` 中保留该核心目标，不要随意修改。
-        - 如果输入中包含 `previous_decomposition`，请参考之前的报告大纲设计（report_design），除非有极其重要的理由，否则**严禁大幅修改大纲结构**，以保持议事的一致性。你可以在原有大纲基础上进行微调或深化。
-        - **质疑官反馈（重要）**：如果输入中包含 `devils_advocate_feedback` 或 `last_round_da_challenge`，请务必认真对待其中的批判性意见。如果质疑合理，请在本次输出中进行针对性修正（如调整大纲、补充遗漏点、修正逻辑偏差等）。
-        
-        严格遵守以下 JSON 格式，不要输出任何其他文字：
-        {{
-            "round": 1,
-            "decomposition": {{
-                "core_goal": "本次议题的核心目标",
-                "key_questions": ["关键问题1", "关键问题2"],
-                "boundaries": "讨论边界",
-                "report_design": {{
-                    "模块名1": "该模块应如何直接回答用户问题的描述",
-                    "模块名2": "该模块应如何直接回答用户问题的描述"
-                }}
-            }},
-            "instructions": "本轮协作指令（如：请策论家聚焦XX方向）",
-            "is_final_round": false,
-            "next_round_focus": "下一轮应重点讨论的方向和需要深入的问题",
-            "da_feedback_response": "对质疑官反馈的回应（如有）",
-            "summary": {{
-                "consensus": ["共识结论1", "共识结论2"],
-                "controversies": ["争议点1", "争议点2"]
-            }}
-        }}
-        
-        注意：
-        - decomposition 必须是一个对象（dict），不能是字符串。
-        - summary 必须是一个对象（dict），包含 consensus 和 controversies 两个列表。
-        - **next_round_focus 是必填项**，请提供明确的下轮讨论方向。
-        - is_final_round 必须设置为 false。
-        - 如果是首次拆解议题，summary 部分可以为空列表。
-        
-        当前时间：{current_time}
-        输入信息（议题或上轮方案与审核意见）：{inputs}
-        """
-
-
-def _get_leader_prompt_for_final_round() -> str:
-    """最后一轮的prompt - 强调全局整合和报告准备"""
-    return """
-        **IMPORTANT: You MUST respond in the SAME LANGUAGE as the input "输入信息" (e.g., if the input is in Chinese, your entire response must be in Chinese).**
-        **CRITICAL: Your internal thinking/reasoning process MUST also be in the SAME LANGUAGE as the input.**
-
-        你是本次讨论的议长（组织者）。
-        
-        🏁 **这是最后一轮讨论！** 🏁
-        
-        任务：
-        1) 基于所有轮次的讨论，进行**全局性总结**，整合核心发现；
-        2) 提炼最关键的结论和建议，为最终报告提供高质量素材；
-        3) 识别并标注未完全解决的关键问题（如有）；
-        4) 删除与议题无关的内容；
-        5) **不需要**规划下一轮讨论方向（因为已经是最后一轮）；
-        6) 仅以JSON格式输出汇总结果。
-        
-        **事实准确性原则**：作为议长，你必须确保对议题的拆解和汇总基于客观事实。**严禁胡编乱造**，严禁虚构行业背景或虚假共识。
-        
-        **联网搜索技能**：如果你需要了解议题的背景知识或行业标准，可以在输出 JSON 之前，先输出 `[SEARCH: 具体的搜索查询语句]`。
-        **搜索建议**：
-        1. 请使用**自然语言短语**（如 `[SEARCH: 2025年人工智能行业标准]`）。
-        2. **严禁将关键词拆得过细**（不要使用空格分隔每一个词）。
-        3. **极简原则**：搜索词必须控制在 **20个字以内**。请提炼最核心的关键词短语，**严禁直接复制背景或长句**。
-        4. **严禁包含无意义的填充词**（如"内容"、"汇总"、"列表"、"有哪些"）。
-        
-        **最后一轮的特殊要求**：
-        - **全局视角**：不仅要总结本轮，更要**横向整合所有轮次的关键发现**；
-        - **结论导向**：聚焦于"我们最终得出了什么结论"，而非"下一步该做什么"；
-        - **报告准备**：summary 部分应该为 Reporter 提供结构清晰、可直接使用的核心素材；
-        - **未解决问题**：如果有关键问题未完全解决，请在 controversies 中明确标注。
-        
-        **注意**：
-        - 如果输入中包含 `original_goal`，请务必在 `decomposition` 中保留该核心目标，不要随意修改。
-        - 如果输入中包含 `previous_decomposition`，请参考之前的报告大纲设计（report_design），除非有极其重要的理由，否则**严禁大幅修改大纲结构**，以保持议事的一致性。
-        - **质疑官反馈（重要）**：如果输入中包含 `last_round_da_challenge`，请务必认真对待其中的批判性意见。如果质疑合理，请在本次输出中进行针对性修正。
-        
-        严格遵守以下 JSON 格式，不要输出任何其他文字：
-        {{
-            "round": 1,
-            "decomposition": {{
-                "core_goal": "本次议题的核心目标",
-                "key_questions": ["关键问题1", "关键问题2"],
-                "boundaries": "讨论边界",
-                "report_design": {{
-                    "模块名1": "该模块应如何直接回答用户问题的描述",
-                    "模块名2": "该模块应如何直接回答用户问题的描述"
-                }}
-            }},
-            "instructions": "本轮协作指令（如：请策论家聚焦XX方向）",
-            "is_final_round": true,
-            "next_round_focus": null,
-            "da_feedback_response": "对质疑官反馈的回应（如有）",
-            "summary": {{
-                "consensus": ["全局性共识结论1", "全局性共识结论2"],
-                "controversies": ["未完全解决的关键问题1", "未完全解决的关键问题2"]
-            }}
-        }}
-        
-        注意：
-        - decomposition 必须是一个对象（dict），不能是字符串。
-        - summary 必须是一个对象（dict），包含 consensus 和 controversies 两个列表。
-        - **is_final_round 必须设置为 true**。
-        - **next_round_focus 必须设置为 null**（不要填写任何内容）。
-        - summary 中的 consensus 应该是跨轮次的全局性结论。
-        
-        当前时间：{current_time}
-        输入信息（议题或上轮方案与审核意见）：{inputs}
-        """
-
-
 def make_leader_chain(model_config: Dict[str, Any], is_final_round: bool = False):
-    """创建议长链
+    """创建议长链（使用RoleManager）
     
     Args:
         model_config: 模型配置
         is_final_round: 是否为最后一轮（影响prompt策略）
     """
+    from src.agents.role_manager import RoleManager
+    
     llm = AdapterLLM(backend_config=ModelConfig(**model_config))
+    role_manager = RoleManager()
     
-    # 根据轮次选择prompt
-    if is_final_round:
-        prompt_text = _get_leader_prompt_for_final_round()
-    else:
-        prompt_text = _get_leader_prompt_for_intermediate_round()
+    # 根据轮次选择stage
+    stage = "summary" if is_final_round else "decomposition"
     
-    prompt = PromptTemplate.from_template(prompt_text)
+    # 从RoleManager加载prompt和配置
+    prompt_text = role_manager.load_prompt("leader", stage)
+    role_config = role_manager.get_role("leader")
+    input_vars = role_config.stages[stage].input_vars
+    
+    prompt = PromptTemplate(template=prompt_text, input_variables=input_vars)
     return prompt | llm
 
 
 # 保留原来的函数签名作为过渡（向后兼容，已废弃）
-def make_leader_chain_legacy(model_config: Dict[str, Any]):
-    llm = AdapterLLM(backend_config=ModelConfig(**model_config))
-    prompt = PromptTemplate.from_template(
-        """
-        **IMPORTANT: You MUST respond in the SAME LANGUAGE as the input "输入信息" (e.g., if the input is in Chinese, your entire response must be in Chinese).**
-        **CRITICAL: Your internal thinking/reasoning process MUST also be in the SAME LANGUAGE as the input.**
-
-        你是本次讨论的议长（组织者）。
-        任务：
-        1) 拆解用户议题，提取核心目标与关键问题；
-        2) 为本次议题设计一份最终报告的结构（report_design）。**核心要求：大纲必须紧扣用户原始问题，确保每个模块都能为回答该问题提供实质性贡献，严禁偏离主题**；
-        3) 在每轮结束后，根据多位策论家/监察官的JSON输出进行去重、汇总与判定；
-        4) 删除与议题无关的内容；
-        5) 仅以JSON格式输出汇总结果。
-        
-        **事实准确性原则**：作为议长，你必须确保对议题的拆解和汇总基于客观事实。**严禁胡编乱造**，严禁虚构行业背景或虚假共识。
-        
-        **联网搜索优先原则**：作为议长，**强烈建议你在拆解议题阶段优先搜索行业背景或最新动态**，以确保讨论方向的专业性。
-        
-        **联网搜索技能**：如果你需要了解议题的背景知识或行业标准，可以在输出 JSON 之前，先输出 `[SEARCH: 具体的搜索查询语句]`。
-        **搜索建议**：
-        1. 请使用**自然语言短语**（如 `[SEARCH: 2025年人工智能行业标准]`）。
-        2. **严禁将关键词拆得过细**（不要使用空格分隔每一个词）。
-        3. **极简原则**：搜索词必须控制在 **20个字以内**。请提炼最核心的关键词短语，**严禁直接复制背景或长句**。
-        4. **严禁包含无意义的填充词**（如“内容”、“汇总”、“列表”、“有哪些”）。
-        
-        **注意**：
-        - **问题导向**：在设计 `report_design` 时，请反复检查：如果按照这个大纲生成报告，是否能完整、直接地回答用户最初提出的问题？
-        - 如果输入中包含 `original_goal`，请务必在 `decomposition` 中保留该核心目标，不要随意修改。
-        - 如果输入中包含 `previous_decomposition`，请参考之前的报告大纲设计（report_design），除非有极其重要的理由，否则**严禁大幅修改大纲结构**，以保持议事的一致性。你可以在原有大纲基础上进行微调或深化。
-        - **质疑官反馈（重要）**：如果输入中包含 `devils_advocate_feedback` 或 `last_round_da_challenge`，请务必认真对待其中的批判性意见。如果质疑合理，请在本次输出中进行针对性修正（如调整大纲、补充遗漏点、修正逻辑偏差等）。
-        
-        严格遵守以下 JSON 格式，不要输出任何其他文字：
-        {{
-            "round": 1,
-            "decomposition": {{
-                "core_goal": "本次议题的核心目标",
-                "key_questions": ["关键问题1", "关键问题2"],
-                "boundaries": "讨论边界",
-                "report_design": {{
-                    "模块名1": "该模块应如何直接回答用户问题的描述",
-                    "模块名2": "该模块应如何直接回答用户问题的描述"
-                }}
-            }},
-            "instructions": "本轮协作指令（如：请策论家聚焦XX方向）",
-            "da_feedback_response": "对质疑官反馈的回应（如有）",
-            "summary": {{
-                "consensus": ["共识结论1", "共识结论2"],
-                "controversies": ["争议点1", "争议点2"]
-            }}
-        }}
-        
-        注意：
-        - decomposition 必须是一个对象（dict），不能是字符串。
-        - summary 必须是一个对象（dict），包含 consensus 和 controversies 两个列表。
-        - 如果是首次拆解议题，summary 部分可以为空列表。
-        
-        当前时间：{current_time}
-        输入信息（议题或上轮方案与审核意见）：{inputs}
-        """
-    )
-    return prompt | llm
-
-
 def make_devils_advocate_chain(model_config: Dict[str, Any], stage: str = "summary"):
-    """创建Devil's Advocate链 - 批判性思维引擎
+    """创建Devil's Advocate链（使用RoleManager）
     
     Args:
         model_config: 模型配置
         stage: 质疑阶段 ("decomposition" | "summary")
     """
-    llm = AdapterLLM(backend_config=ModelConfig(**model_config))
+    from src.agents.role_manager import RoleManager
     
-    if stage == "decomposition":
-        prompt = PromptTemplate.from_template(
-            """你是资深的批判性思维专家（质疑官），专门发现问题分解中的盲点。
-
-**IMPORTANT: You MUST respond in the SAME LANGUAGE as the input.**
-**CRITICAL: Your internal thinking/reasoning process MUST also be in the SAME LANGUAGE as the input.**
-
-当前议题：
-{issue}
-
-议长的问题分解：
-核心目标：{core_goal}
-关键问题：{key_questions}
-边界条件：{boundaries}
-
-当前时间：{current_time}
-
-你的任务：
-1. **识别遗漏维度** - 哪些重要维度未被包含？
-   - 时间维度（短期vs长期）
-   - 利益相关方（谁受影响？）
-   - 约束条件（资源、法规、技术）
-   - 风险维度（what-if场景）
-
-2. **质疑核心假设** - 分解背后的隐含假设是什么？这些假设可靠吗？
-   - 例如："假设我们有足够的资源"
-   - 例如："假设现状会持续"
-
-3. **提供替代框架** - 是否有完全不同但可能更好的分解方式？
-   - 例如：按时间线分解 vs 按利益相关方分解
-   - 例如：自上而下 vs 自下而上
-
-4. **极端场景测试** - 在极端情况下，这个分解框架是否仍然有效？
-
-要求：
-- 每个质疑都要有清晰的推理逻辑
-- 提供建设性的替代视角，而非单纯否定
-- 如果分解合理，也要明确说明
-
-输出严格的JSON格式（不要输出任何其他文字）：
-{{
-    "round": 0,
-    "stage": "decomposition",
-    "decomposition_challenge": {{
-        "missing_dimensions": ["遗漏维度1", "遗漏维度2"],
-        "hidden_assumptions": ["隐含假设1", "隐含假设2"],
-        "alternative_frameworks": ["替代框架1", "替代框架2"],
-        "extreme_scenario_issues": ["极端场景问题1", "极端场景问题2"]
-    }},
-    "overall_assessment": "对拆解的整体评价",
-    "critical_issues": ["严重问题1", "严重问题2"],
-    "recommendations": ["改进建议1", "改进建议2"]
-}}
-
-记住：你的价值在于发现议长可能忽视的盲点，帮助完善问题框架。
-"""
-        )
-    else:  # stage == "summary"
-        prompt = PromptTemplate.from_template(
-            """你是逻辑严密性专家（质疑官），负责验证议长总结的质量。
-
-**IMPORTANT: You MUST respond in the SAME LANGUAGE as the input.**
-**CRITICAL: Your internal thinking/reasoning process MUST also be in the SAME LANGUAGE as the input.**
-
-第{round}轮讨论 - 总结验证阶段
-
-方案簇（Synthesizer归纳）：
-{synthesis_clusters}
-
-议长的总结：
-{leader_summary}
-
-历史讨论记录：
-{history}
-
-你的任务：
-1. **逻辑一致性检查**
-   - 总结中是否有前后矛盾？
-   - 结论是否有逻辑跳跃（从A直接跳到C，缺少B）？
-   - 因果关系是否成立？
-
-2. **完整性检查**
-   - Synthesizer识别的关键观点是否都在总结中体现？
-   - 哪些重要内容被遗漏？
-   - 是否平衡对待了所有方案簇？
-
-3. **合理性检查**
-   - 是否过度乐观（忽视风险）或过度悲观（忽视机会）？
-   - 优先级判断是否合理？
-   - 时间预估是否现实？
-
-4. **一致性检查**
-   - 本轮总结与上一轮是否矛盾？
-   - 是否解决了之前识别的问题？
-
-5. **决策支持性检查**
-   - 总结是否提供了足够的信息供决策？
-   - 是否明确了下一步行动？
-
-要求：
-- 对比总结与原始材料，识别偏差
-- 明确指出哪些遗漏/矛盾是critical级别
-- 如果总结质量高，也要明确肯定
-
-输出严格的JSON格式（不要输出任何其他文字）：
-{{
-    "round": {round},
-    "stage": "summary",
-    "summary_challenge": {{
-        "logical_gaps": ["逻辑缺陷1", "逻辑缺陷2"],
-        "missing_points": ["遗漏要点1", "遗漏要点2"],
-        "inconsistencies": ["矛盾点1", "矛盾点2"],
-        "optimism_bias": "是否存在过度乐观的判断"
-    }},
-    "overall_assessment": "对总结的整体评价",
-    "critical_issues": ["严重问题1", "严重问题2"],
-    "recommendations": ["改进建议1", "改进建议2"]
-}}
-
-记住：你不是挑剔，而是确保最终决策建立在可靠的基础上。
-"""
-    )
+    llm = AdapterLLM(backend_config=ModelConfig(**model_config))
+    role_manager = RoleManager()
+    
+    # 从RoleManager加载对应stage的prompt
+    prompt_text = role_manager.load_prompt("devils_advocate", stage)
+    role_config = role_manager.get_role("devils_advocate")
+    input_vars = role_config.stages[stage].input_vars
+    
+    prompt = PromptTemplate(template=prompt_text, input_variables=input_vars)
     return prompt | llm
 
 
 def make_report_auditor_chain(model_config: Dict[str, Any]):
-    """创建报告审核官链 - 用户参与式报告修订
+    """创建报告审核官链（使用RoleManager）"""
+    from src.agents.role_manager import RoleManager
     
-    报告审核官负责：
-    1. 理解用户的修改要求
-    2. 对照议长总结确保修订不偏离原始讨论
-    3. 生成修订后的HTML报告
-    """
     llm = AdapterLLM(backend_config=ModelConfig(**model_config))
-    prompt = PromptTemplate(
-        input_variables=["leader_summary", "current_html", "user_feedback"],
-        template="""你是报告审核官。用户对报告初稿提出了修改要求，请根据以下信息进行审核和修订。
-
-**IMPORTANT: You MUST respond in the SAME LANGUAGE as the user feedback (e.g., if feedback is in Chinese, respond in Chinese).**
-
-【原始议长总结】（作为事实依据，修订内容必须基于此，严禁虚构）
-{leader_summary}
-
-【当前报告HTML】
-{current_html}
-
-【用户修改要求】
-{user_feedback}
-
-【修订原则】
-1. **优先满足用户要求**：认真理解用户的修改意图，尽力满足合理要求
-2. **基于事实**：修订内容必须基于原始议长总结中的讨论结果，**严禁虚构数据或结论**
-3. **超范围处理**：如果用户要求超出原始讨论范围，请在 warnings 中说明，并尽可能基于现有内容给出相关建议
-4. **保持格式**：保持HTML格式正确，不破坏CSS样式、JavaScript脚本和ECharts图表
-5. **清晰说明**：在 revision_summary 中用简洁语言说明修改了什么
-6. **质量检查**：同时检查内容准确性和结构完整性
-
-【输出格式】
-请严格按照以下JSON格式输出（不要输出任何其他文字）：
-{{
-    "revision_summary": "本次修订概要（1-2句话说明主要改动）",
-    "changes_made": ["修改1：...", "修改2：...", "修改3：..."],
-    "unchanged_reasons": ["未修改项1的原因", "未修改项2的原因"],
-    "warnings": ["警告1（如有超范围要求）", "警告2"],
-    "content_check": {{
-        "conclusion_consistency": true,
-        "key_points_coverage": true,
-        "data_accuracy": true
-    }},
-    "structure_check": {{
-        "follows_report_design": true,
-        "logical_coherence": true
-    }},
-    "revised_html": "<!DOCTYPE html>..."
-}}
-
-**关键要求**：
-- revised_html 必须是完整的、可直接渲染的HTML文档
-- 保留原报告中的所有脚本引用（ECharts、Mermaid、editor.css等）
-- 如果用户要求全部满足，unchanged_reasons 可以为空数组
-- 如果没有警告，warnings 可以为空数组
-
-CRITICAL: Output ONLY the JSON object. No markdown code blocks, no explanations before or after.
-"""
-    )
+    role_manager = RoleManager()
+    
+    # 从RoleManager加载prompt和配置
+    stage_name = "revision"  # report_auditor的stage名称
+    prompt_text = role_manager.load_prompt("report_auditor", stage_name)
+    role_config = role_manager.get_role("report_auditor")
+    input_vars = role_config.stages[stage_name].input_vars
+    
+    prompt = PromptTemplate(template=prompt_text, input_variables=input_vars)
     return prompt | llm
 
 
 def make_reporter_chain(model_config: Dict[str, Any]):
+    """创建记录员链（使用RoleManager）"""
+    from src.agents.role_manager import RoleManager
+    
     llm = AdapterLLM(backend_config=ModelConfig(**model_config))
-    prompt = PromptTemplate.from_template(
-        """
-        **IMPORTANT: You MUST respond in the SAME LANGUAGE as the input "完整议事记录" (e.g., if the input is in Chinese, your entire response must be in Chinese).**
-
-        你是首席方案架构师。你的任务是根据议事过程的完整记录，提炼并整合出一套最终的、具备极高可操作性的建议方案。
-        
-        **核心要求**：
-        1. **禁止累述**：不要提及"策论家A说了什么"、"监察官B质疑了什么"、"质疑官提出了什么问题"等过程细节，直接给出最终达成的共识方案。
-        2. **输出格式**：必须输出一个完整的、自包含的 HTML 页面代码（包含 <!DOCTYPE html>, <html>, <head>, <style>, <body>）。
-        3. **禁止 Markdown**：绝对不要将 HTML 代码包裹在 ```html 或 ``` 等 Markdown 代码块标签中，直接输出 HTML 源码。
-        4. **视觉设计**：使用现代、简约、专业的 UI 设计。利用 CSS 构建清晰的卡片布局、步骤条或信息图表。
-        5. **方案整合（重要）**：如果议事记录中包含"质疑官"（Devil's Advocate）的反馈，请将其作为优化方案的参考资料，自然地整合到最终方案中。**不要在报告中专门突出或罗列质疑内容**（如设置专门的"质疑与回应"章节），而应该直接呈现经过充分讨论和优化后的解决方案。最终报告应该是一个完整、严谨、可执行的方案，而不是讨论过程的记录。
-        6. **交互式编辑器支持（重要）**：
-           - **引入编辑器资源**：在 HTML 的 <head> 中添加以下内容（用于支持报告编辑功能）：
-             ```html
-             <meta name="workspace-id" content="">
-             <link rel="stylesheet" href="/static/css/editor.css">
-             <script src="/static/vendor/html2canvas.min.js"></script>
-             <script src="/static/js/report-editor.js"></script>
-             <!-- 协议检测脚本（防止file://协议下编辑器功能异常） -->
-             <script>
-             (function() {{
-                 // 检测报告是否通过 file:// 协议打开
-                 if (window.location.protocol === 'file:') {{
-                     console.warn('[Report] ⚠️  报告通过本地文件系统打开，编辑器功能不可用');
-                     window.EDITOR_DISABLED = true;
-                     
-                     // 页面加载完成后显示友好提示
-                     window.addEventListener('DOMContentLoaded', function() {{
-                         const banner = document.createElement('div');
-                         banner.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 20px; text-align: center; z-index: 10000; box-shadow: 0 2px 8px rgba(0,0,0,0.15); font-family: -apple-system, sans-serif;';
-                         banner.innerHTML = '<strong>⚠️  编辑器不可用</strong> - 您正在通过本地文件打开报告。<span style="margin-left: 15px;">✅ 解决方案：启动服务器后访问 <code style="background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 3px;">http://localhost:5000/report/[session_id]</code></span>';
-                         document.body.insertBefore(banner, document.body.firstChild);
-                     }});
-                 }} else if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {{
-                     console.warn('[Report] ⚠️  未检测到本地服务器，编辑器功能可能不可用');
-                 }}
-             }})();
-             </script>
-             ```
-             **注意**：workspace-id的content留空即可，系统会自动填充实际的会话ID。
-           - **数据属性标记**：为可编辑章节添加 `data-section-id` 属性，例如：`<div class="card" data-section-id="section-1">`
-        7. **数据可视化（强烈推荐）**：
-           - **使用 ECharts 图表**：在报告中适当位置添加数据可视化图表，让报告更加直观和专业。
-           - **引入方式**：在 HTML 的 <head> 中添加：`<script src="/static/vendor/echarts.min.js"></script>`
-           - **推荐图表类型**：
-             * 柱状图/条形图：用于对比分析（如方案对比、成本对比）
-             * 饼图/环形图：用于占比分析（如资源分配、时间分配）
-             * 雷达图：用于多维度评估（如方案综合评分）
-             * 折线图：用于趋势分析（如时间线、进度规划）
-             * 甘特图/时间线：用于项目规划和里程碑展示
-           - **图表要求**：
-             * 每个图表必须有清晰的标题和图例
-             * 数据必须来源于议事记录中的真实讨论内容
-             * 图表配色应与整体报告风格一致
-             * 建议至少包含 1-3 个图表来增强报告的专业性
-             * **重要**：图表容器必须设置固定高度（建议400-500px），避免PDF导出时布局错乱
-             * **布局提示**：在图表外层添加容器样式 `page-break-inside: avoid; margin: 30px 0;` 防止分页截断
-        
-        8. **流程图与架构图（Mermaid 支持）**：
-           - **使用 Mermaid 图表**：在需要展示流程、架构、时序、状态机等结构化信息时，使用 Mermaid 语法。
-           - **引入方式**：在 HTML 的 <head> 中添加：
-             ```html
-             <script src="/static/vendor/mermaid.min.js"></script>
-             <script>mermaid.initialize({{ startOnLoad: true, theme: 'default' }});</script>
-             ```
-           - **支持的图表类型**：
-             * **流程图 (flowchart)**：展示业务流程、决策树、算法逻辑
-             * **时序图 (sequenceDiagram)**：展示系统交互、API调用流程
-             * **甘特图 (gantt)**：项目时间规划、里程碑管理
-             * **类图 (classDiagram)**：系统架构、模块关系
-             * **状态图 (stateDiagram)**：状态机、生命周期
-             * **ER图 (erDiagram)**：数据库设计、实体关系
-             * **用户旅程图 (journey)**：用户体验流程
-             * **饼图 (pie)**：简单的占比展示
-           - **使用方法**：
-             ```html
-             <div class="mermaid" data-mermaid-source="flowchart TD\n    A[开始] --> B{{是否满足条件?}}\n    B -->|是| C[执行操作]\n    B -->|否| D[跳过]\n    C --> E[结束]\n    D --> E">
-             flowchart TD
-                 A[开始] --> B{{是否满足条件?}}
-                 B -->|是| C[执行操作]
-                 B -->|否| D[跳过]
-                 C --> E[结束]
-                 D --> E
-             </div>
-             ```
-           - **注意事项**：
-             * Mermaid 代码块必须放在 `<div class="mermaid">` 中
-             * **必须在 div 标签中添加 `data-mermaid-source` 属性保存原始代码**（支持 \\n 换行）
-             * 语法必须严格遵循 Mermaid 规范，避免语法错误
-             * 建议在复杂流程、系统架构等场景使用 Mermaid
-             * 简单的数据对比、统计分析优先使用 ECharts
-             * **布局提示**：Mermaid 容器外层添加 `page-break-inside: avoid;` 防止分页截断
-        7. **交互性与高级引用 (Advanced Citations)**：
-           - **悬停预览 (Hover Preview)**：为所有行内引用添加悬停预览功能。
-           - **实现方式**：
-             * 在 HTML 的 `<style>` 中添加引用样式（如：`.citation {{ color: #2563eb; text-decoration: none; font-size: 0.8em; vertical-align: super; margin-left: 2px; cursor: help; }}`）。
-             * 在 HTML 的 `<head>` 中添加悬停预览的 JS 逻辑。
-             * **引用格式**：使用 `<a href="URL" class="citation" data-title="标题" data-snippet="摘要内容..." data-source="来源域名" target="_blank">[n]</a>`。
-             * **JS 逻辑示例**：
-               ```javascript
-               document.addEventListener('DOMContentLoaded', function() {{
-                   const citations = document.querySelectorAll('.citation');
-                   citations.forEach(cite => {{
-                       cite.addEventListener('mouseenter', function(e) {{
-                           const title = this.getAttribute('data-title');
-                           const snippet = this.getAttribute('data-snippet');
-                           const source = this.getAttribute('data-source');
-                           const tooltip = document.createElement('div');
-                           tooltip.className = 'citation-tooltip';
-                           tooltip.innerHTML = `<strong>${{title}}</strong><br><small>${{source}}</small><p>${{snippet}}</p>`;
-                           document.body.appendChild(tooltip);
-                           const rect = this.getBoundingClientRect();
-                           tooltip.style.top = (rect.top + window.scrollY - tooltip.offsetHeight - 10) + 'px';
-                           tooltip.style.left = (rect.left + window.scrollX) + 'px';
-                       }});
-                       cite.addEventListener('mouseleave', function() {{
-                           const tooltips = document.querySelectorAll('.citation-tooltip');
-                           tooltips.forEach(t => t.remove());
-                       }});
-                   }});
-               }});
-               ```
-             * **Tooltip 样式示例**：
-               ```css
-               .citation-tooltip {{
-                   position: absolute;
-                   z-index: 1000;
-                   background: white;
-                   border: 1px solid #e2e8f0;
-                   border-radius: 8px;
-                   padding: 12px;
-                   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-                   max-width: 300px;
-                   font-size: 13px;
-                   line-height: 1.5;
-                   color: #1e293b;
-                   pointer-events: none;
-               }}
-               .citation-tooltip strong {{ display: block; color: #2563eb; margin-bottom: 4px; }}
-               .citation-tooltip small {{ color: #64748b; display: block; margin-bottom: 8px; border-bottom: 1px solid #f1f5f9; padding-bottom: 4px; }}
-               .citation-tooltip p {{ margin: 0; color: #475569; }}
-               ```
-        10. **结构遵循**：请务必遵循议长设计的报告结构（report_design）进行内容组织。
-        11. **语言一致性**：报告的所有内容（包括标题、按钮、标签、正文）必须使用与原始议题相同的语言。
-        12. **引用与参考资料（严禁虚构链接）**：
-            - **真实性原则**：**严禁胡编乱造任何链接、数据或事实**。
-            - **行内引用**：仅引用"联网搜索参考资料"中提供的真实 URL。**严禁虚构类似 `https://developer.aliyun.com/article/xxxxxx` 这种占位符链接**。
-            - **引用格式**：在报告正文中引用到联网搜索提供的信息时，请务必使用上述 **高级引用格式**。
-            - **引用编号规则（重要）**：
-              * **按出现顺序编号**：引用编号 `[n]` 必须**从 [1] 开始**，按照在报告正文中**首次出现的顺序**连续递增（[1], [2], [3]...）。
-              * **禁止使用搜索表格序号**：严禁直接使用"联网搜索参考资料"表格中的 `#` 列序号（如不能直接用表格里的3号结果就标记为[3]）。
-              * **重复引用处理**：如果同一信源在报告中多次使用，后续引用应继续使用首次出现时分配的编号。
-              * **示例**：假设联网搜索返回表格中 #5 的结果在报告中首次被引用，应该标记为 [1]；表格中 #2 的结果在报告中第二个被引用，应标记为 [2]。
-            - **末尾列表**：在报告末尾添加"参考资料"章节，按照 [1], [2], [3]... 的引用编号顺序列出所有参考链接。建议使用列表或表格形式，包含标题、来源和链接。
-        13. **禁止废话**：不要包含任何关于报告生成过程的描述（如"基于多轮讨论形成"、"本报告整合自..."）、版权声明、讲解时长建议或任何前言/后记。直接从报告标题和正文内容开始。
-        
-        请确保 HTML 代码在 <iframe> 中能完美渲染。
-        
-        完整议事记录（包含议长的报告设计）：{final_data}
-        
-        联网搜索参考资料（请务必整合进报告末尾）：{search_references}
-        """
-    )
+    role_manager = RoleManager()
+    
+    # 从RoleManager加载prompt和配置
+    prompt_text = role_manager.load_prompt("reporter", "generate")
+    role_config = role_manager.get_role("reporter")
+    input_vars = role_config.stages["generate"].input_vars
+    
+    prompt = PromptTemplate(template=prompt_text, input_variables=input_vars)
     return prompt | llm
 
 
