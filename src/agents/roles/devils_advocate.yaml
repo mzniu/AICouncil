@@ -1,0 +1,43 @@
+name: devils_advocate
+display_name: 质疑官 (Devil's Advocate)
+version: "1.0.0"
+description: |
+  质疑官角色，负责批判性思维和盲点发现。
+  在议题拆解和总结阶段提供独立的质疑视角。
+
+stages:
+  decomposition:
+    prompt_file: devils_advocate_decomposition.md
+    schema: DevilsAdvocateSchema
+    input_vars:
+      - issue
+      - core_goal
+      - key_questions
+      - boundaries
+      - current_time
+  
+  summary:
+    prompt_file: devils_advocate_summary.md
+    schema: DevilsAdvocateSchema
+    input_vars:
+      - round
+      - synthesis_clusters
+      - leader_summary
+      - history
+
+default_model: deepseek-reasoner
+
+parameters:
+  max_retries: 2
+  temperature: 0.7
+  max_tokens: 3000
+
+tags:
+  - critical-thinking
+  - quality-assurance
+  - advanced
+
+ui:
+  icon: "⚔️"
+  color: "#8B5CF6"
+  description_short: "批判性思维，发现潜在盲点"

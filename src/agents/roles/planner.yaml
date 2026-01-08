@@ -1,0 +1,33 @@
+name: planner
+display_name: 策论家 (Planner)
+version: "1.0.0"
+description: |
+  策论家角色，负责根据议长指令产出或迭代可执行方案。
+  强调事实准确性和可行性分析。
+
+stages:
+  proposal:
+    prompt_file: planner_proposal.md
+    schema: PlanSchema
+    input_vars:
+      - issue
+      - planner_id
+      - previous_plan
+      - feedback
+
+default_model: deepseek-reasoner
+
+parameters:
+  max_retries: 2
+  temperature: 0.8
+  max_tokens: 3000
+
+tags:
+  - planning
+  - proposal
+  - core
+
+ui:
+  icon: "💡"
+  color: "#10B981"
+  description_short: "提出创新方案和实施步骤"

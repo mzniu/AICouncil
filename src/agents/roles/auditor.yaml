@@ -1,0 +1,32 @@
+name: auditor
+display_name: 监察官 (Auditor)
+version: "1.0.0"
+description: |
+  监察官角色，负责对策论家提出的方案进行深度审查和质疑。
+  以严格、犀利、不留情面的态度确保方案质量。
+
+stages:
+  review:
+    prompt_file: auditor_review.md
+    schema: AuditorSchema
+    input_vars:
+      - plans
+      - issue
+      - auditor_id
+
+default_model: deepseek-reasoner
+
+parameters:
+  max_retries: 2
+  temperature: 0.7
+  max_tokens: 3000
+
+tags:
+  - review
+  - quality-control
+  - core
+
+ui:
+  icon: "🔍"
+  color: "#EF4444"
+  description_short: "严格审查方案可行性和风险"
