@@ -515,6 +515,16 @@ def load_workspace(session_id):
                             "chunk_id": f"load_{session_id}_r{round_num}_a{j}"
                         })
                     
+                    # 加载Devil's Advocate质疑官数据
+                    if h.get("devils_advocate"):
+                        discussion_events.append({
+                            "type": "agent_action",
+                            "agent_name": "质疑官",
+                            "role_type": "devils_advocate",
+                            "content": json.dumps(h["devils_advocate"], ensure_ascii=False),
+                            "chunk_id": f"load_{session_id}_r{round_num}_da"
+                        })
+                    
                     if h.get("summary"):
                         discussion_events.append({
                             "type": "agent_action",
