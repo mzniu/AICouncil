@@ -229,20 +229,20 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                     </svg>
                 </button>
-                <button onclick="toggleSettingsModal()" class="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg border border-slate-600 transition group" title="系统设置" data-i18n-title="nav_settings">
-                    <svg class="w-5 h-5 text-slate-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                    </svg>
-                </button>
                 <button onclick="toggleRolesModal()" class="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg border border-slate-600 transition group" title="角色管理" data-i18n-title="nav_roles">
                     <svg class="w-5 h-5 text-slate-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                     </svg>
                 </button>
-                <button onclick="togglePresetsModal()" class="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg border border-slate-600 transition group" title="元老院编制" data-i18n-title="nav_presets">
+                <button id="advanced-config-btn" onclick="toggleAdvancedConfigModal()" class="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg border border-slate-600 transition group" title="高级配置" data-i18n-title="btn_advanced">
                     <svg class="w-5 h-5 text-slate-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                </button>
+                <button id="history-btn" onclick="toggleHistoryModal()" class="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg border border-slate-600 transition group" title="历史" data-i18n-title="btn_history">
+                    <svg class="w-5 h-5 text-slate-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
                 </button>
             </div>
@@ -260,86 +260,20 @@
                            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition text-base resize-none min-h-[42px] max-h-48 overflow-y-auto"
                            oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"></textarea>
                 </div>
-                <div class="w-full md:w-32">
-                    <label class="block text-sm font-bold text-slate-500 uppercase mb-1" data-i18n="input_backend_label">后端</label>
-                    <select id="backend-select" 
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-base bg-white">
-                        <option value="deepseek">DeepSeek</option>
-                        <option value="openai">OpenAI</option>
-                        <option value="azure">Azure OpenAI</option>
-                        <option value="anthropic">Anthropic (Claude)</option>
-                        <option value="gemini">Google Gemini</option>
-                        <option value="openrouter">OpenRouter</option>
-                        <option value="aliyun">Aliyun</option>
-                        <option value="ollama">Ollama</option>
-                    </select>
-                </div>
-                <div class="w-full md:w-48">
-                    <label class="block text-sm font-bold text-slate-500 uppercase mb-1" data-i18n="input_model_label">全局模型 (可选)</label>
-                    <input type="text" id="global-model-input" placeholder="默认模型" data-i18n-placeholder="input_model_placeholder"
-                           class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-base">
-                </div>
-                <div class="w-full md:w-32 hidden" id="global-reasoning-container">
-                    <label class="block text-sm font-bold text-slate-500 uppercase mb-1" data-i18n="input_reasoning_label">推理强度</label>
-                    <select id="global-reasoning-input" 
-                            class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-base bg-white">
-                        <option value="" data-i18n="reasoning_off">关闭</option>
-                        <option value="low">Low</option>
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
-                    </select>
-                </div>
-                <div class="w-full md:w-20">
-                    <label class="block text-sm font-bold text-slate-500 uppercase mb-1" data-i18n="input_rounds_label">轮数</label>
-                    <input type="number" id="rounds-input" value="3" min="1" max="10" 
-                           class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-base">
-                </div>
-                <div class="w-full md:w-20">
-                    <label class="block text-sm font-bold text-slate-500 uppercase mb-1" data-i18n="input_planners_label">策论家</label>
-                    <input type="number" id="planners-input" value="2" min="1" max="5" 
-                           class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-base">
-                </div>
-                <div class="w-full md:w-20">
-                    <label class="block text-sm font-bold text-slate-500 uppercase mb-1" data-i18n="input_auditors_label">监察官</label>
-                    <input type="number" id="auditors-input" value="2" min="1" max="5" 
-                           class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-base">
-                </div>
                 <div class="flex items-end space-x-2">
+                    <!-- 隐藏的配置字段（用于后端逻辑，实际值从modal同步） -->
+                    <input type="hidden" id="backend-select">
+                    <input type="hidden" id="global-model-input">
+                    <input type="hidden" id="global-reasoning-input">
+                    <input type="hidden" id="rounds-input" value="3">
+                    <input type="hidden" id="planners-input" value="2">
+                    <input type="hidden" id="auditors-input" value="2">
+                    <div id="global-reasoning-container" class="hidden"></div>
+                    
                     <button id="start-btn" onclick="startDiscussion()" 
                             class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-8 rounded-lg transition shadow-lg shadow-blue-200 disabled:bg-gray-400 disabled:shadow-none flex items-center justify-center">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         <span data-i18n="btn_start">开始议事</span>
-                    </button>
-                    <button id="advanced-toggle-btn" onclick="toggleAdvancedSettings()" 
-                            class="w-full md:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg transition border border-slate-300 flex items-center justify-center">
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                        <span data-i18n="btn_advanced">高级配置</span>
-                    </button>
-                    
-                    <!-- 快速加载编制下拉菜单 -->
-                    <div class="relative inline-block text-left w-full md:w-auto">
-                        <button onclick="togglePresetsDropdown()" class="w-full md:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg transition border border-slate-300 flex items-center justify-center" id="presets-dropdown-btn" title="快速加载编制" data-i18n-title="btn_load_preset">
-                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-                            <span data-i18n="btn_load_preset">加载编制</span>
-                            <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                        </button>
-                        <div id="presets-dropdown" class="dropdown-content w-72 absolute right-0 mt-2 bg-white shadow-xl z-50">
-                            <div id="presets-list-container" class="max-h-80 overflow-y-auto">
-                                <!-- 动态插入编制列表 -->
-                                <div class="px-4 py-2 text-xs text-gray-400 text-center">暂无存档</div>
-                            </div>
-                            <div class="border-t border-slate-100">
-                                <button onclick="saveCurrentAsPreset(); togglePresetsDropdown()" class="text-blue-600 hover:text-blue-800 w-full text-left px-4 py-2 text-sm font-bold hover:bg-slate-50 transition flex items-center">
-                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
-                                    <span data-i18n="btn_save_current">保存当前配置</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    <button id="history-btn" onclick="toggleHistoryModal()" 
-                            class="w-full md:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-lg transition border border-slate-300 flex items-center justify-center">
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        <span data-i18n="btn_history">历史</span>
                     </button>
                     <button id="stop-btn" onclick="stopDiscussion()" 
                             class="hidden w-full md:w-auto bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-8 rounded-lg transition shadow-lg shadow-red-200" data-i18n="btn_stop">
@@ -347,65 +281,9 @@
                     </button>
                 </div>
             </div>
-
-            <!-- 高级配置面板 -->
-            <div id="advanced-settings" class="hidden mt-4 pt-4 border-t border-slate-100">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-sm font-bold text-slate-700 flex items-center">
-                        <span class="mr-2">⚙️</span> <span data-i18n="advanced_title">席位专家配置</span>
-                    </h3>
-                    <button onclick="resetAgentConfigs()" class="text-xs text-blue-600 hover:text-blue-800 font-medium" data-i18n="advanced_reset">重置为默认</button>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="agent-configs-container">
-                    <!-- 动态生成 Agent 配置 -->
-                    <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                        <h4 class="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center">
-                            <span class="w-2 h-2 bg-blue-500 rounded-full mr-2"></span><span data-i18n="role_leader">议长 (Leader)</span>
-                        </h4>
-                        <div class="flex gap-2">
-                            <select class="agent-backend flex-1 text-xs p-1 border rounded" data-agent="leader">
-                                <option value="default" data-i18n="backend_default">默认后端</option>
-                                <option value="deepseek">DeepSeek</option>
-                                <option value="openai">OpenAI</option>
-                                <option value="openrouter">OpenRouter</option>
-                                <option value="aliyun">Aliyun</option>
-                                <option value="ollama">Ollama</option>
-                            </select>
-                            <input type="text" class="agent-model flex-1 text-xs p-1 border rounded" placeholder="模型名称 (可选)" data-i18n-placeholder="agent_model_placeholder" data-agent="leader">
-                        </div>
-                        <select class="agent-reasoning hidden text-[10px] p-1 border rounded mt-1 w-full" data-agent="leader">
-                            <option value="" data-i18n="reasoning_off">推理: 关闭</option>
-                            <option value="low">推理: Low</option>
-                            <option value="medium">推理: Medium</option>
-                            <option value="high">推理: High</option>
-                        </select>
-                    </div>
-                    <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                        <h4 class="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center">
-                            <span class="w-2 h-2 bg-purple-500 rounded-full mr-2"></span><span data-i18n="role_reporter">记录员 (Reporter)</span>
-                        </h4>
-                        <div class="flex gap-2">
-                            <select class="agent-backend flex-1 text-xs p-1 border rounded" data-agent="reporter">
-                                <option value="default" data-i18n="backend_default">默认后端</option>
-                                <option value="deepseek">DeepSeek</option>
-                                <option value="openai">OpenAI</option>
-                                <option value="openrouter">OpenRouter</option>
-                                <option value="aliyun">Aliyun</option>
-                                <option value="ollama">Ollama</option>
-                            </select>
-                            <input type="text" class="agent-model flex-1 text-xs p-1 border rounded" placeholder="模型名称 (可选)" data-i18n-placeholder="agent_model_placeholder" data-agent="reporter">
-                        </div>
-                        <select class="agent-reasoning hidden text-[10px] p-1 border rounded mt-1 w-full" data-agent="reporter">
-                            <option value="" data-i18n="reasoning_off">推理: 关闭</option>
-                            <option value="low">推理: Low</option>
-                            <option value="medium">推理: Medium</option>
-                            <option value="high">推理: High</option>
-                        </select>
-                    </div>
-                </div>
-                <datalist id="openrouter-models-list"></datalist>
-                <datalist id="deepseek-models-list"></datalist>
-            </div>
+            <!-- datalists for autocomplete -->
+            <datalist id="openrouter-models-list"></datalist>
+            <datalist id="deepseek-models-list"></datalist>
         </div>
 
         <div id="main-layout" class="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
@@ -593,214 +471,325 @@
         </div>
 
         <!-- 系统设置模态框 -->
-        <div id="settings-modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[150] flex items-center justify-center">
-            <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-xl w-full mx-4 flex flex-col">
+        <!-- 高级配置模态框 -->
+        <div id="advanced-config-modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[150] flex items-center justify-center">
+            <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-4xl w-full mx-4 flex flex-col max-h-[85vh]">
                 <div class="flex justify-between items-center mb-6">
                     <h3 class="text-xl font-bold text-slate-800 flex items-center">
-                        <span class="mr-2 text-2xl">⚙️</span> <span data-i18n="settings_modal_title">系统全局设置</span>
+                        <span class="mr-2 text-2xl">⚙️</span> <span data-i18n="advanced_config_title">高级配置</span>
                     </h3>
-                    <button onclick="toggleSettingsModal()" class="text-slate-400 hover:text-slate-600">
+                    <button onclick="toggleAdvancedConfigModal()" class="text-slate-400 hover:text-slate-600">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>
                 </div>
-                
-                <div class="space-y-6 overflow-y-auto max-h-[60vh] pr-2">
-                    <!-- 模型API密钥配置区域 -->
-                    <section class="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-100">
-                        <h4 class="text-sm font-bold text-blue-800 mb-4 flex items-center">
-                            <span class="w-1.5 h-4 bg-blue-500 rounded-full mr-2"></span> 
-                            <span class="mr-1">🤖</span>
-                            <span data-i18n="settings_api_keys">模型 API 密钥配置</span>
-                        </h4>
-                        <div class="grid grid-cols-1 gap-4">
-                            <div class="space-y-1">
-                                <label class="text-xs font-bold text-slate-600 uppercase">DeepSeek API Key</label>
-                                <input type="password" id="settings-key-deepseek" placeholder="sk-..." 
-                                       class="w-full px-3 py-2 border border-blue-200 rounded-lg outline-none focus:border-blue-500 transition bg-white">
+
+                <!-- Tab 导航 -->
+                <div class="flex border-b border-slate-200 mb-6">
+                    <button onclick="switchAdvancedTab('basic')" id="tab-basic-btn" 
+                            class="px-6 py-3 font-bold text-blue-600 border-b-2 border-blue-600 transition" 
+                            data-i18n="tab_basic_config">基础配置</button>
+                    <button onclick="switchAdvancedTab('agents')" id="tab-agents-btn" 
+                            class="px-6 py-3 font-bold text-slate-500 hover:text-slate-700 border-b-2 border-transparent transition" 
+                            data-i18n="tab_agent_config">席位专家配置</button>
+                    <button onclick="switchAdvancedTab('presets')" id="tab-presets-btn" 
+                            class="px-6 py-3 font-bold text-slate-500 hover:text-slate-700 border-b-2 border-transparent transition" 
+                            data-i18n="tab_presets">元老院编制</button>
+                    <button onclick="switchAdvancedTab('settings')" id="tab-settings-btn" 
+                            class="px-6 py-3 font-bold text-slate-500 hover:text-slate-700 border-b-2 border-transparent transition" 
+                            data-i18n="tab_settings">系统设置</button>
+                </div>
+
+                <!-- Tab 内容容器 -->
+                <div class="overflow-y-auto flex-1 pr-2">
+                    <!-- 基础配置 Tab -->
+                    <div id="tab-basic-content" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-bold text-slate-500 uppercase mb-2" data-i18n="input_backend_label">后端</label>
+                                <select id="modal-backend-select" 
+                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-base bg-white">
+                                    <option value="deepseek">DeepSeek</option>
+                                    <option value="openai">OpenAI</option>
+                                    <option value="azure">Azure OpenAI</option>
+                                    <option value="anthropic">Anthropic (Claude)</option>
+                                    <option value="gemini">Google Gemini</option>
+                                    <option value="openrouter">OpenRouter</option>
+                                    <option value="aliyun">Aliyun</option>
+                                    <option value="ollama">Ollama</option>
+                                </select>
                             </div>
-                            <div class="space-y-1">
-                                <label class="text-xs font-bold text-slate-600 uppercase">OpenAI API Key</label>
-                                <input type="password" id="settings-key-openai" placeholder="sk-..." 
-                                       class="w-full px-3 py-2 border border-blue-200 rounded-lg outline-none focus:border-blue-500 transition bg-white">
+                            <div>
+                                <label class="block text-sm font-bold text-slate-500 uppercase mb-2" data-i18n="input_model_label">全局模型 (可选)</label>
+                                <input type="text" id="modal-global-model-input" placeholder="默认模型" data-i18n-placeholder="input_model_placeholder"
+                                       class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-base">
                             </div>
-                            <div class="space-y-1">
-                                <label class="text-xs font-bold text-slate-600 uppercase">Azure OpenAI API Key</label>
-                                <input type="password" id="settings-key-azure" placeholder="your-azure-key..." 
-                                       class="w-full px-3 py-2 border border-blue-200 rounded-lg outline-none focus:border-blue-500 transition bg-white">
+                            <div id="modal-global-reasoning-container" class="hidden">
+                                <label class="block text-sm font-bold text-slate-500 uppercase mb-2" data-i18n="input_reasoning_label">推理强度</label>
+                                <select id="modal-global-reasoning-input" 
+                                        class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-base bg-white">
+                                    <option value="" data-i18n="reasoning_off">关闭</option>
+                                    <option value="low">Low</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="high">High</option>
+                                </select>
                             </div>
-                            <div class="space-y-1">
-                                <label class="text-xs font-bold text-slate-600 uppercase">Azure OpenAI Endpoint</label>
-                                <input type="text" id="settings-azure-endpoint" placeholder="https://your-resource.openai.azure.cn" 
-                                       class="w-full px-3 py-2 border border-blue-200 rounded-lg outline-none focus:border-blue-500 transition bg-white">
-                                <p class="text-xs text-slate-500 mt-1">中国区: .openai.azure.cn | 全球区: .openai.azure.com</p>
+                            <div>
+                                <label class="block text-sm font-bold text-slate-500 uppercase mb-2" data-i18n="input_rounds_label">讨论轮数</label>
+                                <input type="number" id="modal-rounds-input" value="3" min="1" max="10" 
+                                       class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-base">
                             </div>
-                            <div class="space-y-1">
-                                <label class="text-xs font-bold text-slate-600 uppercase">Azure Deployment Name</label>
-                                <input type="text" id="settings-azure-deployment" placeholder="gpt-4o" 
-                                       class="w-full px-3 py-2 border border-blue-200 rounded-lg outline-none focus:border-blue-500 transition bg-white">
-                                <p class="text-xs text-slate-500 mt-1">您在Azure创建的部署名称（不是模型名）</p>
+                            <div>
+                                <label class="block text-sm font-bold text-slate-500 uppercase mb-2" data-i18n="input_planners_label">策论家数量</label>
+                                <input type="number" id="modal-planners-input" value="2" min="1" max="5" 
+                                       class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-base">
                             </div>
-                            <div class="space-y-1">
-                                <label class="text-xs font-bold text-slate-600 uppercase">Anthropic API Key</label>
-                                <input type="password" id="settings-key-anthropic" placeholder="sk-ant-..." 
-                                       class="w-full px-3 py-2 border border-blue-200 rounded-lg outline-none focus:border-blue-500 transition bg-white">
-                                <p class="text-xs text-slate-500 mt-1">Claude API密钥（获取地址: console.anthropic.com）</p>
-                            </div>
-                            <div class="space-y-1">
-                                <label class="text-xs font-bold text-slate-600 uppercase">Google Gemini API Key</label>
-                                <input type="password" id="settings-key-gemini" placeholder="AIza..." 
-                                       class="w-full px-3 py-2 border border-blue-200 rounded-lg outline-none focus:border-blue-500 transition bg-white">
-                                <p class="text-xs text-slate-500 mt-1">Gemini API密钥（获取地址: aistudio.google.com）</p>
-                            </div>
-                            <div class="space-y-1">
-                                <label class="text-xs font-bold text-slate-600 uppercase">OpenRouter API Key</label>
-                                <input type="password" id="settings-key-openrouter" placeholder="sk-or-..." 
-                                       class="w-full px-3 py-2 border border-blue-200 rounded-lg outline-none focus:border-blue-500 transition bg-white">
-                            </div>
-                            <div class="space-y-1">
-                                <label class="text-xs font-bold text-slate-600 uppercase">Aliyun API Key</label>
-                                <input type="password" id="settings-key-aliyun" placeholder="sk-..." 
-                                       class="w-full px-3 py-2 border border-blue-200 rounded-lg outline-none focus:border-blue-500 transition bg-white">
+                            <div>
+                                <label class="block text-sm font-bold text-slate-500 uppercase mb-2" data-i18n="input_auditors_label">监察官数量</label>
+                                <input type="number" id="modal-auditors-input" value="2" min="1" max="5" 
+                                       class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-base">
                             </div>
                         </div>
-                    </section>
+                    </div>
 
-                    <!-- 搜索引擎配置区域 -->
-                    <section class="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-100">
-                        <h4 class="text-sm font-bold text-green-800 mb-4 flex items-center">
-                            <span class="w-1.5 h-4 bg-green-500 rounded-full mr-2"></span>
-                            <span class="mr-1">🔍</span>
-                            <span data-i18n="settings_search_engines">搜索引擎配置</span>
-                        </h4>
-                        <div class="grid grid-cols-1 gap-4">
-                            <div class="space-y-2">
-                                <label class="text-xs font-bold text-slate-600 uppercase" data-i18n="settings_search_engines">搜索增强引擎 (可多选)</label>
-                                <div id="settings-search-providers" class="grid grid-cols-2 gap-2">
-                                    <label class="flex items-center space-x-2 p-2 border border-green-200 rounded-lg hover:bg-white cursor-pointer transition bg-white/50">
-                                        <input type="checkbox" value="bing" class="search-provider-checkbox w-4 h-4 text-green-600 rounded focus:ring-green-500">
-                                        <span class="text-sm text-slate-700">Bing (<span data-i18n="search_stable">不稳定</span>)</span>
-                                    </label>
-                                    <label class="flex items-center space-x-2 p-2 border border-green-200 rounded-lg hover:bg-white cursor-pointer transition bg-white/50">
-                                        <input type="checkbox" value="baidu" class="search-provider-checkbox w-4 h-4 text-green-600 rounded focus:ring-green-500">
-                                        <span class="text-sm text-slate-700">Baidu (<span data-i18n="search_chinese">中文</span>)</span>
-                                    </label>
-                                    <label class="flex items-center space-x-2 p-2 border border-green-200 rounded-lg hover:bg-white cursor-pointer transition bg-white/50">
-                                        <input type="checkbox" value="duckduckgo" class="search-provider-checkbox w-4 h-4 text-green-600 rounded focus:ring-green-500">
-                                        <span class="text-sm text-slate-700">DuckDuckGo</span>
-                                    </label>
-                                    <label class="flex items-center space-x-2 p-2 border border-green-200 rounded-lg hover:bg-white cursor-pointer transition bg-white/50">
-                                        <input type="checkbox" value="yahoo" class="search-provider-checkbox w-4 h-4 text-green-600 rounded focus:ring-green-500">
-                                        <span class="text-sm text-slate-700">Yahoo (<span data-i18n="search_stable_good">稳定</span>)</span>
-                                    </label>
-                                    <label class="flex items-center space-x-2 p-2 border border-green-200 rounded-lg hover:bg-white cursor-pointer transition bg-white/50">
-                                        <input type="checkbox" value="mojeek" class="search-provider-checkbox w-4 h-4 text-green-600 rounded focus:ring-green-500">
-                                        <span class="text-sm text-slate-700">Mojeek (<span data-i18n="search_english">英文</span>)</span>
-                                    </label>
-                                    <label class="flex items-center space-x-2 p-2 border border-green-200 rounded-lg hover:bg-white cursor-pointer transition bg-white/50">
-                                        <input type="checkbox" value="google" class="search-provider-checkbox w-4 h-4 text-green-600 rounded focus:ring-green-500">
-                                        <span class="text-sm text-slate-700">Google (<span class="text-green-600 font-bold">API</span>)</span>
-                                    </label>
-                                    <label class="flex items-center space-x-2 p-2 border border-green-200 rounded-lg hover:bg-white cursor-pointer transition bg-white/50">
-                                        <input type="checkbox" value="tavily" class="search-provider-checkbox w-4 h-4 text-green-600 rounded focus:ring-green-500">
-                                        <span class="text-sm text-slate-700">Tavily (Key)</span>
-                                    </label>
+                    <!-- 席位专家配置 Tab -->
+                    <div id="tab-agents-content" class="hidden">
+                        <div class="flex justify-between items-center mb-4">
+                            <p class="text-sm text-slate-600" data-i18n="agent_config_desc">为不同席位的专家指定特定的模型后端和参数</p>
+                            <button onclick="resetAgentConfigs()" class="text-xs text-blue-600 hover:text-blue-800 font-medium" data-i18n="advanced_reset">重置为默认</button>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="modal-agent-configs-container">
+                            <!-- 固定的 Leader 和 Reporter -->
+                            <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                <h4 class="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center">
+                                    <span class="w-2 h-2 bg-blue-500 rounded-full mr-2"></span><span data-i18n="role_leader">议长 (Leader)</span>
+                                </h4>
+                                <div class="flex gap-2">
+                                    <select class="agent-backend flex-1 text-xs p-1 border rounded" data-agent="leader">
+                                        <option value="default" data-i18n="backend_default">默认后端</option>
+                                        <option value="deepseek">DeepSeek</option>
+                                        <option value="openai">OpenAI</option>
+                                        <option value="openrouter">OpenRouter</option>
+                                        <option value="aliyun">Aliyun</option>
+                                        <option value="ollama">Ollama</option>
+                                    </select>
+                                    <input type="text" class="agent-model flex-1 text-xs p-1 border rounded" placeholder="模型名称 (可选)" data-i18n-placeholder="agent_model_placeholder" data-agent="leader">
+                                </div>
+                                <select class="agent-reasoning hidden text-[10px] p-1 border rounded mt-1 w-full" data-agent="leader">
+                                    <option value="" data-i18n="reasoning_off">推理: 关闭</option>
+                                    <option value="low">推理: Low</option>
+                                    <option value="medium">推理: Medium</option>
+                                    <option value="high">推理: High</option>
+                                </select>
+                            </div>
+                            <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                <h4 class="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center">
+                                    <span class="w-2 h-2 bg-purple-500 rounded-full mr-2"></span><span data-i18n="role_reporter">记录员 (Reporter)</span>
+                                </h4>
+                                <div class="flex gap-2">
+                                    <select class="agent-backend flex-1 text-xs p-1 border rounded" data-agent="reporter">
+                                        <option value="default" data-i18n="backend_default">默认后端</option>
+                                        <option value="deepseek">DeepSeek</option>
+                                        <option value="openai">OpenAI</option>
+                                        <option value="openrouter">OpenRouter</option>
+                                        <option value="aliyun">Aliyun</option>
+                                        <option value="ollama">Ollama</option>
+                                    </select>
+                                    <input type="text" class="agent-model flex-1 text-xs p-1 border rounded" placeholder="模型名称 (可选)" data-i18n-placeholder="agent_model_placeholder" data-agent="reporter">
+                                </div>
+                                <select class="agent-reasoning hidden text-[10px] p-1 border rounded mt-1 w-full" data-agent="reporter">
+                                    <option value="" data-i18n="reasoning_off">推理: 关闭</option>
+                                    <option value="low">推理: Low</option>
+                                    <option value="medium">推理: Medium</option>
+                                    <option value="high">推理: High</option>
+                                </select>
+                            </div>
+                            <!-- 动态生成的 Planners 和 Auditors 将插入到这里 -->
+                        </div>
+                    </div>
+
+                    <!-- 元老院编制 Tab -->
+                    <div id="tab-presets-content" class="hidden space-y-6">
+                        <!-- 保存当前配置 -->
+                        <section class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <h3 class="font-bold text-slate-700 mb-3 flex items-center">
+                                <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span> <span data-i18n="presets_save_new">保存当前配置为新编制</span>
+                            </h3>
+                            <div class="flex gap-2">
+                                <input type="text" id="modal-new-preset-name" placeholder="输入编制名称 (例如: 3人-DeepSeek-高强度)" 
+                                       data-i18n-placeholder="presets_name_placeholder"
+                                       class="flex-1 px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
+                                <button onclick="saveModalPreset()" class="bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-2 rounded-lg transition shadow-sm" data-i18n="btn_save">
+                                    保存
+                                </button>
+                            </div>
+                        </section>
+
+                        <!-- 编制列表 -->
+                        <section>
+                            <h3 class="font-bold text-slate-700 mb-3 flex items-center">
+                                <span class="w-2 h-2 bg-blue-500 rounded-full mr-2"></span> <span data-i18n="presets_list">已保存的编制</span>
+                            </h3>
+                            <div id="modal-presets-list" class="space-y-2 max-h-80 overflow-y-auto pr-2">
+                                <!-- 动态插入 -->
+                                <div class="text-center text-gray-400 py-4">加载中...</div>
+                            </div>
+                        </section>
+                    </div>
+
+                    <!-- 系统设置 Tab -->
+                    <div id="tab-settings-content" class="hidden space-y-6">
+                        <!-- 模型API密钥配置区域 -->
+                        <section class="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-100">
+                            <h4 class="text-sm font-bold text-blue-800 mb-4 flex items-center">
+                                <span class="w-1.5 h-4 bg-blue-500 rounded-full mr-2"></span> 
+                                <span class="mr-1">🤖</span>
+                                <span data-i18n="settings_api_keys">模型 API 密钥配置</span>
+                            </h4>
+                            <div class="grid grid-cols-1 gap-4">
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-slate-600 uppercase">DeepSeek API Key</label>
+                                    <input type="password" id="settings-key-deepseek" placeholder="sk-..." 
+                                           class="w-full px-3 py-2 border border-blue-200 rounded-lg outline-none focus:border-blue-500 transition bg-white">
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-slate-600 uppercase">OpenAI API Key</label>
+                                    <input type="password" id="settings-key-openai" placeholder="sk-..." 
+                                           class="w-full px-3 py-2 border border-blue-200 rounded-lg outline-none focus:border-blue-500 transition bg-white">
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-slate-600 uppercase">Azure OpenAI API Key</label>
+                                    <input type="password" id="settings-key-azure" placeholder="your-azure-key..." 
+                                           class="w-full px-3 py-2 border border-blue-200 rounded-lg outline-none focus:border-blue-500 transition bg-white">
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-slate-600 uppercase">Azure OpenAI Endpoint</label>
+                                    <input type="text" id="settings-azure-endpoint" placeholder="https://your-resource.openai.azure.cn" 
+                                           class="w-full px-3 py-2 border border-blue-200 rounded-lg outline-none focus:border-blue-500 transition bg-white">
+                                    <p class="text-xs text-slate-500 mt-1">中国区: .openai.azure.cn | 全球区: .openai.azure.com</p>
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-slate-600 uppercase">Azure Deployment Name</label>
+                                    <input type="text" id="settings-azure-deployment" placeholder="gpt-4o" 
+                                           class="w-full px-3 py-2 border border-blue-200 rounded-lg outline-none focus:border-blue-500 transition bg-white">
+                                    <p class="text-xs text-slate-500 mt-1">您在Azure创建的部署名称（不是模型名）</p>
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-slate-600 uppercase">Anthropic API Key</label>
+                                    <input type="password" id="settings-key-anthropic" placeholder="sk-ant-..." 
+                                           class="w-full px-3 py-2 border border-blue-200 rounded-lg outline-none focus:border-blue-500 transition bg-white">
+                                    <p class="text-xs text-slate-500 mt-1">Claude API密钥（获取地址: console.anthropic.com）</p>
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-slate-600 uppercase">Google Gemini API Key</label>
+                                    <input type="password" id="settings-key-gemini" placeholder="AIza..." 
+                                           class="w-full px-3 py-2 border border-blue-200 rounded-lg outline-none focus:border-blue-500 transition bg-white">
+                                    <p class="text-xs text-slate-500 mt-1">Gemini API密钥（获取地址: aistudio.google.com）</p>
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-slate-600 uppercase">OpenRouter API Key</label>
+                                    <input type="password" id="settings-key-openrouter" placeholder="sk-or-..." 
+                                           class="w-full px-3 py-2 border border-blue-200 rounded-lg outline-none focus:border-blue-500 transition bg-white">
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-slate-600 uppercase">Aliyun API Key</label>
+                                    <input type="password" id="settings-key-aliyun" placeholder="sk-..." 
+                                           class="w-full px-3 py-2 border border-blue-200 rounded-lg outline-none focus:border-blue-500 transition bg-white">
                                 </div>
                             </div>
-                            <div class="space-y-1">
-                                <label class="text-xs font-bold text-slate-600 uppercase">Tavily API Key</label>
-                                <input type="password" id="settings-key-tavily" placeholder="tvly-..." 
-                                       class="w-full px-3 py-2 border border-green-200 rounded-lg outline-none focus:border-green-500 transition bg-white">
+                        </section>
+
+                        <!-- 搜索引擎配置区域 -->
+                        <section class="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-100">
+                            <h4 class="text-sm font-bold text-green-800 mb-4 flex items-center">
+                                <span class="w-1.5 h-4 bg-green-500 rounded-full mr-2"></span>
+                                <span class="mr-1">🔍</span>
+                                <span data-i18n="settings_search_engines">搜索引擎配置</span>
+                            </h4>
+                            <div class="grid grid-cols-1 gap-4">
+                                <div class="space-y-2">
+                                    <label class="text-xs font-bold text-slate-600 uppercase" data-i18n="settings_search_engines">搜索增强引擎 (可多选)</label>
+                                    <div id="settings-search-providers" class="grid grid-cols-2 gap-2">
+                                        <label class="flex items-center space-x-2 p-2 border border-green-200 rounded-lg hover:bg-white cursor-pointer transition bg-white/50">
+                                            <input type="checkbox" value="bing" class="search-provider-checkbox w-4 h-4 text-green-600 rounded focus:ring-green-500">
+                                            <span class="text-sm text-slate-700">Bing (<span data-i18n="search_stable">不稳定</span>)</span>
+                                        </label>
+                                        <label class="flex items-center space-x-2 p-2 border border-green-200 rounded-lg hover:bg-white cursor-pointer transition bg-white/50">
+                                            <input type="checkbox" value="baidu" class="search-provider-checkbox w-4 h-4 text-green-600 rounded focus:ring-green-500">
+                                            <span class="text-sm text-slate-700">Baidu (<span data-i18n="search_chinese">中文</span>)</span>
+                                        </label>
+                                        <label class="flex items-center space-x-2 p-2 border border-green-200 rounded-lg hover:bg-white cursor-pointer transition bg-white/50">
+                                            <input type="checkbox" value="duckduckgo" class="search-provider-checkbox w-4 h-4 text-green-600 rounded focus:ring-green-500">
+                                            <span class="text-sm text-slate-700">DuckDuckGo</span>
+                                        </label>
+                                        <label class="flex items-center space-x-2 p-2 border border-green-200 rounded-lg hover:bg-white cursor-pointer transition bg-white/50">
+                                            <input type="checkbox" value="yahoo" class="search-provider-checkbox w-4 h-4 text-green-600 rounded focus:ring-green-500">
+                                            <span class="text-sm text-slate-700">Yahoo (<span data-i18n="search_stable_good">稳定</span>)</span>
+                                        </label>
+                                        <label class="flex items-center space-x-2 p-2 border border-green-200 rounded-lg hover:bg-white cursor-pointer transition bg-white/50">
+                                            <input type="checkbox" value="mojeek" class="search-provider-checkbox w-4 h-4 text-green-600 rounded focus:ring-green-500">
+                                            <span class="text-sm text-slate-700">Mojeek (<span data-i18n="search_english">英文</span>)</span>
+                                        </label>
+                                        <label class="flex items-center space-x-2 p-2 border border-green-200 rounded-lg hover:bg-white cursor-pointer transition bg-white/50">
+                                            <input type="checkbox" value="google" class="search-provider-checkbox w-4 h-4 text-green-600 rounded focus:ring-green-500">
+                                            <span class="text-sm text-slate-700">Google (<span class="text-green-600 font-bold">API</span>)</span>
+                                        </label>
+                                        <label class="flex items-center space-x-2 p-2 border border-green-200 rounded-lg hover:bg-white cursor-pointer transition bg-white/50">
+                                            <input type="checkbox" value="tavily" class="search-provider-checkbox w-4 h-4 text-green-600 rounded focus:ring-green-500">
+                                            <span class="text-sm text-slate-700">Tavily (Key)</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-slate-600 uppercase">Tavily API Key</label>
+                                    <input type="password" id="settings-key-tavily" placeholder="tvly-..." 
+                                           class="w-full px-3 py-2 border border-green-200 rounded-lg outline-none focus:border-green-500 transition bg-white">
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-slate-600 uppercase flex items-center">
+                                        <span class="mr-2">Google API Key</span>
+                                        <a href="https://developers.google.com/custom-search/v1/overview" target="_blank" class="text-green-500 hover:text-green-700 text-xs">
+                                            (获取 ↗️)
+                                        </a>
+                                    </label>
+                                    <input type="password" id="settings-key-google" placeholder="AIzaSy..." 
+                                           class="w-full px-3 py-2 border border-green-200 rounded-lg outline-none focus:border-green-500 transition bg-white">
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-slate-600 uppercase flex items-center">
+                                        <span class="mr-2">Google Search Engine ID</span>
+                                        <a href="https://programmablesearchengine.google.com/" target="_blank" class="text-green-500 hover:text-green-700 text-xs">
+                                            (获取 ↗️)
+                                        </a>
+                                    </label>
+                                    <input type="text" id="settings-google-cx" placeholder="003ac4d2..." 
+                                           class="w-full px-3 py-2 border border-green-200 rounded-lg outline-none focus:border-green-500 transition bg-white">
+                                    <p class="text-xs text-slate-500 mt-1">
+                                        💡 免费配额：100次/天 | 付费：$5/1000次 | 国内可访问
+                                    </p>
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-xs font-bold text-slate-600 uppercase" data-i18n="settings_browser_path">浏览器可执行文件路径 (Baidu/Bing 搜索)</label>
+                                    <input type="text" id="settings-browser-path" placeholder="例如: C:\Program Files\Google\Chrome\Application\chrome.exe" 
+                                           data-i18n-placeholder="settings_browser_path_placeholder"
+                                           class="w-full px-3 py-2 border border-green-200 rounded-lg outline-none focus:border-green-500 transition bg-white">
+                                </div>
                             </div>
-                            <div class="space-y-1">
-                                <label class="text-xs font-bold text-slate-600 uppercase flex items-center">
-                                    <span class="mr-2">Google API Key</span>
-                                    <a href="https://developers.google.com/custom-search/v1/overview" target="_blank" class="text-green-500 hover:text-green-700 text-xs">
-                                        (获取 ↗️)
-                                    </a>
-                                </label>
-                                <input type="password" id="settings-key-google" placeholder="AIzaSy..." 
-                                       class="w-full px-3 py-2 border border-green-200 rounded-lg outline-none focus:border-green-500 transition bg-white">
-                            </div>
-                            <div class="space-y-1">
-                                <label class="text-xs font-bold text-slate-600 uppercase flex items-center">
-                                    <span class="mr-2">Google Search Engine ID</span>
-                                    <a href="https://programmablesearchengine.google.com/" target="_blank" class="text-green-500 hover:text-green-700 text-xs">
-                                        (获取 ↗️)
-                                    </a>
-                                </label>
-                                <input type="text" id="settings-google-cx" placeholder="003ac4d2..." 
-                                       class="w-full px-3 py-2 border border-green-200 rounded-lg outline-none focus:border-green-500 transition bg-white">
-                                <p class="text-xs text-slate-500 mt-1">
-                                    💡 免费配额：100次/天 | 付费：$5/1000次 | 国内可访问
-                                </p>
-                            </div>
-                            <div class="space-y-1">
-                                <label class="text-xs font-bold text-slate-600 uppercase" data-i18n="settings_browser_path">浏览器可执行文件路径 (Baidu/Bing 搜索)</label>
-                                <input type="text" id="settings-browser-path" placeholder="例如: C:\Program Files\Google\Chrome\Application\chrome.exe" 
-                                       data-i18n-placeholder="settings_browser_path_placeholder"
-                                       class="w-full px-3 py-2 border border-green-200 rounded-lg outline-none focus:border-green-500 transition bg-white">
-                            </div>
-                        </div>
-                    </section>
+                        </section>
+                    </div>
                 </div>
 
-                <div class="mt-8 pt-4 border-t border-slate-100 flex justify-end space-x-3">
-                    <button onclick="toggleSettingsModal()" class="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition" data-i18n="btn_cancel">
+                <div class="mt-6 pt-4 border-t border-slate-100 flex justify-end space-x-3">
+                    <button onclick="toggleAdvancedConfigModal()" class="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition" data-i18n="btn_cancel">
                         取消
                     </button>
-                    <button onclick="saveSettings()" class="px-8 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-lg shadow-blue-200" data-i18n="btn_save_apply">
-                        保存并应用
+                    <button onclick="applyAdvancedConfig()" class="px-8 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-lg shadow-blue-200" data-i18n="btn_apply">
+                        应用
                     </button>
                 </div>
             </div>
         </div>
 
-        <!-- 编制管理模态框 -->
-        <div id="presets-modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[150] flex items-center justify-center">
-            <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl p-8 m-4 max-h-[90vh] overflow-y-auto transform transition-all scale-100">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-2xl font-black text-slate-800 flex items-center">
-                        <span class="mr-3 text-3xl">📂</span> <span data-i18n="presets_title">元老院编制管理</span>
-                    </h2>
-                    <button onclick="togglePresetsModal()" class="text-slate-400 hover:text-slate-600 transition">
-                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                    </button>
-                </div>
-
-                <div class="space-y-6">
-                    <!-- 保存当前配置 -->
-                    <section class="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                        <h3 class="font-bold text-slate-700 mb-3 flex items-center">
-                            <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span> <span data-i18n="presets_save_new">保存当前配置为新编制</span>
-                        </h3>
-                        <div class="flex gap-2">
-                            <input type="text" id="new-preset-name" placeholder="输入编制名称 (例如: 3人-DeepSeek-高强度)" 
-                                   class="flex-1 px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition">
-                            <button onclick="saveCurrentAsPreset()" class="bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-2 rounded-lg transition shadow-sm" data-i18n="btn_save">
-                                保存
-                            </button>
-                        </div>
-                    </section>
-
-                    <!-- 编制列表 -->
-                    <section>
-                        <h3 class="font-bold text-slate-700 mb-3 flex items-center">
-                            <span class="w-2 h-2 bg-blue-500 rounded-full mr-2"></span> <span data-i18n="presets_list">已保存的编制</span>
-                        </h3>
-                        <div id="presets-management-list" class="space-y-2 max-h-60 overflow-y-auto pr-2">
-                            <!-- 动态插入 -->
-                            <div class="text-center text-gray-400 py-4">加载中...</div>
-                        </div>
-                    </section>
-                </div>
-
-                <div class="mt-8 pt-4 border-t border-slate-100 flex justify-end">
-                    <button onclick="togglePresetsModal()" class="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition" data-i18n="btn_close">
-                        关闭
-                    </button>
-                </div>
-            </div>
-        </div>
+        <!-- 编制管理模态框 (已废弃，功能移至高级配置modal) -->
 
         <!-- 角色管理模态框 -->
         <div id="roles-modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[150] flex items-center justify-center">
@@ -870,6 +859,16 @@
                     input_auditors_label: "监察官",
                     btn_start: "开始议事",
                     btn_advanced: "高级配置",
+                    advanced_config_title: "高级配置",
+                    tab_basic_config: "基础配置",
+                    tab_agent_config: "席位专家配置",
+                    tab_presets: "元老院编制",
+                    tab_settings: "系统设置",
+                    agent_config_desc: "为不同席位的专家指定特定的模型后端和参数",
+                    presets_name_placeholder: "输入编制名称 (例如: 3人-DeepSeek-高强度)",
+                    btn_load: "加载",
+                    btn_delete: "删除",
+                    btn_apply: "应用",
                     btn_load_preset: "加载编制",
                     btn_save_current: "保存当前配置",
                     btn_history: "历史",
@@ -1025,6 +1024,16 @@
                     input_auditors_label: "Auditors",
                     btn_start: "Start Discussion",
                     btn_advanced: "Advanced",
+                    advanced_config_title: "Advanced Configuration",
+                    tab_basic_config: "Basic Configuration",
+                    tab_agent_config: "Seat Expert Configuration",
+                    tab_presets: "Council Presets",
+                    tab_settings: "System Settings",
+                    agent_config_desc: "Specify specific model backends and parameters for different seat experts",
+                    presets_name_placeholder: "Enter preset name (e.g., 3-member-DeepSeek-high)",
+                    btn_load: "Load",
+                    btn_delete: "Delete",
+                    btn_apply: "Apply",
                     btn_history: "History",
                     btn_stop: "Stop",
                     advanced_title: "Seat Expert Configuration",
@@ -3266,6 +3275,17 @@ function confirmSatisfied() {
                 // 初始化语言
                 setLanguage(currentLang);
 
+                // 初始化隐藏字段的默认值
+                document.getElementById('backend-select').value = 'deepseek';
+                document.getElementById('global-model-input').value = '';
+                document.getElementById('global-reasoning-input').value = '';
+                document.getElementById('rounds-input').value = '3';
+                document.getElementById('planners-input').value = '2';
+                document.getElementById('auditors-input').value = '2';
+
+                // 加载编制列表
+                loadPresets();
+
                 // 启动定时轮询
                 setInterval(fetchUpdates, 1000);
                 
@@ -3293,7 +3313,7 @@ function confirmSatisfied() {
                     }
                 });
                 
-                // 监听全局后端选择
+                // 监听全局后端选择（隐藏字段）
                 const globalBackend = document.getElementById('backend-select');
                 const globalModel = document.getElementById('global-model-input');
                 const updateGlobalList = () => {
@@ -3310,11 +3330,36 @@ function confirmSatisfied() {
                 globalBackend.addEventListener('change', updateGlobalList);
                 updateGlobalList(); // 初始检查
 
+                // 监听modal后端选择
+                const modalBackend = document.getElementById('modal-backend-select');
+                const modalModel = document.getElementById('modal-global-model-input');
+                const updateModalGlobalList = () => {
+                    if (modalBackend.value === 'openrouter') {
+                        modalModel.setAttribute('list', 'openrouter-models-list');
+                        fetchOpenRouterModels();
+                    } else if (modalBackend.value === 'deepseek') {
+                        modalModel.setAttribute('list', 'deepseek-models-list');
+                        fetchDeepSeekModels();
+                    } else {
+                        modalModel.removeAttribute('list');
+                    }
+                    updateModalReasoningVisibility();
+                };
+                modalBackend.addEventListener('change', updateModalGlobalList);
+                
+                // 监听modal中策论家和监察官数量变化
+                document.getElementById('modal-planners-input').addEventListener('input', () => {
+                    updateModalAgentConfigsUI();
+                });
+                document.getElementById('modal-auditors-input').addEventListener('input', () => {
+                    updateModalAgentConfigsUI();
+                });
+
                 // 监听策论家和监察官数量变化，动态更新席位配置
                 const updateConfigsIfVisible = () => {
-                    const panel = document.getElementById('advanced-settings');
-                    if (panel && !panel.classList.contains('hidden')) {
-                        updateAgentConfigsUI();
+                    const modal = document.getElementById('advanced-config-modal');
+                    if (modal && !modal.classList.contains('hidden')) {
+                        updateModalAgentConfigsUI();
                     }
                 };
                 document.getElementById('planners-input').addEventListener('input', updateConfigsIfVisible);
@@ -3343,17 +3388,129 @@ function confirmSatisfied() {
             });
 
             function toggleAdvancedSettings() {
-                const panel = document.getElementById('advanced-settings');
-                panel.classList.toggle('hidden');
-                if (!panel.classList.contains('hidden')) {
-                    updateAgentConfigsUI();
+                // 废弃函数 - 改为使用 toggleAdvancedConfigModal
+                toggleAdvancedConfigModal();
+            }
+
+            // 新的高级配置Modal控制函数
+            function toggleAdvancedConfigModal() {
+                const modal = document.getElementById('advanced-config-modal');
+                if (modal.classList.contains('hidden')) {
+                    // 打开modal - 从隐藏字段加载值到modal字段
+                    document.getElementById('modal-backend-select').value = document.getElementById('backend-select').value || 'deepseek';
+                    document.getElementById('modal-global-model-input').value = document.getElementById('global-model-input').value || '';
+                    document.getElementById('modal-global-reasoning-input').value = document.getElementById('global-reasoning-input').value || '';
+                    document.getElementById('modal-rounds-input').value = document.getElementById('rounds-input').value || '3';
+                    document.getElementById('modal-planners-input').value = document.getElementById('planners-input').value || '2';
+                    document.getElementById('modal-auditors-input').value = document.getElementById('auditors-input').value || '2';
+                    
+                    // 更新推理强度容器显示
+                    updateModalReasoningVisibility();
+                    // 更新席位配置列表
+                    updateModalAgentConfigsUI();
+                    
+                    modal.classList.remove('hidden');
+                } else {
+                    modal.classList.add('hidden');
                 }
             }
 
-            function updateAgentConfigsUI() {
-                const container = document.getElementById('agent-configs-container');
-                const plannersCount = parseInt(document.getElementById('planners-input').value) || 0;
-                const auditorsCount = parseInt(document.getElementById('auditors-input').value) || 0;
+            // Tab切换函数
+            function switchAdvancedTab(tabName) {
+                // 更新tab按钮样式
+                const basicBtn = document.getElementById('tab-basic-btn');
+                const agentsBtn = document.getElementById('tab-agents-btn');
+                const presetsBtn = document.getElementById('tab-presets-btn');
+                const settingsBtn = document.getElementById('tab-settings-btn');
+                const basicContent = document.getElementById('tab-basic-content');
+                const agentsContent = document.getElementById('tab-agents-content');
+                const presetsContent = document.getElementById('tab-presets-content');
+                const settingsContent = document.getElementById('tab-settings-content');
+                
+                // 重置所有tab样式
+                [basicBtn, agentsBtn, presetsBtn, settingsBtn].forEach(btn => {
+                    btn.classList.remove('text-blue-600', 'border-blue-600');
+                    btn.classList.add('text-slate-500', 'border-transparent');
+                });
+                [basicContent, agentsContent, presetsContent, settingsContent].forEach(content => {
+                    content.classList.add('hidden');
+                });
+                
+                // 激活选中的tab
+                if (tabName === 'basic') {
+                    basicBtn.classList.add('text-blue-600', 'border-blue-600');
+                    basicBtn.classList.remove('text-slate-500', 'border-transparent');
+                    basicContent.classList.remove('hidden');
+                } else if (tabName === 'agents') {
+                    agentsBtn.classList.add('text-blue-600', 'border-blue-600');
+                    agentsBtn.classList.remove('text-slate-500', 'border-transparent');
+                    agentsContent.classList.remove('hidden');
+                    // 切换到席位配置tab时，更新UI
+                    updateModalAgentConfigsUI();
+                } else if (tabName === 'presets') {
+                    presetsBtn.classList.add('text-blue-600', 'border-blue-600');
+                    presetsBtn.classList.remove('text-slate-500', 'border-transparent');
+                    presetsContent.classList.remove('hidden');
+                    // 切换到编制tab时，加载编制列表
+                    loadModalPresetsList();
+                } else if (tabName === 'settings') {
+                    settingsBtn.classList.add('text-blue-600', 'border-blue-600');
+                    settingsBtn.classList.remove('text-slate-500', 'border-transparent');
+                    settingsContent.classList.remove('hidden');
+                    // 切换到系统设置tab时，加载当前配置
+                    loadSystemSettings();
+                }
+            }
+
+            // 应用高级配置
+            async function applyAdvancedConfig() {
+                // 如果当前在系统设置tab，先保存系统设置
+                const settingsTab = document.getElementById('tab-settings-content');
+                if (!settingsTab.classList.contains('hidden')) {
+                    const saved = await saveSettings();
+                    if (!saved) {
+                        return; // 如果保存失败，不关闭modal
+                    }
+                }
+                
+                // 从modal字段复制值到隐藏字段
+                document.getElementById('backend-select').value = document.getElementById('modal-backend-select').value;
+                document.getElementById('global-model-input').value = document.getElementById('modal-global-model-input').value;
+                document.getElementById('global-reasoning-input').value = document.getElementById('modal-global-reasoning-input').value;
+                document.getElementById('rounds-input').value = document.getElementById('modal-rounds-input').value;
+                document.getElementById('planners-input').value = document.getElementById('modal-planners-input').value;
+                document.getElementById('auditors-input').value = document.getElementById('modal-auditors-input').value;
+                
+                // 触发后端选择变化事件（更新推理容器可见性）
+                const backendSelect = document.getElementById('backend-select');
+                const event = new Event('change');
+                backendSelect.dispatchEvent(event);
+                
+                // 关闭modal
+                toggleAdvancedConfigModal();
+                
+                // 显示提示
+                console.log('高级配置已应用');
+            }
+
+            // 监听modal后端选择变化，控制推理强度显示
+            function updateModalReasoningVisibility() {
+                const backend = document.getElementById('modal-backend-select').value;
+                const reasoningContainer = document.getElementById('modal-global-reasoning-container');
+                const supportsReasoning = ['deepseek', 'openai', 'azure', 'openrouter'].includes(backend);
+                
+                if (supportsReasoning) {
+                    reasoningContainer.classList.remove('hidden');
+                } else {
+                    reasoningContainer.classList.add('hidden');
+                }
+            }
+
+            // 更新modal中的席位配置UI
+            function updateModalAgentConfigsUI() {
+                const container = document.getElementById('modal-agent-configs-container');
+                const plannersCount = parseInt(document.getElementById('modal-planners-input').value) || 0;
+                const auditorsCount = parseInt(document.getElementById('modal-auditors-input').value) || 0;
                 
                 // 处理 Planners
                 for (let i = 0; i < 5; i++) {
@@ -3393,6 +3550,171 @@ function confirmSatisfied() {
                     } else if (el) {
                         container.removeChild(el);
                     }
+                }
+            }
+
+            function updateAgentConfigsUI() {
+                // 旧函数 - 现在调用modal版本
+                updateModalAgentConfigsUI();
+            }
+
+            // Modal编制管理函数
+            async function saveModalPreset() {
+                const nameInput = document.getElementById('modal-new-preset-name');
+                let name = nameInput.value.trim();
+                
+                if (!name) {
+                    showAlert(t('msg_preset_name_empty'), t('title_hint'), 'warning');
+                    return;
+                }
+
+                // 从modal字段收集配置
+                const config = {
+                    backend: document.getElementById('modal-backend-select').value,
+                    global_model: document.getElementById('modal-global-model-input').value,
+                    global_reasoning: document.getElementById('modal-global-reasoning-input').value,
+                    rounds: parseInt(document.getElementById('modal-rounds-input').value),
+                    planners: parseInt(document.getElementById('modal-planners-input').value),
+                    auditors: parseInt(document.getElementById('modal-auditors-input').value),
+                    agents: {}
+                };
+
+                // 收集 Agent 配置
+                document.querySelectorAll('.agent-backend').forEach(select => {
+                    const agentId = select.dataset.agent;
+                    const modelInput = document.querySelector(`.agent-model[data-agent="${agentId}"]`);
+                    const reasoningSelect = document.querySelector(`.agent-reasoning[data-agent="${agentId}"]`);
+                    if (modelInput && reasoningSelect) {
+                        config.agents[agentId] = {
+                            backend: select.value,
+                            model: modelInput.value,
+                            reasoning: reasoningSelect.value
+                        };
+                    }
+                });
+
+                try {
+                    const response = await fetch('/api/presets', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, config })
+                    });
+                    const data = await response.json();
+                    
+                    if (data.status === 'success') {
+                        showAlert(t('msg_preset_saved'), t('title_success'));
+                        nameInput.value = ''; 
+                        loadModalPresetsList();
+                        loadPresets(); // 同时更新dropdown列表
+                    } else {
+                        showAlert(data.message, t('title_error'), 'error');
+                    }
+                } catch (error) {
+                    showAlert(error.message, t('title_error'), 'error');
+                }
+            }
+
+            async function loadModalPresetsList() {
+                const container = document.getElementById('modal-presets-list');
+                try {
+                    const response = await fetch('/api/presets');
+                    const data = await response.json();
+                    
+                    // API返回的是对象格式 {name: config, ...}
+                    const presetArray = Object.entries(data.presets || {});
+                    
+                    if (presetArray.length > 0) {
+                        container.innerHTML = presetArray.map(([name, config]) => `
+                            <div class="bg-white p-3 rounded-lg border border-slate-200 hover:border-blue-300 transition flex items-center justify-between">
+                                <div class="flex-1">
+                                    <div class="font-bold text-slate-700 mb-1">${name}</div>
+                                    <div class="text-xs text-slate-500">
+                                        ${config.backend || 'default'} | ${t('input_rounds_label')}: ${config.rounds || 3} | 
+                                        ${t('input_planners_label')}: ${config.planners || 2} | ${t('input_auditors_label')}: ${config.auditors || 2}
+                                    </div>
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button onclick="applyModalPreset('${name}')" class="text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition" data-i18n="btn_load">
+                                        加载
+                                    </button>
+                                    <button onclick="deleteModalPreset('${name}')" class="text-xs bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded transition" data-i18n="btn_delete">
+                                        删除
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('');
+                    } else {
+                        container.innerHTML = '<div class="text-center text-gray-400 py-4">暂无存档</div>';
+                    }
+                } catch (error) {
+                    container.innerHTML = `<div class="text-center text-red-400 py-4">加载失败: ${error.message}</div>`;
+                }
+            }
+
+            async function applyModalPreset(name) {
+                try {
+                    const response = await fetch('/api/presets');
+                    const data = await response.json();
+                    
+                    // API返回的是对象格式 {name: config, ...}
+                    const config = data.presets[name];
+                    if (!config) {
+                        showAlert('编制不存在', t('title_error'), 'error');
+                        return;
+                    }
+                    
+                    // 应用到modal字段
+                    document.getElementById('modal-backend-select').value = config.backend || 'deepseek';
+                    document.getElementById('modal-global-model-input').value = config.global_model || '';
+                    document.getElementById('modal-global-reasoning-input').value = config.global_reasoning || '';
+                    document.getElementById('modal-rounds-input').value = config.rounds || 3;
+                    document.getElementById('modal-planners-input').value = config.planners || 2;
+                    document.getElementById('modal-auditors-input').value = config.auditors || 2;
+                    
+                    // 更新推理强度显示
+                    updateModalReasoningVisibility();
+                    
+                    // 应用 Agent 配置
+                    if (config.agents) {
+                        Object.keys(config.agents).forEach(agentId => {
+                            const agentConfig = config.agents[agentId];
+                            const backendSelect = document.querySelector(`.agent-backend[data-agent="${agentId}"]`);
+                            const modelInput = document.querySelector(`.agent-model[data-agent="${agentId}"]`);
+                            const reasoningSelect = document.querySelector(`.agent-reasoning[data-agent="${agentId}"]`);
+                            
+                            if (backendSelect) backendSelect.value = agentConfig.backend || 'default';
+                            if (modelInput) modelInput.value = agentConfig.model || '';
+                            if (reasoningSelect) reasoningSelect.value = agentConfig.reasoning || '';
+                        });
+                    }
+                    
+                    // 更新席位配置UI
+                    updateModalAgentConfigsUI();
+                    
+                    showAlert(t('msg_preset_loaded'), t('title_success'));
+                } catch (error) {
+                    showAlert(error.message, t('title_error'), 'error');
+                }
+            }
+
+            async function deleteModalPreset(name) {
+                if (!confirm(t('confirm_delete_preset'))) return;
+
+                try {
+                    const response = await fetch(`/api/presets/${encodeURIComponent(name)}`, {
+                        method: 'DELETE'
+                    });
+                    const data = await response.json();
+                    
+                    if (data.status === 'success') {
+                        showAlert(t('msg_preset_deleted'), t('title_success'));
+                        loadModalPresetsList();
+                        loadPresets(); // 同时更新dropdown列表
+                    } else {
+                        showAlert(data.message, t('title_error'), 'error');
+                    }
+                } catch (error) {
+                    showAlert(error.message, t('title_error'), 'error');
                 }
             }
 
@@ -3522,43 +3844,38 @@ function confirmSatisfied() {
                 }
             });
 
-            async function toggleSettingsModal() {
-                const modal = document.getElementById('settings-modal');
-                if (modal.classList.contains('hidden')) {
-                    // 打开时加载当前配置
-                    try {
-                        const response = await fetch('/api/config');
-                        const data = await response.json();
-                        if (data.status === 'success') {
-                            const cfg = data.config;
-                            document.getElementById('settings-key-deepseek').value = cfg.DEEPSEEK_API_KEY || '';
-                            document.getElementById('settings-key-openai').value = cfg.OPENAI_API_KEY || '';
-                            document.getElementById('settings-key-azure').value = cfg.AZURE_OPENAI_API_KEY || '';
-                            document.getElementById('settings-azure-endpoint').value = cfg.AZURE_OPENAI_ENDPOINT || '';
-                            document.getElementById('settings-azure-deployment').value = cfg.AZURE_OPENAI_DEPLOYMENT_NAME || '';
-                            document.getElementById('settings-key-anthropic').value = cfg.ANTHROPIC_API_KEY || '';
-                            document.getElementById('settings-key-gemini').value = cfg.GEMINI_API_KEY || '';
-                            document.getElementById('settings-key-openrouter').value = cfg.OPENROUTER_API_KEY || '';
-                            document.getElementById('settings-key-aliyun').value = cfg.ALIYUN_API_KEY || '';
-                            document.getElementById('settings-key-tavily').value = cfg.TAVILY_API_KEY || '';
-                            document.getElementById('settings-key-google').value = cfg.GOOGLE_API_KEY || '';
-                            document.getElementById('settings-google-cx').value = cfg.GOOGLE_SEARCH_ENGINE_ID || '';
-                            document.getElementById('settings-browser-path').value = cfg.BROWSER_PATH || '';
-                            
-                            // 处理多选搜索供应商
-                            if (cfg.SEARCH_PROVIDER) {
-                                const providers = cfg.SEARCH_PROVIDER.split(',').map(p => p.trim());
-                                document.querySelectorAll('.search-provider-checkbox').forEach(cb => {
-                                    cb.checked = providers.includes(cb.value);
-                                });
-                            }
+            // --- 系统设置功能 (整合至高级配置) ---
+            
+            async function loadSystemSettings() {
+                try {
+                    const response = await fetch('/api/config');
+                    const data = await response.json();
+                    if (data.status === 'success') {
+                        const cfg = data.config;
+                        document.getElementById('settings-key-deepseek').value = cfg.DEEPSEEK_API_KEY || '';
+                        document.getElementById('settings-key-openai').value = cfg.OPENAI_API_KEY || '';
+                        document.getElementById('settings-key-azure').value = cfg.AZURE_OPENAI_API_KEY || '';
+                        document.getElementById('settings-azure-endpoint').value = cfg.AZURE_OPENAI_ENDPOINT || '';
+                        document.getElementById('settings-azure-deployment').value = cfg.AZURE_OPENAI_DEPLOYMENT_NAME || '';
+                        document.getElementById('settings-key-anthropic').value = cfg.ANTHROPIC_API_KEY || '';
+                        document.getElementById('settings-key-gemini').value = cfg.GEMINI_API_KEY || '';
+                        document.getElementById('settings-key-openrouter').value = cfg.OPENROUTER_API_KEY || '';
+                        document.getElementById('settings-key-aliyun').value = cfg.ALIYUN_API_KEY || '';
+                        document.getElementById('settings-key-tavily').value = cfg.TAVILY_API_KEY || '';
+                        document.getElementById('settings-key-google').value = cfg.GOOGLE_API_KEY || '';
+                        document.getElementById('settings-google-cx').value = cfg.GOOGLE_SEARCH_ENGINE_ID || '';
+                        document.getElementById('settings-browser-path').value = cfg.BROWSER_PATH || '';
+                        
+                        // 处理多选搜索供应商
+                        if (cfg.SEARCH_PROVIDER) {
+                            const providers = cfg.SEARCH_PROVIDER.split(',').map(p => p.trim());
+                            document.querySelectorAll('.search-provider-checkbox').forEach(cb => {
+                                cb.checked = providers.includes(cb.value);
+                            });
                         }
-                    } catch (error) {
-                        console.error('Failed to load config:', error);
                     }
-                    modal.classList.remove('hidden');
-                } else {
-                    modal.classList.add('hidden');
+                } catch (error) {
+                    console.error('Failed to load config:', error);
                 }
             }
 
@@ -3593,12 +3910,14 @@ function confirmSatisfied() {
                     const data = await response.json();
                     if (data.status === 'success') {
                         showAlert(t('msg_save_success'), t('title_success'));
-                        toggleSettingsModal();
+                        return true;
                     } else {
                         showAlert(t('msg_save_failed') + ': ' + data.message, t('title_error'), 'error');
+                        return false;
                     }
                 } catch (error) {
                     showAlert(t('msg_save_failed') + ': ' + error.message, t('title_error'), 'error');
+                    return false;
                 }
             }
             
@@ -3816,13 +4135,26 @@ function confirmSatisfied() {
             // --- 编制管理功能 ---
 
             function togglePresetsModal() {
-                const modal = document.getElementById('presets-modal');
+                // 废弃函数 - 改为openPresetsTab
+                openPresetsTab();
+            }
+
+            function openPresetsTab() {
+                // 打开高级配置modal并切换到编制tab
+                const modal = document.getElementById('advanced-config-modal');
                 if (modal.classList.contains('hidden')) {
+                    // 首先加载当前配置到modal
+                    document.getElementById('modal-backend-select').value = document.getElementById('backend-select').value || 'deepseek';
+                    document.getElementById('modal-global-model-input').value = document.getElementById('global-model-input').value || '';
+                    document.getElementById('modal-global-reasoning-input').value = document.getElementById('global-reasoning-input').value || '';
+                    document.getElementById('modal-rounds-input').value = document.getElementById('rounds-input').value || '3';
+                    document.getElementById('modal-planners-input').value = document.getElementById('planners-input').value || '2';
+                    document.getElementById('modal-auditors-input').value = document.getElementById('auditors-input').value || '2';
+                    
                     modal.classList.remove('hidden');
-                    loadPresets();
-                } else {
-                    modal.classList.add('hidden');
                 }
+                // 切换到编制tab
+                switchAdvancedTab('presets');
             }
 
             function togglePresetsDropdown() {
@@ -3838,7 +4170,7 @@ function confirmSatisfied() {
                     const response = await fetch('/api/presets');
                     const data = await response.json();
                     
-                    if (data.status === 'success') {
+                    if (data.presets) {
                         renderPresetsList(data.presets);
                     }
                 } catch (error) {
@@ -3847,43 +4179,23 @@ function confirmSatisfied() {
             }
 
             function renderPresetsList(presets) {
-                const listContainer = document.getElementById('presets-management-list');
                 const dropdownContainer = document.getElementById('presets-list-container');
                 
-                if (!listContainer || !dropdownContainer) return;
+                if (!dropdownContainer) return;
 
-                listContainer.innerHTML = '';
                 dropdownContainer.innerHTML = '';
 
-                if (Object.keys(presets).length === 0) {
+                // API返回的是对象格式 {name: config, ...}，需要转换为数组
+                const presetArray = Object.entries(presets || {});
+                
+                if (presetArray.length === 0) {
                     const emptyHtml = `<div class="text-center text-gray-400 py-4 text-xs">暂无存档</div>`;
-                    listContainer.innerHTML = emptyHtml;
                     dropdownContainer.innerHTML = emptyHtml;
                     return;
                 }
 
-                for (const [name, config] of Object.entries(presets)) {
-                    // 渲染管理列表项
-                    const item = document.createElement('div');
-                    item.className = 'flex justify-between items-center p-3 bg-white border border-slate-200 rounded-lg hover:shadow-sm transition';
-                    item.innerHTML = `
-                        <div>
-                            <div class="font-bold text-slate-700 text-sm">${name}</div>
-                            <div class="text-xs text-slate-500 mt-1">
-                                ${config.backend} / ${config.rounds}轮 / ${config.planners}策 / ${config.auditors}监
-                            </div>
-                        </div>
-                        <div class="flex space-x-2">
-                            <button onclick="applyPreset('${name}')" class="text-blue-600 hover:text-blue-800 text-xs font-bold px-2 py-1 bg-blue-50 rounded hover:bg-blue-100 transition">
-                                加载
-                            </button>
-                            <button onclick="deletePreset('${name}')" class="text-red-600 hover:text-red-800 text-xs font-bold px-2 py-1 bg-red-50 rounded hover:bg-red-100 transition">
-                                删除
-                            </button>
-                        </div>
-                    `;
-                    listContainer.appendChild(item);
-
+                for (const [name, config] of presetArray) {
+                    
                     // 渲染下拉菜单项
                     const dropdownItem = document.createElement('button');
                     dropdownItem.onclick = () => { applyPreset(name); togglePresetsDropdown(); };
@@ -3891,12 +4203,12 @@ function confirmSatisfied() {
                     dropdownItem.innerHTML = `
                         <div class="font-bold text-slate-700 mb-1 truncate">${name}</div>
                         <div class="text-xs text-slate-500 group-hover:text-slate-600 flex items-center space-x-2">
-                            <span class="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded text-[10px] border border-blue-100 font-medium">${config.backend}</span>
-                            <span class="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] border border-slate-200">R${config.rounds}</span>
+                            <span class="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded text-[10px] border border-blue-100 font-medium">${config.backend || 'default'}</span>
+                            <span class="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] border border-slate-200">R${config.rounds || 3}</span>
                             <span class="flex items-center space-x-1">
-                                <span title="策论家">🧠 ${config.planners}</span>
+                                <span title="策论家">🧠 ${config.planners || 2}</span>
                                 <span class="text-slate-300">|</span>
-                                <span title="监察官">👁️ ${config.auditors}</span>
+                                <span title="监察官">👁️ ${config.auditors || 2}</span>
                             </span>
                         </div>
                     `;
@@ -3905,15 +4217,13 @@ function confirmSatisfied() {
             }
 
             async function saveCurrentAsPreset() {
-                const nameInput = document.getElementById('new-preset-name');
-                let name = nameInput.value.trim();
+                // 从下拉菜单调用时，没有输入框，需要弹出prompt
+                let name = prompt(t('msg_preset_name_empty'));
+                if (!name || !name.trim()) return;
                 
-                if (!name) {
-                    name = prompt(t('msg_preset_name_empty'));
-                    if (!name) return;
-                }
+                name = name.trim();
 
-                // 收集当前配置
+                // 收集当前配置（从隐藏字段读取）
                 const config = {
                     backend: document.getElementById('backend-select').value,
                     global_model: document.getElementById('global-model-input').value,
@@ -3944,8 +4254,7 @@ function confirmSatisfied() {
                     
                     if (data.status === 'success') {
                         showAlert(t('msg_preset_saved'), t('title_success'));
-                        nameInput.value = ''; 
-                        loadPresets(); 
+                        loadPresets(); // 更新下拉列表
                     } else {
                         showAlert(data.message, t('title_error'), 'error');
                     }
@@ -3978,15 +4287,16 @@ function confirmSatisfied() {
                 fetch('/api/presets')
                     .then(res => res.json())
                     .then(data => {
-                        if (data.status === 'success' && data.presets[name]) {
-                            const config = data.presets[name];
+                        // API返回的是 {presets: {name: config, ...}} 对象结构
+                        const config = data.presets[name];
+                        if (config) {
                             
-                            document.getElementById('backend-select').value = config.backend;
+                            document.getElementById('backend-select').value = config.backend || 'deepseek';
                             document.getElementById('global-model-input').value = config.global_model || '';
                             document.getElementById('global-reasoning-input').value = config.global_reasoning || '';
-                            document.getElementById('rounds-input').value = config.rounds;
-                            document.getElementById('planners-input').value = config.planners;
-                            document.getElementById('auditors-input').value = config.auditors;
+                            document.getElementById('rounds-input').value = config.rounds || 3;
+                            document.getElementById('planners-input').value = config.planners || 2;
+                            document.getElementById('auditors-input').value = config.auditors || 2;
 
                             document.getElementById('backend-select').dispatchEvent(new Event('change'));
 
@@ -4006,8 +4316,12 @@ function confirmSatisfied() {
                             }
 
                             showAlert(t('msg_preset_loaded'), t('title_success'));
-                            document.getElementById('presets-modal').classList.add('hidden');
+                        } else {
+                            showAlert('编制不存在', t('title_error'), 'error');
                         }
+                    })
+                    .catch(error => {
+                        showAlert(error.message, t('title_error'), 'error');
                     });
             }
         </script>

@@ -158,5 +158,85 @@
                 "reasoning": ""
             }
         }
+    },
+    "111": {
+        "backend": "deepseek",
+        "global_model": "",
+        "global_reasoning": "",
+        "rounds": 3,
+        "planners": 2,
+        "auditors": 2,
+        "agents": {
+            "leader": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            },
+            "reporter": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            },
+            "planner_0": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            },
+            "planner_1": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            },
+            "auditor_0": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            },
+            "auditor_1": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            }
+        }
+    },
+    "3": {
+        "backend": "deepseek",
+        "global_model": "",
+        "global_reasoning": "",
+        "rounds": 3,
+        "planners": 2,
+        "auditors": 2,
+        "agents": {
+            "leader": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            },
+            "reporter": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            },
+            "planner_0": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            },
+            "planner_1": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            },
+            "auditor_0": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            },
+            "auditor_1": {
+                "backend": "default",
+                "model": "",
+                "reasoning": ""
+            }
+        }
     }
 }
