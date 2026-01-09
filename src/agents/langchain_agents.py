@@ -1046,6 +1046,11 @@ def call_role_designer(requirement: str) -> schemas.RoleDesignOutput:
         
         logger.info("[role_designer] 开始生成角色设计...")
         
+        # 发送用户需求到前端（显示在reasoning区域顶部）
+        send_web_event("role_designer_reasoning", 
+                      content=f"📋 用户需求：\n{requirement}\n\n{'='*60}\n\n",
+                      agent_name="角色设计师")
+        
         # 使用stream模式捕获推理过程
         reasoning_parts = []
         content_parts = []
