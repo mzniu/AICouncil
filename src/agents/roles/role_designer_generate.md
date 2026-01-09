@@ -84,27 +84,27 @@ AICouncil是一个多Agent辩论系统，现有核心角色：
 **CRITICAL**: 你的输出必须是严格的JSON，直接对应`RoleDesignOutput` Schema，NO ADDITIONAL TEXT！
 
 ```json
-{
+{{
   "role_name": "英文技术名称",
   "display_name": "中文显示名称",
   "role_description": "50-200字角色描述",
   "stages": [
-    {
+    {{
       "stage_name": "阶段名称",
       "output_schema": "PlanSchema或其他Schema",
       "responsibilities": ["职责1", "职责2", "..."],
       "thinking_style": "思维方式描述",
       "output_format": "输出格式描述"
-    }
+    }}
   ],
   "recommended_personas": [
-    {
+    {{
       "name": "人物名称",
       "reason": "推荐理由",
       "traits": ["特质1", "特质2"]
-    }
+    }}
   ]
-}
+}}
 ```
 
 ## 设计原则
@@ -119,12 +119,12 @@ AICouncil是一个多Agent辩论系统，现有核心角色：
 
 输出示例：
 ```json
-{
+{{
   "role_name": "market_researcher",
   "display_name": "市场调研员",
   "role_description": "负责收集和分析市场数据，提供行业趋势洞察和竞品分析报告。擅长定量分析和定性研究，为战略决策提供数据支撑。",
   "stages": [
-    {
+    {{
       "stage_name": "市场分析阶段",
       "output_schema": "PlanSchema",
       "responsibilities": [
@@ -135,16 +135,16 @@ AICouncil是一个多Agent辩论系统，现有核心角色：
       ],
       "thinking_style": "数据驱动、客观分析",
       "output_format": "结构化JSON报告，包含数据来源、分析结论和建议"
-    }
+    }}
   ],
   "recommended_personas": [
-    {
+    {{
       "name": "彼得·德鲁克",
       "reason": "现代管理学之父，擅长市场洞察和战略分析",
       "traits": ["系统性思维", "数据敏感", "前瞻性"]
-    }
+    }}
   ]
-}
+}}
 ```
 
 ---
