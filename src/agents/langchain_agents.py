@@ -1048,7 +1048,7 @@ def call_role_designer(requirement: str) -> schemas.RoleDesignOutput:
         
         # 同步调用（不使用stream）
         response = llm.invoke(prompt_text)
-        raw_output = response.content
+        raw_output = response if isinstance(response, str) else str(response)
         
         logger.info(f"[role_designer] 原始输出长度: {len(raw_output)}")
         
