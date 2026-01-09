@@ -1,0 +1,28 @@
+name: role_designer
+display_name: 角色设计师 (Role Designer)
+version: "1.0.0"
+description: |
+  角色设计师Agent，负责根据用户需求自动创建新的议会角色。
+  能够分析需求、设计阶段、推荐人物原型，并生成完整的角色配置。
+
+stages:
+  generate:
+    prompt_file: role_designer_generate.md
+    schema: RoleDesignOutput
+    input_vars:
+      - requirement  # 用户的需求描述
+
+default_model: deepseek-reasoner
+
+parameters:
+  max_retries: 2
+  temperature: 0.7
+  max_tokens: 4000
+
+tags:
+  - meta
+  - role_creation
+  - automation
+
+ui:
+  hidden: true  # 不在常规角色列表中显示

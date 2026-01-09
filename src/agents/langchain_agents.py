@@ -1006,3 +1006,63 @@ def generate_report_from_workspace(workspace_path: str, model_config: Dict[str, 
         logger.error(traceback.format_exc())
         return "报告生成失败"
 
+
+def call_role_designer(requirement: str) -> schemas.RoleDesignOutput:
+    """调用角色设计师Agent生成角色设计
+    
+    Args:
+        requirement: 用户的需求描述
+    
+    Returns:
+        RoleDesignOutput: 角色设计输出
+    
+    Raises:
+        Exception: 如果生成失败或验证失败
+    """
+    from src.agents.role_manager import RoleManager
+    
+    try:
+        rm = RoleManager()
+        
+        # 加载role_designer的prompt
+        prompt_template_str = rm.load_prompt('role_designer', 'generate')
+        prompt_template = PromptTemplate.from_template(prompt_template_str)
+        
+        # 准备输入
+        prompt_text = prompt_template.format(requirement=requirement)
+        
+        # 调用LLM
+        model_config = ModelConfig(
+            backend="deepseek",
+            model="deepseek-reasoner"
+        )
+        llm = AdapterLLM(model_config)
+        
+        logger.info("[role_designer] 开始生成角色设计...")
+        
+        # 同步调用（不使用stream）
+        response = llm.invoke(prompt_text)
+        raw_output = response.content
+        
+        logger.info(f"[role_designer] 原始输出长度: {len(raw_output)}")
+        
+        # 清理并解析JSON
+        json_str = clean_json_string(raw_output)
+        
+        try:
+            json_obj = json.loads(json_str)
+            design = schemas.RoleDesignOutput(**json_obj)
+            logger.info(f"[role_designer] ✅ 成功生成角色: {design.display_name}")
+            return design
+            
+        except (json.JSONDecodeError, ValidationError) as e:
+            logger.error(f"[role_designer] JSON解析失败: {e}")
+            logger.error(f"[role_designer] 原始输出: {raw_output[:500]}")
+            raise Exception(f"角色设计格式错误: {str(e)}")
+        
+    except Exception as e:
+        logger.error(f"[role_designer] 调用失败: {e}")
+        logger.error(traceback.format_exc())
+        raise
+
+

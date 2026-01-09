@@ -933,6 +933,106 @@ def validate_role_config():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+@app.route('/api/roles/design', methods=['POST'])
+def design_role():
+    """使用角色设计师Agent生成新角色设计
+    
+    Request JSON:
+        {
+            "requirement": "用户需求描述"
+        }
+    
+    Response JSON:
+        {
+            "status": "success",
+            "design": {...}  # RoleDesignOutput JSON
+        }
+    """
+    try:
+        from src.agents.langchain_agents import call_role_designer
+        
+        data = request.get_json()
+        requirement = data.get('requirement', '').strip()
+        
+        if not requirement:
+            return jsonify({
+                "status": "error",
+                "message": "需求描述不能为空"
+            }), 400
+        
+        logger.info(f"[API] 角色设计请求: {requirement[:50]}...")
+        
+        # 调用角色设计师Agent（同步调用，可能需要30-60秒）
+        design_output = call_role_designer(requirement)
+        
+        return jsonify({
+            "status": "success",
+            "design": design_output.model_dump()
+        })
+        
+    except Exception as e:
+        logger.error(f"[API] 角色设计失败: {e}", exc_info=True)
+        return jsonify({
+            "status": "error",
+            "message": f"生成失败: {str(e)}"
+        }), 500
+
+
+@app.route('/api/roles', methods=['POST'])
+def create_role():
+    """创建新角色
+    
+    Request JSON:
+        RoleDesignOutput的完整JSON
+    
+    Response JSON:
+        {
+            "status": "success",
+            "role_name": "xxx"
+        }
+    """
+    try:
+        from src.agents.role_manager import RoleManager
+        from src.agents.schemas import RoleDesignOutput
+        
+        rm = RoleManager()
+        
+        data = request.get_json()
+        
+        # 验证并解析为RoleDesignOutput
+        try:
+            design = RoleDesignOutput(**data)
+        except Exception as e:
+            return jsonify({
+                "status": "error",
+                "message": f"数据格式错误: {str(e)}"
+            }), 400
+        
+        # 创建角色
+        success, error = rm.create_new_role(design)
+        
+        if success:
+            return jsonify({
+                "status": "success",
+                "success": True,
+                "role_name": design.role_name,
+                "display_name": design.display_name
+            })
+        else:
+            return jsonify({
+                "status": "error",
+                "success": False,
+                "message": error
+            }), 400
+        
+    except Exception as e:
+        logger.error(f"[API] 创建角色失败: {e}", exc_info=True)
+        return jsonify({
+            "status": "error",
+            "message": f"创建失败: {str(e)}"
+        }), 500
+
+
 @app.route('/api/playwright/install', methods=['POST'])
 def install_playwright():
     """安装Playwright + Chromium"""
