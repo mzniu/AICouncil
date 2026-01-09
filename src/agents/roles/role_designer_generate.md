@@ -29,8 +29,17 @@ AICouncil是一个多Agent辩论系统，现有核心角色：
 
 **如需创建新Schema**：建议在设计中说明"需要新Schema: XXX"，暂时可用现有相近Schema替代。
 
-## 用户需求
+---
+
+## ⚠️ 用户需求（这是你的核心任务）
+
+```
 {{requirement}}
+```
+
+**请严格基于以上用户需求设计角色，不要偏离用户描述的场景和目标！**
+
+---
 
 ## 你的任务
 
@@ -113,11 +122,16 @@ AICouncil是一个多Agent辩论系统，现有核心角色：
 3. **Schema复用**: 优先使用现有Schema，避免不必要的复杂性
 4. **实用性**: 角色应能解决实际问题，而非概念化设计
 
-## 示例（仅供参考，实际输出需根据用户需求定制）
+---
 
-用户需求：我需要一个能做市场调研的角色
+## 参考示例（仅作格式参考，不是你的任务）
 
-输出示例：
+<details>
+<summary>示例：市场调研角色（点击展开查看JSON格式）</summary>
+
+假设用户需求为："我需要一个能做市场调研的角色"
+
+输出：
 ```json
 {{
   "role_name": "market_researcher",
@@ -146,7 +160,18 @@ AICouncil是一个多Agent辩论系统，现有核心角色：
   ]
 }}
 ```
+</details>
 
 ---
 
-**NOW OUTPUT THE JSON FOR THE USER'S REQUIREMENT. NO EXPLANATIONS, JUST JSON!**
+## 🎯 现在开始设计
+
+**基于上面「用户需求」部分的描述，生成符合该需求的角色JSON配置。**
+
+**CRITICAL**:
+- ✅ 输出纯JSON，无任何额外文字
+- ✅ 严格对应用户需求的场景和能力
+- ✅ role_name必须与用户需求相关（如"楼市分析"需求 → `real_estate_analyst`）
+- ❌ 不要生成与用户需求无关的角色（如用户要"楼市专家"，不要生成"哲学家"）
+
+**NOW OUTPUT THE JSON:**
