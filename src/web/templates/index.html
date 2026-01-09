@@ -638,6 +638,25 @@
 
                     <!-- 系统设置 Tab -->
                     <div id="tab-settings-content" class="hidden space-y-6">
+                        <!-- 角色管理区域 -->
+                        <section class="bg-gradient-to-br from-purple-50 to-pink-50 p-4 rounded-xl border border-purple-100">
+                            <h4 class="text-sm font-bold text-purple-800 mb-4 flex items-center">
+                                <span class="w-1.5 h-4 bg-purple-500 rounded-full mr-2"></span> 
+                                <span class="mr-1">👥</span>
+                                <span>角色管理</span>
+                            </h4>
+                            <div class="space-y-3">
+                                <button onclick="openRoleDesigner()" 
+                                        class="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold rounded-xl transition shadow-lg shadow-purple-200 flex items-center justify-center">
+                                    <span class="mr-2 text-xl">✨</span>
+                                    <span>创建新角色 (AI自动设计)</span>
+                                </button>
+                                <p class="text-xs text-slate-600 text-center">
+                                    描述需求，AI将自动生成完整的角色配置
+                                </p>
+                            </div>
+                        </section>
+
                         <!-- 模型API密钥配置区域 -->
                         <section class="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-100">
                             <h4 class="text-sm font-bold text-blue-800 mb-4 flex items-center">
@@ -876,6 +895,148 @@
                         </button>
                         <button onclick="saveRoleConfig()" class="px-8 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-lg shadow-blue-200">
                             保存
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 角色设计师模态框 (3步向导) -->
+        <div id="role-designer-modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[160] flex items-center justify-center">
+            <div class="bg-white w-full max-w-4xl rounded-2xl shadow-2xl p-8 m-4 max-h-[90vh] flex flex-col">
+                <!-- 标题 -->
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-black text-slate-800 flex items-center">
+                        <span class="mr-3 text-3xl">✨</span> 
+                        <span>AI角色设计师</span>
+                    </h2>
+                    <button onclick="closeRoleDesigner()" class="text-slate-400 hover:text-slate-600 transition">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- 步骤指示器 -->
+                <div class="flex items-center justify-center mb-6">
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center">
+                            <div id="step-indicator-1" class="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold">1</div>
+                            <span id="step-label-1" class="ml-2 font-bold text-blue-600">需求描述</span>
+                        </div>
+                        <div class="w-16 h-1 bg-slate-200">
+                            <div id="step-progress-1" class="h-full bg-blue-600 transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                        <div class="flex items-center">
+                            <div id="step-indicator-2" class="w-10 h-10 rounded-full bg-slate-200 text-slate-400 flex items-center justify-center font-bold">2</div>
+                            <span id="step-label-2" class="ml-2 text-slate-400">AI生成</span>
+                        </div>
+                        <div class="w-16 h-1 bg-slate-200">
+                            <div id="step-progress-2" class="h-full bg-blue-600 transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                        <div class="flex items-center">
+                            <div id="step-indicator-3" class="w-10 h-10 rounded-full bg-slate-200 text-slate-400 flex items-center justify-center font-bold">3</div>
+                            <span id="step-label-3" class="ml-2 text-slate-400">预览保存</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 步骤内容 -->
+                <div class="flex-1 overflow-y-auto pr-2">
+                    <!-- Step 1: 需求输入 -->
+                    <div id="designer-step-1" class="space-y-4">
+                        <p class="text-slate-600 mb-4">
+                            描述您需要的角色功能和特点，AI将自动生成完整的角色配置。
+                        </p>
+                        <div>
+                            <label class="block text-sm font-bold text-slate-700 mb-2">角色需求 *</label>
+                            <textarea id="role-requirement-input" 
+                                      rows="8"
+                                      class="w-full px-4 py-3 border border-slate-300 rounded-lg outline-none focus:border-blue-500 transition text-base"
+                                      placeholder="例如：我需要一个擅长数据分析的角色，能够处理统计分析、数据可视化和趋势预测任务。这个角色应该具备批判性思维，输出结构化的分析报告..."></textarea>
+                            <p class="text-xs text-slate-500 mt-2">💡 提示：详细描述角色的专业领域、工作方式和输出要求</p>
+                        </div>
+
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <h4 class="font-bold text-blue-800 mb-2">📋 示例需求</h4>
+                            <ul class="text-sm text-blue-700 space-y-1">
+                                <li>• 市场调研员：收集行业数据、分析竞品策略、生成SWOT报告</li>
+                                <li>• 创意激发官：头脑风暴、跨领域联想、打破常规思维</li>
+                                <li>• 风险评估师：识别潜在风险、评估影响程度、提出缓解措施</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: 生成中 -->
+                    <div id="designer-step-2" class="hidden space-y-4">
+                        <div class="text-center py-12">
+                            <div class="inline-block animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-600 mb-4"></div>
+                            <p class="text-lg font-bold text-slate-700">AI正在设计角色...</p>
+                            <p class="text-sm text-slate-500 mt-2">预计需要30-60秒，请稍候</p>
+                            <div id="generation-status" class="mt-4 text-sm text-slate-600">
+                                <!-- 动态更新状态 -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: 预览和编辑 -->
+                    <div id="designer-step-3" class="hidden space-y-4">
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                            <p class="text-green-800 font-bold">✅ 角色设计完成！您可以预览并调整后保存。</p>
+                        </div>
+
+                        <!-- 角色基本信息 -->
+                        <section class="bg-slate-50 rounded-lg p-4">
+                            <h4 class="font-bold text-slate-700 mb-3">基本信息</h4>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 mb-1">技术名称</label>
+                                    <input type="text" id="preview-role-name" readonly
+                                           class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 mb-1">显示名称</label>
+                                    <input type="text" id="preview-display-name" 
+                                           class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm">
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <label class="block text-xs font-bold text-slate-500 mb-1">角色描述</label>
+                                <textarea id="preview-description" rows="3"
+                                          class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm"></textarea>
+                            </div>
+                        </section>
+
+                        <!-- 阶段定义 -->
+                        <section class="bg-slate-50 rounded-lg p-4">
+                            <h4 class="font-bold text-slate-700 mb-3">工作阶段</h4>
+                            <div id="preview-stages-container" class="space-y-3">
+                                <!-- 动态插入阶段卡片 -->
+                            </div>
+                        </section>
+
+                        <!-- 推荐人物 -->
+                        <section class="bg-slate-50 rounded-lg p-4">
+                            <h4 class="font-bold text-slate-700 mb-3">推荐人物原型</h4>
+                            <div id="preview-personas-container" class="space-y-2">
+                                <!-- 动态插入人物卡片 -->
+                            </div>
+                        </section>
+                    </div>
+                </div>
+
+                <!-- 底部按钮 -->
+                <div class="mt-6 pt-4 border-t border-slate-100 flex justify-between">
+                    <button id="designer-back-btn" onclick="designerGoBack()" class="hidden px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition">
+                        ← 返回
+                    </button>
+                    <div></div> <!-- 占位 -->
+                    <div class="space-x-3">
+                        <button onclick="closeRoleDesigner()" class="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition">
+                            取消
+                        </button>
+                        <button id="designer-next-btn" onclick="designerNextStep()" class="px-8 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-lg shadow-blue-200">
+                            开始生成 →
                         </button>
                     </div>
                 </div>
@@ -4293,6 +4454,234 @@ function confirmSatisfied() {
                 } catch (error) {
                     console.error('Failed to save role config:', error);
                     showAlert('保存失败: ' + error.message, t('title_error'), 'error');
+                }
+            }
+
+            // --- 角色设计师功能 ---
+            let currentDesignerStep = 1;
+            let generatedRoleDesign = null;
+
+            function openRoleDesigner() {
+                // 重置状态
+                currentDesignerStep = 1;
+                generatedRoleDesign = null;
+                document.getElementById('role-requirement-input').value = '';
+                
+                // 显示modal并切换到第1步
+                document.getElementById('role-designer-modal').classList.remove('hidden');
+                updateDesignerStep(1);
+            }
+
+            function closeRoleDesigner() {
+                document.getElementById('role-designer-modal').classList.add('hidden');
+                currentDesignerStep = 1;
+                generatedRoleDesign = null;
+            }
+
+            function updateDesignerStep(step) {
+                currentDesignerStep = step;
+                
+                // 隐藏所有步骤内容
+                document.getElementById('designer-step-1').classList.add('hidden');
+                document.getElementById('designer-step-2').classList.add('hidden');
+                document.getElementById('designer-step-3').classList.add('hidden');
+                
+                // 显示当前步骤
+                document.getElementById(`designer-step-${step}`).classList.remove('hidden');
+                
+                // 更新步骤指示器
+                for (let i = 1; i <= 3; i++) {
+                    const indicator = document.getElementById(`step-indicator-${i}`);
+                    const label = document.getElementById(`step-label-${i}`);
+                    
+                    if (i < step) {
+                        // 已完成的步骤
+                        indicator.className = 'w-10 h-10 rounded-full bg-green-500 text-white flex items-center justify-center font-bold';
+                        indicator.innerHTML = '✓';
+                        label.className = 'ml-2 text-green-600 font-bold';
+                    } else if (i === step) {
+                        // 当前步骤
+                        indicator.className = 'w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold';
+                        indicator.textContent = i;
+                        label.className = 'ml-2 font-bold text-blue-600';
+                    } else {
+                        // 未完成的步骤
+                        indicator.className = 'w-10 h-10 rounded-full bg-slate-200 text-slate-400 flex items-center justify-center font-bold';
+                        indicator.textContent = i;
+                        label.className = 'ml-2 text-slate-400';
+                    }
+                }
+                
+                // 更新进度条
+                for (let i = 1; i <= 2; i++) {
+                    const progress = document.getElementById(`step-progress-${i}`);
+                    if (i < step) {
+                        progress.style.width = '100%';
+                    } else {
+                        progress.style.width = '0%';
+                    }
+                }
+                
+                // 更新按钮
+                const backBtn = document.getElementById('designer-back-btn');
+                const nextBtn = document.getElementById('designer-next-btn');
+                
+                if (step === 1) {
+                    backBtn.classList.add('hidden');
+                    nextBtn.textContent = '开始生成 →';
+                    nextBtn.onclick = designerNextStep;
+                } else if (step === 2) {
+                    backBtn.classList.add('hidden'); // 生成中不允许返回
+                    nextBtn.classList.add('hidden');
+                } else if (step === 3) {
+                    backBtn.classList.remove('hidden');
+                    nextBtn.classList.remove('hidden');
+                    nextBtn.textContent = '保存角色';
+                    nextBtn.onclick = saveNewRole;
+                }
+            }
+
+            async function designerNextStep() {
+                if (currentDesignerStep === 1) {
+                    // 验证需求输入
+                    const requirement = document.getElementById('role-requirement-input').value.trim();
+                    if (!requirement) {
+                        showAlert('请输入角色需求描述', '提示', 'warning');
+                        return;
+                    }
+                    
+                    // 切换到生成步骤
+                    updateDesignerStep(2);
+                    
+                    // 调用API生成角色
+                    try {
+                        const statusDiv = document.getElementById('generation-status');
+                        statusDiv.textContent = '正在调用AI...';
+                        
+                        const response = await fetch('/api/roles/design', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ requirement })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.status === 'success') {
+                            generatedRoleDesign = data.design;
+                            statusDiv.textContent = '✅ 生成完成！';
+                            
+                            // 短暂延迟后切换到预览步骤
+                            setTimeout(() => {
+                                updateDesignerStep(3);
+                                renderRolePreview(generatedRoleDesign);
+                            }, 1000);
+                        } else {
+                            statusDiv.textContent = '❌ 生成失败';
+                            showAlert('生成失败: ' + (data.message || '未知错误'), '错误', 'error');
+                            
+                            // 失败后返回第1步
+                            setTimeout(() => updateDesignerStep(1), 2000);
+                        }
+                    } catch (error) {
+                        console.error('Failed to generate role:', error);
+                        showAlert('生成失败: ' + error.message, '错误', 'error');
+                        updateDesignerStep(1);
+                    }
+                }
+            }
+
+            function designerGoBack() {
+                if (currentDesignerStep === 3) {
+                    updateDesignerStep(1);
+                }
+            }
+
+            function renderRolePreview(design) {
+                // 渲染基本信息
+                document.getElementById('preview-role-name').value = design.role_name;
+                document.getElementById('preview-display-name').value = design.display_name;
+                document.getElementById('preview-description').value = design.role_description;
+                
+                // 渲染阶段
+                const stagesContainer = document.getElementById('preview-stages-container');
+                stagesContainer.innerHTML = '';
+                
+                design.stages.forEach((stage, idx) => {
+                    const stageCard = document.createElement('div');
+                    stageCard.className = 'bg-white border border-slate-300 rounded-lg p-3';
+                    stageCard.innerHTML = `
+                        <div class="flex items-center justify-between mb-2">
+                            <h5 class="font-bold text-slate-700">${stage.stage_name}</h5>
+                            <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">${stage.output_schema}</span>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-2"><strong>思维方式:</strong> ${stage.thinking_style}</p>
+                        <div class="text-sm text-slate-600">
+                            <strong>职责:</strong>
+                            <ul class="list-disc list-inside mt-1 space-y-1">
+                                ${stage.responsibilities.map(r => `<li>${r}</li>`).join('')}
+                            </ul>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2"><strong>输出格式:</strong> ${stage.output_format}</p>
+                    `;
+                    stagesContainer.appendChild(stageCard);
+                });
+                
+                // 渲染推荐人物
+                const personasContainer = document.getElementById('preview-personas-container');
+                personasContainer.innerHTML = '';
+                
+                if (design.recommended_personas && design.recommended_personas.length > 0) {
+                    design.recommended_personas.forEach(persona => {
+                        const personaCard = document.createElement('div');
+                        personaCard.className = 'bg-white border border-slate-300 rounded-lg p-3 flex items-start';
+                        personaCard.innerHTML = `
+                            <div class="text-2xl mr-3">👤</div>
+                            <div class="flex-1">
+                                <h5 class="font-bold text-slate-700 mb-1">${persona.name}</h5>
+                                <p class="text-sm text-slate-600 mb-2">${persona.reason}</p>
+                                <div class="flex flex-wrap gap-1">
+                                    ${persona.traits.map(t => `<span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">${t}</span>`).join('')}
+                                </div>
+                            </div>
+                        `;
+                        personasContainer.appendChild(personaCard);
+                    });
+                } else {
+                    personasContainer.innerHTML = '<p class="text-sm text-slate-400">无推荐人物</p>';
+                }
+            }
+
+            async function saveNewRole() {
+                try {
+                    // 收集可能的编辑内容
+                    const updatedDesign = {
+                        ...generatedRoleDesign,
+                        display_name: document.getElementById('preview-display-name').value,
+                        role_description: document.getElementById('preview-description').value
+                    };
+                    
+                    const response = await fetch('/api/roles', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(updatedDesign)
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        showAlert(`✅ 成功创建角色: ${data.display_name}`, '成功', 'success');
+                        closeRoleDesigner();
+                        
+                        // 刷新角色列表（如果在角色管理页面）
+                        if (typeof loadRoles === 'function') {
+                            loadRoles();
+                        }
+                    } else {
+                        showAlert('创建失败: ' + (data.message || '未知错误'), '错误', 'error');
+                    }
+                } catch (error) {
+                    console.error('Failed to create role:', error);
+                    showAlert('创建失败: ' + error.message, '错误', 'error');
                 }
             }
 
