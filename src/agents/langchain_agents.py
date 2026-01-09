@@ -1037,7 +1037,7 @@ def call_role_designer(requirement: str) -> schemas.RoleDesignOutput:
         # 准备输入
         prompt_text = prompt_template.format(requirement=requirement)
         
-        # 调用LLM
+        # 调用LLM（使用stream模式捕获reasoning和content）
         model_config = ModelConfig(
             type="deepseek",
             model="deepseek-reasoner"
@@ -1046,11 +1046,27 @@ def call_role_designer(requirement: str) -> schemas.RoleDesignOutput:
         
         logger.info("[role_designer] 开始生成角色设计...")
         
-        # 同步调用（不使用stream）
-        response = llm.invoke(prompt_text)
-        raw_output = response if isinstance(response, str) else str(response)
+        # 使用stream模式捕获推理过程
+        reasoning_parts = []
+        content_parts = []
         
-        logger.info(f"[role_designer] 原始输出长度: {len(raw_output)}")
+        for chunk in llm.stream(prompt_text):
+            if hasattr(chunk, 'generation_info') and chunk.generation_info:
+                reasoning = chunk.generation_info.get('reasoning', '')
+                if reasoning:
+                    reasoning_parts.append(reasoning)
+                    # 发送reasoning到前端
+                    send_web_event("role_designer_reasoning", reasoning, agent_name="角色设计师")
+            
+            if chunk.text:
+                content_parts.append(chunk.text)
+                # 发送content到前端
+                send_web_event("role_designer_content", chunk.text, agent_name="角色设计师")
+        
+        raw_output = ''.join(content_parts)
+        full_reasoning = ''.join(reasoning_parts)
+        
+        logger.info(f"[role_designer] Reasoning长度: {len(full_reasoning)}, 输出长度: {len(raw_output)}")
         
         # 清理并解析JSON
         json_str = clean_json_string(raw_output)
@@ -1064,6 +1080,7 @@ def call_role_designer(requirement: str) -> schemas.RoleDesignOutput:
         except (json.JSONDecodeError, ValidationError) as e:
             logger.error(f"[role_designer] JSON解析失败: {e}")
             logger.error(f"[role_designer] 原始输出: {raw_output[:500]}")
+            logger.error(f"[role_designer] 完整Reasoning: {full_reasoning[:1000]}")
             raise Exception(f"角色设计格式错误: {str(e)}")
         
     except Exception as e:
