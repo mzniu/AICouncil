@@ -1024,8 +1024,14 @@ def call_role_designer(requirement: str) -> schemas.RoleDesignOutput:
     try:
         rm = RoleManager()
         
-        # 加载role_designer的prompt
-        prompt_template_str = rm.load_prompt('role_designer', 'generate')
+        # 尝试加载role_designer的prompt，如果失败则刷新角色列表
+        try:
+            prompt_template_str = rm.load_prompt('role_designer', 'generate')
+        except ValueError as e:
+            logger.warning(f"[role_designer] 首次加载失败，尝试刷新角色列表: {e}")
+            rm.refresh_all_roles()
+            prompt_template_str = rm.load_prompt('role_designer', 'generate')
+        
         prompt_template = PromptTemplate.from_template(prompt_template_str)
         
         # 准备输入
