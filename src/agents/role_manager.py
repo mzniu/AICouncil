@@ -117,6 +117,13 @@ class RoleManager:
             except Exception as e:
                 print(f"[RoleManager] 加载失败 {yaml_file.name}: {e}")
     
+    def refresh_all_roles(self):
+        """强制刷新所有角色（用于开发环境）"""
+        print("[RoleManager] 强制刷新所有角色...")
+        self._roles.clear()
+        self.load_prompt.cache_clear()
+        self._load_all_roles()
+    
     def get_role(self, name: str) -> RoleConfig:
         """获取角色配置"""
         if name not in self._roles:
