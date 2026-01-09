@@ -317,6 +317,61 @@ class RoleManager:
             self.reload_role(role_name)
             
             return True, None
+    
+    def _generate_icon(self, role_name: str, display_name: str) -> str:
+        """根据角色名称生成合适的emoji图标"""
+        icon_map = {
+            'analyst': '📊', 'analysis': '📊', '分析': '📊',
+            'data': '📈', '数据': '📈',
+            'research': '🔬', 'researcher': '🔬', '研究': '🔬',
+            'market': '📊', '市场': '📊',
+            'risk': '⚠️', '风险': '⚠️',
+            'strategy': '🎯', '战略': '🎯',
+            'creative': '💡', '创意': '💡',
+            'design': '🎨', '设计': '🎨',
+            'technical': '⚙️', '技术': '⚙️',
+            'real_estate': '🏠', 'property': '🏠', '房地产': '🏠', '楼市': '🏠',
+            'financial': '💰', 'finance': '💰', '金融': '💰',
+            'legal': '⚖️', '法律': '⚖️',
+            'medical': '🏥', '医疗': '🏥',
+            'education': '📚', '教育': '📚',
+        }
+        
+        # 尝试匹配关键词
+        text = (role_name + ' ' + display_name).lower()
+        for keyword, icon in icon_map.items():
+            if keyword in text:
+                return icon
+        
+        # 默认图标
+        return '🤖'
+    
+    def _generate_color(self, role_name: str) -> str:
+        """根据角色名称生成合适的颜色"""
+        color_map = {
+            'analyst': '#3B82F6', 'analysis': '#3B82F6',
+            'data': '#8B5CF6',
+            'research': '#06B6D4',
+            'market': '#10B981',
+            'risk': '#EF4444',
+            'strategy': '#F59E0B',
+            'creative': '#EC4899',
+            'design': '#8B5CF6',
+            'technical': '#6B7280',
+            'real_estate': '#14B8A6', 'property': '#14B8A6',
+            'financial': '#F59E0B', 'finance': '#F59E0B',
+            'legal': '#6366F1',
+            'medical': '#EF4444',
+            'education': '#3B82F6',
+        }
+        
+        # 尝试匹配关键词
+        for keyword, color in color_map.items():
+            if keyword in role_name.lower():
+                return color
+        
+        # 默认颜色（蓝色）
+        return '#6366F1'
             
         except Exception as e:
             return False, f"保存失败: {str(e)}"
@@ -345,7 +400,11 @@ class RoleManager:
                 'max_tokens': 3000
             },
             'tags': ['auto_generated'],
-            'ui': {}
+            'ui': {
+                'icon': self._generate_icon(design.role_name, design.display_name),
+                'color': self._generate_color(design.role_name),
+                'description_short': design.role_description.split('。')[0][:30] + '...' if len(design.role_description) > 30 else design.role_description.split('。')[0]
+            }
         }
         
         # 转换stages
