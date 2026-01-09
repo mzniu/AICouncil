@@ -1032,10 +1032,8 @@ def call_role_designer(requirement: str) -> schemas.RoleDesignOutput:
             rm.refresh_all_roles()
             prompt_template_str = rm.load_prompt('role_designer', 'generate')
         
-        prompt_template = PromptTemplate.from_template(prompt_template_str)
-        
-        # 准备输入
-        prompt_text = prompt_template.format(requirement=requirement)
+        # 直接使用字符串替换，避免LangChain PromptTemplate对{{}}的解析问题
+        prompt_text = prompt_template_str.replace('{{requirement}}', requirement)
         
         # 调用LLM（使用stream模式捕获reasoning和content）
         model_config = ModelConfig(
