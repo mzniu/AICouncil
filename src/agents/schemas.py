@@ -99,3 +99,60 @@ class ReportRevisionResult(BaseModel):
     content_check: ContentCheck  # 内容检查结果
     structure_check: StructureCheck  # 结构检查结果
     revised_html: str  # 修订后的完整HTML
+
+
+# 角色设计师 schema
+from pydantic import field_validator
+
+class RoleStageDefinition(BaseModel):
+    """角色阶段定义"""
+    stage_name: str  # 阶段名称，如"规划阶段"
+    output_schema: str  # 输出Schema名称，如"PlannerOutput"
+    responsibilities: List[str]  # 职责列表（至少1项）
+    thinking_style: str  # 思维方式，如"批判性思维"、"创造性思维"
+    output_format: str  # 输出格式描述
+    
+    @field_validator('responsibilities')
+    @classmethod
+    def validate_responsibilities(cls, v):
+        if len(v) == 0:
+            raise ValueError('至少需要定义1个职责')
+        return v
+
+
+class FamousPersona(BaseModel):
+    """推荐的历史/虚构人物"""
+    name: str  # 人物名称
+    reason: str  # 推荐理由
+    traits: List[str]  # 关键特质（至少1个）
+    
+    @field_validator('traits')
+    @classmethod
+    def validate_traits(cls, v):
+        if len(v) == 0:
+            raise ValueError('至少需要提供1个特质')
+        return v
+
+
+class RoleDesignOutput(BaseModel):
+    """角色设计师完整输出"""
+    role_name: str  # 角色技术名称（英文+下划线，如strategic_planner）
+    display_name: str  # 显示名称（中文）
+    role_description: str  # 角色描述（50-200字）
+    stages: List[RoleStageDefinition]  # 参与的阶段（至少1个）
+    recommended_personas: List[FamousPersona]  # 推荐人物（0-3个）
+    
+    @field_validator('role_name')
+    @classmethod
+    def validate_role_name(cls, v):
+        import re
+        if not re.match(r'^[a-z][a-z0-9_]*$', v):
+            raise ValueError('角色名称必须是小写字母、数字和下划线组合，且以字母开头')
+        return v
+    
+    @field_validator('stages')
+    @classmethod
+    def validate_stages(cls, v):
+        if len(v) == 0:
+            raise ValueError('至少需要定义1个阶段')
+        return v

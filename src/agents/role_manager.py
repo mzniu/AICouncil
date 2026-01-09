@@ -284,3 +284,142 @@ class RoleManager:
             
         except Exception as e:
             return False, f"保存失败: {str(e)}"
+    
+    # === 角色设计师功能 ===
+    
+    def generate_yaml_from_design(self, design: 'RoleDesignOutput') -> str:
+        """从RoleDesignOutput生成YAML配置
+        
+        Args:
+            design: 角色设计输出（Pydantic模型）
+        
+        Returns:
+            YAML配置字符串
+        """
+        yaml_dict = {
+            'name': design.role_name,
+            'display_name': design.display_name,
+            'version': '1.0.0',
+            'description': design.role_description,
+            'stages': {},
+            'default_model': 'deepseek-reasoner',
+            'parameters': {
+                'max_retries': 2,
+                'temperature': 0.7,
+                'max_tokens': 3000
+            },
+            'tags': ['auto_generated'],
+            'ui': {}
+        }
+        
+        # 转换stages
+        for idx, stage in enumerate(design.stages):
+            stage_key = f"stage_{idx + 1}" if len(design.stages) > 1 else "main"
+            prompt_filename = f"{design.role_name}_{stage_key}.md"
+            
+            yaml_dict['stages'][stage_key] = {
+                'prompt_file': prompt_filename,
+                'schema': stage.output_schema,
+                'input_vars': ['issue', 'round']  # 默认变量，可后续调整
+            }
+        
+        return yaml.dump(yaml_dict, allow_unicode=True, sort_keys=False)
+    
+    def generate_prompt_from_design(self, design: 'RoleDesignOutput', stage: 'RoleStageDefinition') -> str:
+        """从阶段定义生成prompt内容
+        
+        Args:
+            design: 角色设计输出
+            stage: 具体阶段定义
+        
+        Returns:
+            Prompt模板内容
+        """
+        # 生成人物原型部分
+        personas_section = ""
+        if design.recommended_personas:
+            personas_section = "\n## 推荐人物原型\n"
+            for persona in design.recommended_personas:
+                traits_str = "、".join(persona.traits)
+                personas_section += f"- **{persona.name}**: {persona.reason}\n  - 关键特质：{traits_str}\n"
+        
+        # 生成职责清单
+        responsibilities_list = "\n".join([f"{i+1}. {resp}" for i, resp in enumerate(stage.responsibilities)])
+        
+        prompt_template = f"""# {design.display_name} - {stage.stage_name}
+
+## 你的身份
+你是{design.display_name}，{design.role_description}
+{personas_section}
+## 你的职责
+在本阶段，你需要完成以下任务：
+{responsibilities_list}
+
+## 思维方式
+采用**{stage.thinking_style}**进行分析和推理。
+
+## 当前议题
+{{{{issue}}}}
+
+## 当前轮次
+第{{{{round}}}}轮讨论
+
+## 输出要求
+{stage.output_format}
+
+**CRITICAL**: 你的输出必须是严格的JSON，直接对应`{stage.output_schema}` Schema，NO ADDITIONAL TEXT！
+
+---
+请开始你的分析和输出。
+"""
+        return prompt_template
+    
+    def create_new_role(self, design: 'RoleDesignOutput') -> tuple[bool, Optional[str]]:
+        """创建新角色
+        
+        Args:
+            design: 角色设计输出（Pydantic模型）
+        
+        Returns:
+            (success, error_message)
+        """
+        try:
+            # 1. 检查重名
+            if self.has_role(design.role_name):
+                return False, f"角色 {design.role_name} 已存在，请使用不同的名称"
+            
+            yaml_file = ROLES_DIR / f"{design.role_name}.yaml"
+            if yaml_file.exists():
+                return False, f"角色文件 {yaml_file.name} 已存在"
+            
+            # 2. 生成YAML配置
+            yaml_content = self.generate_yaml_from_design(design)
+            
+            # 3. 保存YAML文件
+            yaml_file.write_text(yaml_content, encoding='utf-8')
+            
+            # 4. 生成并保存prompt文件
+            for idx, stage in enumerate(design.stages):
+                stage_key = f"stage_{idx + 1}" if len(design.stages) > 1 else "main"
+                prompt_filename = f"{design.role_name}_{stage_key}.md"
+                prompt_file = ROLES_DIR / prompt_filename
+                
+                prompt_content = self.generate_prompt_from_design(design, stage)
+                prompt_file.write_text(prompt_content, encoding='utf-8')
+            
+            # 5. 加载新角色到内存
+            self.reload_role(design.role_name)
+            
+            print(f"[RoleManager] ✅ 成功创建角色: {design.display_name}")
+            return True, None
+            
+        except Exception as e:
+            import traceback
+            error_detail = traceback.format_exc()
+            print(f"[RoleManager] ❌ 创建角色失败: {error_detail}")
+            return False, f"创建失败: {str(e)}"
+    
+    def get_roles_directory(self) -> Path:
+        """获取roles目录路径（供外部使用）"""
+        return ROLES_DIR
+
