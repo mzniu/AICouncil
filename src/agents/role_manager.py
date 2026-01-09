@@ -375,9 +375,6 @@ class RoleManager:
         
         # 默认颜色（蓝色）
         return '#6366F1'
-            
-        except Exception as e:
-            return False, f"保存失败: {str(e)}"
     
     # === 角色设计师功能 ===
     
