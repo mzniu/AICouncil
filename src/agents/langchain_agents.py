@@ -1056,12 +1056,12 @@ def call_role_designer(requirement: str) -> schemas.RoleDesignOutput:
                 if reasoning:
                     reasoning_parts.append(reasoning)
                     # 发送reasoning到前端
-                    send_web_event("role_designer_reasoning", reasoning, agent_name="角色设计师")
+                    send_web_event("role_designer_reasoning", content=reasoning, agent_name="角色设计师")
             
             if chunk.text:
                 content_parts.append(chunk.text)
                 # 发送content到前端
-                send_web_event("role_designer_content", chunk.text, agent_name="角色设计师")
+                send_web_event("role_designer_content", content=chunk.text, agent_name="角色设计师")
         
         raw_output = ''.join(content_parts)
         full_reasoning = ''.join(reasoning_parts)
