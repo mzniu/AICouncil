@@ -2,10 +2,50 @@
 from pathlib import Path
 from typing import Dict, List, Optional
 import yaml
+import shutil
+import sys
 from functools import lru_cache
 from dataclasses import dataclass, field
 
-ROLES_DIR = Path(__file__).parent / "roles"
+def get_roles_directory() -> Path:
+    """获取roles目录路径（优先用户目录，支持打包环境）"""
+    # 1. 检查用户目录中的roles（可编辑）
+    if sys.platform == 'win32':
+        user_data_dir = Path.home() / "AppData" / "Local" / "AICouncil"
+    elif sys.platform == 'darwin':
+        user_data_dir = Path.home() / "Library" / "Application Support" / "AICouncil"
+    else:
+        user_data_dir = Path.home() / ".aicouncil"
+    
+    user_roles_dir = user_data_dir / "roles"
+    
+    # 2. 获取内置roles目录（只读模板）
+    if getattr(sys, 'frozen', False):
+        # 打包环境：从exe旁边的_internal目录读取
+        builtin_roles = Path(sys._MEIPASS) / "src" / "agents" / "roles"
+    else:
+        # 开发环境
+        builtin_roles = Path(__file__).parent / "roles"
+    
+    # 3. 如果用户目录不存在，从内置模板复制
+    if not user_roles_dir.exists():
+        print(f"[RoleManager] 初始化用户roles目录: {user_roles_dir}")
+        user_roles_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 复制所有内置角色配置
+        if builtin_roles.exists():
+            for item in builtin_roles.glob('*'):
+                if item.name != 'backups':  # 跳过备份目录
+                    dest = user_roles_dir / item.name
+                    if item.is_file():
+                        shutil.copy2(item, dest)
+            print(f"[RoleManager] 已从内置模板复制 {len(list(user_roles_dir.glob('*.yaml')))} 个角色")
+        else:
+            print(f"[RoleManager] ⚠️ 警告：未找到内置roles模板目录")
+    
+    return user_roles_dir
+
+ROLES_DIR = get_roles_directory()
 
 @dataclass
 class RoleStage:

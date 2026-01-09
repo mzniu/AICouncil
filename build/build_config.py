@@ -57,6 +57,9 @@ DATA_FILES = [
     # 配置模板
     (str(SRC_DIR / "config_template.py"), "src/"),
     
+    # 角色定义文件（作为只读模板，实际使用会复制到用户目录）
+    (str(SRC_DIR / "agents" / "roles"), "src/agents/roles"),
+    
     # 默认配置（打包环境使用）
     # 注意：实际的 config.py 不打包，运行时从用户目录读取
 ]
