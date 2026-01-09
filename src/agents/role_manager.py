@@ -27,7 +27,7 @@ def get_roles_directory() -> Path:
         # 开发环境
         builtin_roles = Path(__file__).parent / "roles"
     
-    # 3. 如果用户目录不存在，从内置模板复制
+    # 3. 初始化或同步角色文件
     if not user_roles_dir.exists():
         print(f"[RoleManager] 初始化用户roles目录: {user_roles_dir}")
         user_roles_dir.mkdir(parents=True, exist_ok=True)
@@ -42,6 +42,35 @@ def get_roles_directory() -> Path:
             print(f"[RoleManager] 已从内置模板复制 {len(list(user_roles_dir.glob('*.yaml')))} 个角色")
         else:
             print(f"[RoleManager] ⚠️ 警告：未找到内置roles模板目录")
+    else:
+        # 4. 开发环境下自动同步新增的角色文件
+        if not getattr(sys, 'frozen', False) and builtin_roles.exists():
+            builtin_yamls = set(f.name for f in builtin_roles.glob('*.yaml'))
+            user_yamls = set(f.name for f in user_roles_dir.glob('*.yaml'))
+            new_roles = builtin_yamls - user_yamls
+            
+            if new_roles:
+                print(f"[RoleManager] 发现 {len(new_roles)} 个新角色，正在同步...")
+                for role_name in new_roles:
+                    # 复制YAML文件
+                    src_yaml = builtin_roles / role_name
+                    dest_yaml = user_roles_dir / role_name
+                    shutil.copy2(src_yaml, dest_yaml)
+                    print(f"[RoleManager]   • 同步: {role_name}")
+                    
+                    # 同步对应的prompt文件
+                    import yaml
+                    with open(src_yaml, 'r', encoding='utf-8') as f:
+                        role_config = yaml.safe_load(f)
+                    
+                    for stage_data in role_config.get('stages', {}).values():
+                        prompt_file = stage_data.get('prompt_file')
+                        if prompt_file:
+                            src_prompt = builtin_roles / prompt_file
+                            dest_prompt = user_roles_dir / prompt_file
+                            if src_prompt.exists():
+                                shutil.copy2(src_prompt, dest_prompt)
+                                print(f"[RoleManager]   • 同步: {prompt_file}")
     
     return user_roles_dir
 
