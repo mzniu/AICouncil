@@ -401,9 +401,9 @@ class RoleManager:
             },
             'tags': ['auto_generated'],
             'ui': {
-                'icon': self._generate_icon(design.role_name, design.display_name),
-                'color': self._generate_color(design.role_name),
-                'description_short': design.role_description.split('。')[0][:30] + '...' if len(design.role_description) > 30 else design.role_description.split('。')[0]
+                'icon': design.ui.icon if design.ui else self._generate_icon(design.role_name, design.display_name),
+                'color': design.ui.color if design.ui else self._generate_color(design.role_name),
+                'description_short': design.ui.description_short if design.ui else (design.role_description.split('。')[0][:30] + '...')
             }
         }
         

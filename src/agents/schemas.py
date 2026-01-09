@@ -134,6 +134,35 @@ class FamousPersona(BaseModel):
         return v
 
 
+class UIConfig(BaseModel):
+    """角色UI配置"""
+    icon: str  # emoji图标（单个emoji字符）
+    color: str  # 主题色（hex格式，如#3B82F6）
+    description_short: str  # 简短描述（15-30字）
+    
+    @field_validator('icon')
+    @classmethod
+    def validate_icon(cls, v):
+        if len(v) > 4:  # emoji通常1-2字符，留点余量
+            raise ValueError('icon应为单个emoji字符')
+        return v
+    
+    @field_validator('color')
+    @classmethod
+    def validate_color(cls, v):
+        import re
+        if not re.match(r'^#[0-9A-Fa-f]{6}$', v):
+            raise ValueError('color必须是hex格式，如#3B82F6')
+        return v
+    
+    @field_validator('description_short')
+    @classmethod
+    def validate_description_short(cls, v):
+        if len(v) < 5 or len(v) > 50:
+            raise ValueError('简短描述长度应在5-50字符之间')
+        return v
+
+
 class RoleDesignOutput(BaseModel):
     """角色设计师完整输出"""
     role_name: str  # 角色技术名称（英文+下划线，如strategic_planner）
@@ -141,6 +170,7 @@ class RoleDesignOutput(BaseModel):
     role_description: str  # 角色描述（50-200字）
     stages: List[RoleStageDefinition]  # 参与的阶段（至少1个）
     recommended_personas: List[FamousPersona]  # 推荐人物（0-3个）
+    ui: UIConfig  # UI配置（图标、颜色、简短描述）
     
     @field_validator('role_name')
     @classmethod
