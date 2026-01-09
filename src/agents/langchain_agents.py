@@ -1039,10 +1039,10 @@ def call_role_designer(requirement: str) -> schemas.RoleDesignOutput:
         
         # 调用LLM
         model_config = ModelConfig(
-            backend="deepseek",
+            type="deepseek",
             model="deepseek-reasoner"
         )
-        llm = AdapterLLM(model_config)
+        llm = AdapterLLM(backend_config=model_config)
         
         logger.info("[role_designer] 开始生成角色设计...")
         
