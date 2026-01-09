@@ -969,13 +969,32 @@
 
                     <!-- Step 2: 生成中 -->
                     <div id="designer-step-2" class="hidden space-y-4">
-                        <div class="text-center py-12">
-                            <div class="inline-block animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-600 mb-4"></div>
-                            <p class="text-lg font-bold text-slate-700">AI正在设计角色...</p>
-                            <p class="text-sm text-slate-500 mt-2">预计需要30-60秒，请稍候</p>
-                            <div id="generation-status" class="mt-4 text-sm text-slate-600">
-                                <!-- 动态更新状态 -->
+                        <div class="flex items-center justify-center space-x-3 mb-4">
+                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                            <span class="text-lg text-slate-600">AI正在生成角色设计...</span>
+                        </div>
+                        
+                        <!-- Reasoning显示区 -->
+                        <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                            <div class="flex items-center mb-2">
+                                <svg class="w-5 h-5 text-amber-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path>
+                                    <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"></path>
+                                </svg>
+                                <h4 class="font-bold text-amber-800">AI思考过程</h4>
                             </div>
+                            <div id="reasoning-display" class="text-sm text-amber-900 whitespace-pre-wrap max-h-48 overflow-y-auto font-mono bg-white rounded p-3 border border-amber-100"></div>
+                        </div>
+                        
+                        <!-- Content显示区 -->
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <div class="flex items-center mb-2">
+                                <svg class="w-5 h-5 text-blue-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"></path>
+                                </svg>
+                                <h4 class="font-bold text-blue-800">生成内容</h4>
+                            </div>
+                            <div id="content-display" class="text-sm text-blue-900 whitespace-pre-wrap max-h-48 overflow-y-auto font-mono bg-white rounded p-3 border border-blue-100"></div>
                         </div>
                     </div>
 
@@ -2261,6 +2280,9 @@ function confirmSatisfied() {
                         targetProgress = 95;
                         setLayoutMode('report');
                     }
+                } else if (event.type === 'role_designer_reasoning' || event.type === 'role_designer_content') {
+                    // 处理角色设计师的实时更新
+                    handleRoleDesignerEvent(event);
                 } else if (event.type === 'discussion_complete' || event.type === 'final_report') {
                     targetProgress = 100;
                     // 切换到报告模式布局
@@ -4553,11 +4575,12 @@ function confirmSatisfied() {
                     // 切换到生成步骤
                     updateDesignerStep(2);
                     
+                    // 清空显示区
+                    document.getElementById('reasoning-display').textContent = '';
+                    document.getElementById('content-display').textContent = '';
+                    
                     // 调用API生成角色
                     try {
-                        const statusDiv = document.getElementById('generation-status');
-                        statusDiv.textContent = '正在调用AI...';
-                        
                         const response = await fetch('/api/roles/design', {
                             method: 'POST',
                             headers: {'Content-Type': 'application/json'},
@@ -4568,7 +4591,6 @@ function confirmSatisfied() {
                         
                         if (data.status === 'success') {
                             generatedRoleDesign = data.design;
-                            statusDiv.textContent = '✅ 生成完成！';
                             
                             // 短暂延迟后切换到预览步骤
                             setTimeout(() => {
@@ -4576,7 +4598,6 @@ function confirmSatisfied() {
                                 renderRolePreview(generatedRoleDesign);
                             }, 1000);
                         } else {
-                            statusDiv.textContent = '❌ 生成失败';
                             showAlert('生成失败: ' + (data.message || '未知错误'), '错误', 'error');
                             
                             // 失败后返回第1步
@@ -4586,6 +4607,23 @@ function confirmSatisfied() {
                         console.error('Failed to generate role:', error);
                         showAlert('生成失败: ' + error.message, '错误', 'error');
                         updateDesignerStep(1);
+                    }
+                }
+            }
+            
+            // 处理角色设计师的实时更新
+            function handleRoleDesignerEvent(eventData) {
+                if (eventData.type === 'role_designer_reasoning') {
+                    const reasoningDiv = document.getElementById('reasoning-display');
+                    if (reasoningDiv) {
+                        reasoningDiv.textContent += eventData.content;
+                        reasoningDiv.scrollTop = reasoningDiv.scrollHeight;
+                    }
+                } else if (eventData.type === 'role_designer_content') {
+                    const contentDiv = document.getElementById('content-display');
+                    if (contentDiv) {
+                        contentDiv.textContent += eventData.content;
+                        contentDiv.scrollTop = contentDiv.scrollHeight;
                     }
                 }
             }
