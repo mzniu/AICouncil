@@ -317,6 +317,9 @@ class RoleManager:
             self.reload_role(role_name)
             
             return True, None
+            
+        except Exception as e:
+            return False, f"保存失败: {str(e)}"
     
     def _generate_icon(self, role_name: str, display_name: str) -> str:
         """根据角色名称生成合适的emoji图标"""
