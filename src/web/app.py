@@ -849,6 +849,90 @@ def reload_role(role_name):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+@app.route('/api/roles/<role_name>/config', methods=['GET'])
+def get_role_config(role_name):
+    """获取角色的原始配置（用于编辑）"""
+    try:
+        from src.agents.role_manager import RoleManager
+        
+        rm = RoleManager()
+        
+        if not rm.has_role(role_name):
+            return jsonify({"status": "error", "message": f"角色不存在: {role_name}"}), 404
+        
+        yaml_content = rm.get_role_yaml_content(role_name)
+        prompts = rm.get_role_prompts(role_name)
+        
+        return jsonify({
+            "status": "success",
+            "data": {
+                "yaml_content": yaml_content,
+                "prompts": prompts
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"[API] 获取角色配置失败: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/roles/<role_name>', methods=['PUT'])
+def update_role(role_name):
+    """更新角色配置"""
+    try:
+        from src.agents.role_manager import RoleManager
+        
+        rm = RoleManager()
+        
+        if not rm.has_role(role_name):
+            return jsonify({"status": "error", "message": f"角色不存在: {role_name}"}), 404
+        
+        data = request.get_json()
+        yaml_content = data.get('yaml_content', '')
+        prompts = data.get('prompts', {})
+        
+        # 保存配置
+        success, error = rm.save_role_config(role_name, yaml_content, prompts)
+        
+        if not success:
+            return jsonify({"status": "error", "message": error}), 400
+        
+        return jsonify({
+            "status": "success",
+            "message": f"角色 {role_name} 已更新"
+        })
+        
+    except Exception as e:
+        logger.error(f"[API] 更新角色失败: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/roles/validate', methods=['POST'])
+def validate_role_config():
+    """验证角色配置（不保存）"""
+    try:
+        from src.agents.role_manager import RoleManager
+        
+        rm = RoleManager()
+        
+        data = request.get_json()
+        yaml_content = data.get('yaml_content', '')
+        
+        is_valid, error = rm.validate_role_config(yaml_content)
+        
+        return jsonify({
+            "status": "success",
+            "valid": is_valid,
+            "error": error
+        })
+        
+    except Exception as e:
+        logger.error(f"[API] 验证配置失败: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @app.route('/api/playwright/install', methods=['POST'])
 def install_playwright():
     """安装Playwright + Chromium"""

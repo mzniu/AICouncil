@@ -835,6 +835,53 @@
             </div>
         </div>
 
+        <!-- 角色编辑模态框 -->
+        <div id="role-edit-modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[160] flex items-center justify-center">
+            <div class="bg-white w-full max-w-5xl rounded-2xl shadow-2xl p-8 m-4 max-h-[90vh] flex flex-col">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-black text-slate-800 flex items-center">
+                        <span class="mr-3 text-3xl">✏️</span> <span>编辑角色: <span id="edit-role-name" class="text-blue-600"></span></span>
+                    </h2>
+                    <button onclick="closeRoleEditor()" class="text-slate-400 hover:text-slate-600 transition">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto pr-2 space-y-6">
+                    <!-- YAML配置编辑 -->
+                    <section>
+                        <label class="block text-sm font-bold text-slate-700 mb-2">角色配置 (YAML)</label>
+                        <textarea id="role-yaml-editor" 
+                                  class="w-full h-64 px-3 py-2 border border-slate-300 rounded-lg font-mono text-sm outline-none focus:border-blue-500 transition"
+                                  placeholder="加载中..."></textarea>
+                        <p class="text-xs text-slate-500 mt-1">⚠️ 请确保YAML格式正确，修改name、stages等字段请谨慎</p>
+                    </section>
+
+                    <!-- Prompt编辑区 -->
+                    <section>
+                        <label class="block text-sm font-bold text-slate-700 mb-2">提示词内容</label>
+                        <div id="prompt-editors" class="space-y-4">
+                            <!-- 动态插入各阶段的prompt编辑器 -->
+                        </div>
+                    </section>
+                </div>
+
+                <div class="mt-6 pt-4 border-t border-slate-100 flex justify-between">
+                    <button onclick="validateRoleConfig()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition">
+                        验证配置
+                    </button>
+                    <div class="space-x-3">
+                        <button onclick="closeRoleEditor()" class="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition">
+                            取消
+                        </button>
+                        <button onclick="saveRoleConfig()" class="px-8 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-lg shadow-blue-200">
+                            保存
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <script>
             const translations = {
                 zh: {
@@ -4098,6 +4145,17 @@ function confirmSatisfied() {
                         
                         document.getElementById('role-detail-content').innerHTML = contentHtml;
                         document.getElementById('role-detail-panel').classList.remove('hidden');
+                        
+                        // 添加编辑按钮（在详情面板标题旁）
+                        const detailHeader = document.getElementById('role-detail-panel').querySelector('.flex.justify-between');
+                        const editBtn = detailHeader.querySelector('.edit-role-btn');
+                        if (!editBtn) {
+                            const newBtn = document.createElement('button');
+                            newBtn.className = 'edit-role-btn px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition text-sm mr-2';
+                            newBtn.innerHTML = '✏️ 编辑';
+                            newBtn.onclick = () => openRoleEditor(roleName);
+                            detailHeader.querySelector('div').insertAdjacentElement('beforebegin', newBtn);
+                        }
                     } else {
                         showAlert(t('msg_load_failed') + ': ' + data.message, t('title_error'), 'error');
                     }
@@ -4129,6 +4187,112 @@ function confirmSatisfied() {
                 } catch (error) {
                     console.error('Failed to reload role:', error);
                     showAlert(t('role_reload_failed') + ': ' + error.message, t('title_error'), 'error');
+                }
+            }
+
+            // --- 角色编辑功能 ---
+            
+            let currentEditingRole = null;
+            
+            async function openRoleEditor(roleName) {
+                try {
+                    const response = await fetch(`/api/roles/${roleName}/config`);
+                    const data = await response.json();
+                    
+                    if (data.status === 'success') {
+                        currentEditingRole = roleName;
+                        
+                        // 显示modal
+                        document.getElementById('role-edit-modal').classList.remove('hidden');
+                        document.getElementById('edit-role-name').textContent = roleName;
+                        
+                        // 加载YAML配置
+                        document.getElementById('role-yaml-editor').value = data.data.yaml_content;
+                        
+                        // 加载prompts
+                        const promptsContainer = document.getElementById('prompt-editors');
+                        promptsContainer.innerHTML = '';
+                        
+                        for (const [stageName, promptContent] of Object.entries(data.data.prompts)) {
+                            const editorHtml = `
+                                <div class="border border-slate-300 rounded-lg p-4">
+                                    <label class="block text-xs font-bold text-slate-600 uppercase mb-2">${stageName} Prompt</label>
+                                    <textarea data-stage="${stageName}" 
+                                              class="prompt-editor w-full h-48 px-3 py-2 border border-slate-300 rounded-lg font-mono text-sm outline-none focus:border-blue-500 transition"
+                                              placeholder="Prompt内容...">${promptContent}</textarea>
+                                </div>
+                            `;
+                            promptsContainer.insertAdjacentHTML('beforeend', editorHtml);
+                        }
+                    } else {
+                        showAlert('加载配置失败: ' + data.message, t('title_error'), 'error');
+                    }
+                } catch (error) {
+                    console.error('Failed to load role config:', error);
+                    showAlert('加载配置失败: ' + error.message, t('title_error'), 'error');
+                }
+            }
+            
+            function closeRoleEditor() {
+                document.getElementById('role-edit-modal').classList.add('hidden');
+                currentEditingRole = null;
+            }
+            
+            async function validateRoleConfig() {
+                const yamlContent = document.getElementById('role-yaml-editor').value;
+                
+                try {
+                    const response = await fetch('/api/roles/validate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ yaml_content: yamlContent })
+                    });
+                    const data = await response.json();
+                    
+                    if (data.status === 'success' && data.valid) {
+                        showAlert('✅ 配置验证通过', t('title_success'));
+                    } else {
+                        showAlert('❌ 配置验证失败:\n' + data.error, t('title_error'), 'error');
+                    }
+                } catch (error) {
+                    showAlert('验证失败: ' + error.message, t('title_error'), 'error');
+                }
+            }
+            
+            async function saveRoleConfig() {
+                if (!currentEditingRole) return;
+                
+                const yamlContent = document.getElementById('role-yaml-editor').value;
+                
+                // 收集所有prompt
+                const prompts = {};
+                document.querySelectorAll('.prompt-editor').forEach(textarea => {
+                    const stageName = textarea.getAttribute('data-stage');
+                    prompts[stageName] = textarea.value;
+                });
+                
+                try {
+                    const response = await fetch(`/api/roles/${currentEditingRole}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            yaml_content: yamlContent,
+                            prompts: prompts
+                        })
+                    });
+                    const data = await response.json();
+                    
+                    if (data.status === 'success') {
+                        showAlert('✅ 角色配置已保存并重载', t('title_success'));
+                        closeRoleEditor();
+                        await loadRolesList(); // 刷新角色列表
+                        closeRoleDetail(); // 关闭详情面板
+                    } else {
+                        showAlert('❌ 保存失败:\n' + data.message, t('title_error'), 'error');
+                    }
+                } catch (error) {
+                    console.error('Failed to save role config:', error);
+                    showAlert('保存失败: ' + error.message, t('title_error'), 'error');
                 }
             }
 
