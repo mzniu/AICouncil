@@ -143,8 +143,8 @@ class UIConfig(BaseModel):
     @field_validator('icon')
     @classmethod
     def validate_icon(cls, v):
-        if len(v) > 4:  # emoji通常1-2字符，留点余量
-            raise ValueError('icon应为单个emoji字符')
+        if len(v) > 15:  # 允许组合emoji（如👨‍👩‍👧‍👦），覆盖99%场景
+            raise ValueError('icon应为单个emoji字符或组合emoji')
         return v
     
     @field_validator('color')
