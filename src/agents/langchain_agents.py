@@ -4,6 +4,7 @@ from src.agents import schemas, model_adapter
 from src.utils.logger import logger
 from src.utils import search_utils
 from src.utils.path_manager import get_workspace_dir
+from src.agents.frameworks import get_framework
 from pydantic import ValidationError
 import json
 import requests
@@ -71,6 +72,106 @@ def clean_json_string(s: str) -> str:
         return s[start:end+1]
     
     return s.strip()
+
+def _auto_fix_orchestration_plan(plan: schemas.OrchestrationPlan) -> schemas.OrchestrationPlan:
+    """自动修正 OrchestrationPlan 的不完整配置（方案E核心逻辑）
+    
+    修正内容：
+    1. 添加缺失的框架必需角色到 agent_counts
+    2. 添加缺失的专业角色到 agent_counts
+    3. 为缺失映射的专业角色自动生成 role_stage_mapping
+    
+    Args:
+        plan: LLM 输出的原始规划方案
+    
+    Returns:
+        修正后的规划方案
+    """
+    modified = False
+    
+    # 1. 获取框架定义，识别必需角色
+    try:
+        framework = get_framework(plan.framework_selection.framework_id)
+        if not framework:
+            logger.warning(f"[auto_fix] 未找到框架 {plan.framework_selection.framework_id}，跳过修正")
+            return plan
+    except Exception as e:
+        logger.error(f"[auto_fix] 获取框架失败: {e}，跳过修正")
+        return plan
+    
+    # 2. 提取框架中所有必需角色
+    required_roles = set()
+    for stage in framework.stages:
+        required_roles.update(stage.roles)
+    
+    # 3. 识别专业角色（非框架角色）
+    framework_role_names = {"planner", "auditor", "leader", "devils_advocate", "reporter"}
+    professional_roles = [
+        role for role in plan.role_planning.existing_roles
+        if role.name not in framework_role_names
+    ]
+    
+    # 4. 修正 agent_counts
+    # 4.1 添加缺失的框架角色
+    for role in required_roles:
+        if role not in plan.execution_config.agent_counts:
+            plan.execution_config.agent_counts[role] = 1
+            logger.warning(f"[auto_fix] 🔧 自动添加缺失的框架角色: {role}")
+            modified = True
+    
+    # 4.2 添加缺失的专业角色
+    for role_match in professional_roles:
+        if role_match.name not in plan.execution_config.agent_counts:
+            count = role_match.assigned_count or 1
+            plan.execution_config.agent_counts[role_match.name] = count
+            logger.warning(f"[auto_fix] 🔧 自动添加缺失的专业角色: {role_match.name} (count={count})")
+            modified = True
+    
+    # 5. 修正 role_stage_mapping
+    if not plan.execution_config.role_stage_mapping:
+        plan.execution_config.role_stage_mapping = {}
+    
+    for role_match in professional_roles:
+        if role_match.name not in plan.execution_config.role_stage_mapping:
+            # 智能分配：根据匹配度和框架结构分配合适的 stage
+            suitable_stages = _find_suitable_stages(role_match, framework)
+            plan.execution_config.role_stage_mapping[role_match.name] = suitable_stages
+            logger.warning(f"[auto_fix] 🔧 自动为 {role_match.display_name} 分配 stage: {suitable_stages}")
+            modified = True
+    
+    if modified:
+        logger.info(f"[auto_fix] ✅ 已自动修正 OrchestrationPlan 配置")
+        logger.info(f"[auto_fix]   修正后 agent_counts: {plan.execution_config.agent_counts}")
+        logger.info(f"[auto_fix]   修正后 role_stage_mapping: {plan.execution_config.role_stage_mapping}")
+    else:
+        logger.info(f"[auto_fix] ✓ OrchestrationPlan 配置完整，无需修正")
+    
+    return plan
+
+def _find_suitable_stages(role_match: schemas.RoleMatch, framework) -> List[str]:
+    """为专业角色寻找合适的参与 stage
+    
+    策略：
+    - 高匹配度角色(>=0.9)：分配到前2个讨论型stage
+    - 中匹配度角色：分配到1个中间stage
+    - 避免分配到纯 leader 的综合stage
+    """
+    discussion_stages = [
+        stage.name for stage in framework.stages 
+        if len(stage.roles) > 1 or "leader" not in stage.roles  # 排除纯leader的stage
+    ]
+    
+    if not discussion_stages:
+        # 兜底：返回第一个stage
+        return [framework.stages[0].name] if framework.stages else []
+    
+    # 高匹配度：参与多个stage
+    if role_match.match_score >= 0.9:
+        return discussion_stages[:2] if len(discussion_stages) >= 2 else [discussion_stages[0]]
+    
+    # 中等匹配度：参与1个中间stage
+    mid_index = len(discussion_stages) // 2
+    return [discussion_stages[mid_index]]
 
 def stream_agent_output(chain, prompt_vars, agent_name, role_type, event_type="agent_action"):
     """流式执行 Agent 并实时发送到 Web。支持联网搜索。
@@ -1236,14 +1337,17 @@ def run_meta_orchestrator(user_requirement: str, model_config: Dict[str, Any] = 
                 for role in plan.role_planning.existing_roles:
                     logger.info(f"    • {role.display_name} ({role.name}): score={role.match_score}, count={role.assigned_count}")
             
-            # 详细日志：打印 agent_counts
-            logger.info(f"[meta_orchestrator] agent_counts 配置: {plan.execution_config.agent_counts}")
+            # 详细日志：打印 agent_counts（修正前）
+            logger.info(f"[meta_orchestrator] agent_counts 配置（LLM输出）: {plan.execution_config.agent_counts}")
             
-            # 详细日志：打印 role_stage_mapping
+            # 详细日志：打印 role_stage_mapping（修正前）
             if plan.execution_config.role_stage_mapping:
-                logger.info(f"[meta_orchestrator] role_stage_mapping: {plan.execution_config.role_stage_mapping}")
+                logger.info(f"[meta_orchestrator] role_stage_mapping（LLM输出）: {plan.execution_config.role_stage_mapping}")
             else:
                 logger.warning(f"[meta_orchestrator] ⚠️ role_stage_mapping 为空或未设置")
+            
+            # 🔧 自动修正配置（方案E核心逻辑）
+            plan = _auto_fix_orchestration_plan(plan)
             
             # 构建详细的输出信息
             existing_roles_detail = ""
