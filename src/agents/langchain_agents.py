@@ -1230,6 +1230,21 @@ def run_meta_orchestrator(user_requirement: str, model_config: Dict[str, Any] = 
             logger.info(f"  - 现有角色: {len(plan.role_planning.existing_roles)} 个")
             logger.info(f"  - 需创建角色: {len(plan.role_planning.roles_to_create)} 个")
             
+            # 详细日志：打印匹配到的角色
+            if plan.role_planning.existing_roles:
+                logger.info(f"[meta_orchestrator] 匹配到的现有角色:")
+                for role in plan.role_planning.existing_roles:
+                    logger.info(f"    • {role.display_name} ({role.name}): score={role.match_score}, count={role.assigned_count}")
+            
+            # 详细日志：打印 agent_counts
+            logger.info(f"[meta_orchestrator] agent_counts 配置: {plan.execution_config.agent_counts}")
+            
+            # 详细日志：打印 role_stage_mapping
+            if plan.execution_config.role_stage_mapping:
+                logger.info(f"[meta_orchestrator] role_stage_mapping: {plan.execution_config.role_stage_mapping}")
+            else:
+                logger.warning(f"[meta_orchestrator] ⚠️ role_stage_mapping 为空或未设置")
+            
             # 构建详细的输出信息
             existing_roles_detail = ""
             if plan.role_planning.existing_roles:
