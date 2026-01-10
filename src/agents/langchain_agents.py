@@ -1234,7 +1234,7 @@ def run_meta_orchestrator(user_requirement: str, model_config: Dict[str, Any] = 
             existing_roles_detail = ""
             if plan.role_planning.existing_roles:
                 existing_roles_detail = "\n".join([
-                    f"  • {role.display_name} ({role.role_name}): {role.match_reason}"
+                    f"  • {role.display_name} ({role.name}): {role.match_reason}"
                     for role in plan.role_planning.existing_roles[:10]  # 最多显示10个
                 ])
             else:
