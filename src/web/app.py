@@ -126,6 +126,7 @@ def start_discussion():
     planners = data.get('planners', 2)
     auditors = data.get('auditors', 2)
     agent_configs = data.get('agent_configs') # 获取 agent_configs
+    use_meta_orchestrator = data.get('use_meta_orchestrator', False)  # Meta-Orchestrator 模式
 
     if not issue:
         return jsonify({"status": "error", "message": "议题不能为空"}), 400
@@ -138,18 +139,19 @@ def start_discussion():
         "rounds": rounds,
         "planners": planners,
         "auditors": auditors,
-        "agent_configs": agent_configs
+        "agent_configs": agent_configs,
+        "use_meta_orchestrator": use_meta_orchestrator
     }
 
     is_running = True
     # 在后台线程启动 demo_runner.py，设置为 daemon 确保主进程退出时线程也退出
-    thread = threading.Thread(target=run_backend, args=(issue, backend, model, rounds, planners, auditors, agent_configs, reasoning))
+    thread = threading.Thread(target=run_backend, args=(issue, backend, model, rounds, planners, auditors, agent_configs, reasoning, use_meta_orchestrator))
     thread.daemon = True
     thread.start()
     
     return jsonify({"status": "ok"})
 
-def run_backend(issue, backend, model, rounds, planners, auditors, agent_configs=None, reasoning=None):
+def run_backend(issue, backend, model, rounds, planners, auditors, agent_configs=None, reasoning=None, use_meta_orchestrator=False):
     global is_running, current_process
     try:
         # 确保参数为整数（前端传递的可能是字符串）
@@ -177,17 +179,29 @@ def run_backend(issue, backend, model, rounds, planners, auditors, agent_configs
             if reasoning:
                 model_cfg["reasoning"] = reasoning
             
-            logger.info(f"[app] 使用模型配置: {model_cfg}, 轮数: {rounds}, 策论家: {planners}, 监察官: {auditors}")
+            logger.info(f"[app] 使用模型配置: {model_cfg}, 轮数: {rounds}, 策论家: {planners}, 监察官: {auditors}, Meta-Orchestrator: {use_meta_orchestrator}")
             
-            # 直接调用核心函数
-            result = run_full_cycle(
-                issue, 
-                model_config=model_cfg, 
-                max_rounds=rounds,
-                num_planners=planners,
-                num_auditors=auditors,
-                agent_configs=agent_configs
-            )
+            # 如果启用 Meta-Orchestrator 模式
+            if use_meta_orchestrator:
+                from src.agents.demo_runner import run_meta_orchestrator_flow
+                result = run_meta_orchestrator_flow(
+                    issue=issue,
+                    backend=backend,
+                    model=model,
+                    reasoning=reasoning,
+                    agent_configs=agent_configs,
+                    mode='plan_and_execute'
+                )
+            else:
+                # 传统模式：直接调用核心函数
+                result = run_full_cycle(
+                    issue, 
+                    model_config=model_cfg, 
+                    max_rounds=rounds,
+                    num_planners=planners,
+                    num_auditors=auditors,
+                    agent_configs=agent_configs
+                )
             
             logger.info(f"[app] 完成 {rounds} 轮流程")
             
@@ -215,6 +229,9 @@ def run_backend(issue, backend, model, rounds, planners, auditors, agent_configs
             if agent_configs:
                 cmd.extend(["--agent_configs", json.dumps(agent_configs)])
             
+            if use_meta_orchestrator:
+                cmd.append("--use-meta-orchestrator")
+            
             current_process = subprocess.Popen(
                 cmd,
                 text=True,
@@ -226,6 +243,190 @@ def run_backend(issue, backend, model, rounds, planners, auditors, agent_configs
     except Exception as e:
         logger.error(f"[app] 启动后端失败: {e}")
         traceback.print_exc()
+    finally:
+        is_running = False
+        current_process = None
+
+@app.route('/api/orchestrate', methods=['POST'])
+def orchestrate_discussion():
+    """
+    Meta-Orchestrator智能规划端点
+    
+    接收用户需求，返回规划方案或直接执行
+    """
+    global is_running, discussion_events, backend_logs, final_report, current_config, current_session_id
+    
+    if is_running:
+        return jsonify({"status": "error", "message": "讨论正在进行中"}), 400
+    
+    # 清空旧数据
+    discussion_events = []
+    backend_logs = []
+    final_report = ""
+    
+    data = request.json
+    issue = data.get('issue')
+    backend = data.get('backend', 'deepseek')
+    model = data.get('model')
+    reasoning = data.get('reasoning')
+    agent_configs = data.get('agent_configs')
+    mode = data.get('mode', 'plan_and_execute')  # 'plan_only' 或 'plan_and_execute'
+    
+    if not issue:
+        return jsonify({"status": "error", "message": "议题不能为空"}), 400
+    
+    current_config = {
+        "issue": issue,
+        "backend": backend,
+        "model": model,
+        "reasoning": reasoning,
+        "agent_configs": agent_configs,
+        "mode": mode,
+        "use_meta_orchestrator": True
+    }
+    
+    # 根据mode决定是否立即执行
+    if mode == 'plan_only':
+        # 仅规划，不执行
+        try:
+            from src.agents.langchain_agents import run_meta_orchestrator
+            
+            # 确定模型名称
+            if not model:
+                if backend == 'deepseek':
+                    model = config.DEEPSEEK_MODEL
+                elif backend == 'openrouter':
+                    model = config.OPENROUTER_MODEL
+                elif backend == 'openai':
+                    model = config.OPENAI_MODEL
+                else:
+                    model = config.MODEL_NAME
+            
+            model_cfg = {"type": backend, "model": model}
+            if reasoning:
+                model_cfg["reasoning"] = reasoning
+            
+            # 调用Meta-Orchestrator生成规划
+            logger.info("[app] 执行Meta-Orchestrator规划（仅规划模式）")
+            plan = run_meta_orchestrator(
+                user_requirement=issue,
+                model_config=model_cfg
+            )
+            
+            # 返回规划方案
+            return jsonify({
+                "status": "ok",
+                "mode": "plan_only",
+                "plan": plan.dict()
+            })
+            
+        except Exception as e:
+            logger.error(f"[app] Meta-Orchestrator规划失败: {e}")
+            logger.error(traceback.format_exc())
+            return jsonify({
+                "status": "error",
+                "message": f"规划失败: {str(e)}"
+            }), 500
+    
+    else:
+        # plan_and_execute：规划并执行
+        is_running = True
+        
+        # 在后台线程执行完整流程
+        thread = threading.Thread(
+            target=run_meta_orchestrator_backend,
+            args=(issue, backend, model, agent_configs, reasoning)
+        )
+        thread.daemon = True
+        thread.start()
+        
+        return jsonify({"status": "ok", "mode": "plan_and_execute"})
+
+
+def run_meta_orchestrator_backend(issue, backend, model, agent_configs=None, reasoning=None):
+    """
+    后台执行Meta-Orchestrator完整流程
+    
+    Args:
+        issue: 用户需求
+        backend: 模型后端
+        model: 模型名称
+        agent_configs: Agent配置覆盖
+        reasoning: 推理配置
+    """
+    global is_running, current_process, current_session_id
+    
+    try:
+        # 确定模型名称
+        if not model:
+            if backend == 'deepseek':
+                model = config.DEEPSEEK_MODEL
+            elif backend == 'openrouter':
+                model = config.OPENROUTER_MODEL
+            elif backend == 'openai':
+                model = config.OPENAI_MODEL
+            else:
+                model = config.MODEL_NAME
+        
+        model_cfg = {"type": backend, "model": model}
+        if reasoning:
+            model_cfg["reasoning"] = reasoning
+        
+        logger.info(f"[app] 启动Meta-Orchestrator流程，模型: {model_cfg}")
+        
+        # 打包环境：直接调用函数
+        if is_frozen():
+            logger.info("[app] 打包环境：直接调用 run_meta_orchestrator_flow")
+            
+            from src.agents.demo_runner import run_meta_orchestrator_flow
+            
+            result = run_meta_orchestrator_flow(
+                issue_text=issue,
+                model_config=model_cfg,
+                agent_configs=agent_configs
+            )
+            
+            # 保存session_id
+            if result.get('success'):
+                current_session_id = result.get('session_id')
+                logger.info(f"[app] Meta-Orchestrator流程完成，Session ID: {current_session_id}")
+            else:
+                logger.error(f"[app] Meta-Orchestrator流程失败: {result.get('error')}")
+        
+        else:
+            # 开发环境：启动子进程
+            logger.info("[app] 开发环境：启动 demo_runner.py 子进程（Meta-Orchestrator模式）")
+            
+            python_exe = sys.executable
+            cmd = [
+                python_exe,
+                "src/agents/demo_runner.py",
+                "--issue", issue,
+                "--backend", backend,
+                "--use-meta-orchestrator"
+            ]
+            
+            if model:
+                cmd.extend(["--model", model])
+            
+            if reasoning:
+                cmd.extend(["--reasoning", json.dumps(reasoning)])
+            
+            if agent_configs:
+                cmd.extend(["--agent_configs", json.dumps(agent_configs)])
+            
+            current_process = subprocess.Popen(
+                cmd,
+                text=True,
+                encoding='utf-8'
+            )
+            
+            current_process.wait()
+    
+    except Exception as e:
+        logger.error(f"[app] Meta-Orchestrator后台执行失败: {e}")
+        logger.error(traceback.format_exc())
+    
     finally:
         is_running = False
         current_process = None
@@ -789,8 +990,10 @@ def get_role_detail(role_name):
         }
         
         # 加载每个stage的prompt内容
+        prompts_full = {}  # 完整prompts内容
         for stage_name, stage in role.stages.items():
             prompt_content = rm.load_prompt(role_name, stage_name)
+            prompts_full[stage_name] = prompt_content  # 保存完整内容
             role_detail["stages"].append({
                 "name": stage_name,
                 "prompt_file": stage.prompt_file,
@@ -800,7 +1003,10 @@ def get_role_detail(role_name):
                 "prompt_preview": prompt_content[:500] + "..." if len(prompt_content) > 500 else prompt_content
             })
         
-        # 合并所有prompt预览作为整体预览
+        # 添加完整prompts字段（供前端详情页使用）
+        role_detail["prompts"] = prompts_full
+        
+        # 合并所有prompt预览作为整体预览（截断版）
         all_prompts = [rm.load_prompt(role_name, stage_name) for stage_name in role.stages.keys()]
         full_prompt = "\n\n".join(all_prompts)
         role_detail["prompt_preview"] = full_prompt[:500] + "..." if len(full_prompt) > 500 else full_prompt
@@ -845,6 +1051,34 @@ def reload_role(role_name):
         
     except Exception as e:
         logger.error(f"[API] 重新加载角色失败: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/roles/<role_name>', methods=['DELETE'])
+def delete_role(role_name):
+    """删除角色（保护内置角色）"""
+    try:
+        from src.agents.role_manager import RoleManager
+        
+        rm = RoleManager()
+        
+        if not rm.has_role(role_name):
+            return jsonify({"status": "error", "message": f"角色不存在: {role_name}"}), 404
+        
+        # 执行删除
+        success, error = rm.delete_role(role_name)
+        
+        if success:
+            return jsonify({
+                "status": "success",
+                "message": f"角色已删除: {role_name}"
+            })
+        else:
+            return jsonify({"status": "error", "message": error}), 400
+        
+    except Exception as e:
+        logger.error(f"[API] 删除角色失败: {e}")
         logger.error(traceback.format_exc())
         return jsonify({"status": "error", "message": str(e)}), 500
 

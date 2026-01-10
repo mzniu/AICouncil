@@ -186,3 +186,75 @@ class RoleDesignOutput(BaseModel):
         if len(v) == 0:
             raise ValueError('至少需要定义1个阶段')
         return v
+
+
+# ========== Meta-Orchestrator Schemas ==========
+
+class RequirementAnalysis(BaseModel):
+    """需求分析结果"""
+    problem_type: str  # 问题类型：决策类/论证类/分析类/综合类
+    complexity: str  # 复杂度：简单/中等/复杂
+    required_capabilities: List[str]  # 所需能力维度
+    reasoning: str  # 分析推理过程
+
+
+class ExistingRoleMatch(BaseModel):
+    """现有角色匹配结果"""
+    name: str  # 角色ID
+    display_name: str  # 角色显示名
+    match_score: float  # 匹配度 0.0-1.0
+    match_reason: str  # 匹配理由
+    assigned_count: int = 1  # 分配该角色的Agent数量
+
+
+class RoleToCreate(BaseModel):
+    """需要创建的新角色"""
+    capability: str  # 缺失的能力维度
+    requirement: str  # 详细的角色需求描述（给role_designer的输入）
+    assigned_count: int = 1  # 分配该角色的Agent数量
+
+
+class RolePlanning(BaseModel):
+    """角色规划结果"""
+    existing_roles: List[ExistingRoleMatch]  # 匹配到的现有角色
+    roles_to_create: List[RoleToCreate]  # 需要创建的新角色
+
+
+class FrameworkStageInfo(BaseModel):
+    """框架阶段摘要"""
+    stage_name: str  # 阶段名称
+    stage_description: str  # 阶段说明
+
+
+class FrameworkSelection(BaseModel):
+    """框架选择结果"""
+    framework_id: str  # 框架ID：roberts_rules/toulmin_model/critical_thinking
+    framework_name: str  # 框架显示名称
+    selection_reason: str  # 选择理由
+    framework_stages: List[FrameworkStageInfo]  # 框架阶段摘要
+
+
+class ExecutionConfig(BaseModel):
+    """执行配置"""
+    total_rounds: int  # 总讨论轮次
+    agent_counts: Dict[str, int]  # Agent数量配置，如 {"planner": 2, "auditor": 1, "economist": 1}
+    estimated_duration: str  # 预估耗时
+    special_instructions: Optional[str] = None  # 特殊注意事项
+    role_stage_mapping: Optional[Dict[str, List[str]]] = None  # 专业角色参与的stage映射，如 {"economist": ["证据评估", "替代视角"]}
+
+
+class PlanSummary(BaseModel):
+    """规划方案摘要"""
+    title: str  # 方案标题
+    overview: str  # 方案总览（2-3句话）
+    key_advantages: List[str]  # 关键优势
+    potential_risks: Optional[List[str]] = None  # 潜在风险
+
+
+class OrchestrationPlan(BaseModel):
+    """元调度器输出的完整规划方案"""
+    analysis: RequirementAnalysis  # 需求分析
+    role_planning: RolePlanning  # 角色规划
+    framework_selection: FrameworkSelection  # 框架选择
+    execution_config: ExecutionConfig  # 执行配置
+    summary: PlanSummary  # 方案摘要

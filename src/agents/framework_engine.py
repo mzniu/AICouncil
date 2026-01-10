@@ -93,23 +93,28 @@ class FrameworkEngine:
         self, 
         user_requirement: str, 
         agent_counts: Dict[str, int],
-        agent_configs: Optional[Dict[str, Any]] = None
+        agent_configs: Optional[Dict[str, Any]] = None,
+        role_stage_mapping: Optional[Dict[str, List[str]]] = None
     ) -> Dict[str, Any]:
         """执行完整的框架流程
         
         Args:
             user_requirement: 用户的原始需求
-            agent_counts: 每种角色的Agent数量，如 {"planner": 2, "auditor": 2}
+            agent_counts: 每种角色的Agent数量，如 {"planner": 2, "auditor": 2, "economist": 1}
             agent_configs: 可选的每个Agent的模型配置覆盖
+            role_stage_mapping: 专业角色参与的stage映射，如 {"economist": ["证据评估", "替代视角"]}
             
         Returns:
             执行结果字典，包含所有stage的输出和最终总结
         """
         self.user_requirement = user_requirement
         agent_configs = agent_configs or {}
+        self.role_stage_mapping = role_stage_mapping or {}
         
         logger.info(f"[FrameworkEngine] 开始执行框架 '{self.framework.name}'")
         logger.info(f"[FrameworkEngine] Agent配置: {agent_counts}")
+        if self.role_stage_mapping:
+            logger.info(f"[FrameworkEngine] 专业角色映射: {self.role_stage_mapping}")
         
         # 发送框架启动事件
         send_web_event(
@@ -221,6 +226,7 @@ class FrameworkEngine:
         chains = []
         role_manager = RoleManager()
         
+        # 1. 处理框架定义的角色（stage.roles）
         for role_type in stage.roles:
             # 获取该角色的数量（默认使用stage的min_agents）
             count = agent_counts.get(role_type, stage.min_agents)
@@ -272,6 +278,43 @@ class FrameworkEngine:
                 chains.append((chain, agent_id, role_type, display_name))
                 
                 logger.info(f"[FrameworkEngine] 创建Agent: {agent_id} ({display_name})")
+        
+        # 2. 处理通过 role_stage_mapping 映射到此stage的专业角色
+        if hasattr(self, 'role_stage_mapping') and self.role_stage_mapping:
+            for role_name, stage_names in self.role_stage_mapping.items():
+                # 检查该角色是否参与当前stage
+                if stage.name in stage_names:
+                    # 检查该角色是否在agent_counts中配置
+                    if role_name not in agent_counts:
+                        logger.warning(f"[FrameworkEngine] 角色 '{role_name}' 在 role_stage_mapping 中但不在 agent_counts 中，跳过")
+                        continue
+                    
+                    # 检查该角色是否已经在stage.roles中（避免重复添加）
+                    if role_name in stage.roles:
+                        continue
+                    
+                    count = agent_counts.get(role_name, 1)
+                    
+                    # 从RoleManager加载角色配置
+                    role_config = role_manager.get_role(role_name)
+                    if not role_config:
+                        logger.warning(f"[FrameworkEngine] 未找到角色 '{role_name}'，跳过")
+                        continue
+                    
+                    display_name = role_config.display_name
+                    logger.info(f"[FrameworkEngine] 映射专业角色 '{role_name}' ({display_name}) 到 stage '{stage.name}'")
+                    
+                    # 创建Agent
+                    for i in range(count):
+                        agent_id = f"{role_name}_{i+1}"
+                        agent_model_config = agent_configs.get(agent_id) or self.model_config
+                        
+                        # 使用通用chain创建函数
+                        stage_name_for_role = list(role_config.stages.keys())[0] if role_config.stages else "default"
+                        chain = make_generic_role_chain(role_name, stage_name_for_role, agent_model_config)
+                        
+                        chains.append((chain, agent_id, role_name, display_name))
+                        logger.info(f"[FrameworkEngine] 创建映射Agent: {agent_id} ({display_name})")
         
         return chains
     

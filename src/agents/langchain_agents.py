@@ -1354,6 +1354,7 @@ def execute_orchestration_plan(
         
         # 3. 准备Agent数量配置（从规划方案中提取）
         agent_counts = plan.execution_config.agent_counts
+        role_stage_mapping = plan.execution_config.role_stage_mapping
         
         # 4. 准备模型配置
         model_config = model_config or {
@@ -1375,7 +1376,8 @@ def execute_orchestration_plan(
         execution_result = engine.execute(
             user_requirement=user_requirement,
             agent_counts=agent_counts,
-            agent_configs=agent_configs
+            agent_configs=agent_configs,
+            role_stage_mapping=role_stage_mapping
         )
         
         # 6. 保存完整结果

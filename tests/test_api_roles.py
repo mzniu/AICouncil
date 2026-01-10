@@ -168,5 +168,36 @@ class TestRoleUIInfo:
             assert isinstance(stage['input_vars'], list)
 
 
+class TestRoleDelete:
+    """测试角色删除功能"""
+    
+    @pytest.fixture
+    def client(self):
+        app.config['TESTING'] = True
+        with app.test_client() as client:
+            yield client
+    
+    def test_delete_builtin_role_forbidden(self, client):
+        """测试禁止删除内置角色"""
+        builtin_roles = ['leader', 'planner', 'auditor', 'reporter', 'report_auditor', 'role_designer']
+        
+        for role_name in builtin_roles:
+            response = client.delete(f'/api/roles/{role_name}')
+            assert response.status_code == 400, f"Should forbid deleting builtin role: {role_name}"
+            
+            data = json.loads(response.data)
+            assert data['status'] == 'error'
+            assert '内置角色' in data['message'] or '系统' in data['message']
+    
+    def test_delete_nonexistent_role(self, client):
+        """测试删除不存在的角色"""
+        response = client.delete('/api/roles/nonexistent_role_xyz')
+        assert response.status_code == 404
+        
+        data = json.loads(response.data)
+        assert data['status'] == 'error'
+        assert '不存在' in data['message']
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

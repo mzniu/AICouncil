@@ -27,6 +27,94 @@
 - **✋ 用户介入**：支持在议事过程中随时输入指令，实时引导智能体的讨论方向。
 - **📊 进度可视化**：实时显示当前议事轮数及详细状态。进度条逻辑经过优化，议事结束即达 100%，无需等待报告生成。
 - **🤖 广泛的模型支持**：原生支持 **DeepSeek**、**OpenAI**、**Azure OpenAI**（中国区/全球区）、**Anthropic (Claude)**、**Google Gemini**、**Aliyun (Qwen)**、**OpenRouter** 及本地 **Ollama** 模型。
+- **🧭 Meta-Orchestrator 智能编排**（新功能）：根据需求自动选择最优讨论框架（罗伯特议事规则/图尔敏论证模型/批判性思维），动态配置角色和阶段化执行。详见 [Meta-Orchestrator 使用指南](#-meta-orchestrator-智能框架编排)。
+
+---
+
+## 🧭 Meta-Orchestrator 智能框架编排
+
+**Meta-Orchestrator** 是 AICouncil 的高级功能，能够根据用户需求**自动选择最优讨论框架**并**动态配置角色**，实现更加专业化和结构化的议事流程。
+
+### ✨ 核心能力
+
+- **🤖 智能需求分析**：自动分析问题类型（决策类/论证类/分析类）和复杂度，推荐最优讨论策略
+- **📋 框架自动匹配**：从 3 个预定义框架中选择最适合的方案：
+  - **罗伯特议事规则**（Roberts Rules of Order）：适用于结构化决策和表决场景
+  - **图尔敏论证模型**（Toulmin Model）：适用于深度论证和逻辑推理
+  - **批判性思维框架**（Critical Thinking）：适用于质疑和风险识别
+- **👥 角色智能配置**：
+  - 自动匹配现有角色（Leader、Planner、Auditor、Reporter、Devil's Advocate 等）
+  - 必要时调用 Role Designer 创建新的专业角色
+- **📊 阶段化执行**：将复杂任务分解为多个 Stage（规划 → 执行 → 审查 → 报告），逐步推进
+- **📈 流程可视化**：Reporter 自动生成 Mermaid 流程图，展示框架执行过程（从需求分析到最终报告）
+
+### 🚀 使用方式
+
+#### 方式 1: 命令行（开发环境）
+
+```bash
+# 仅生成规划方案（不执行）- 快速了解系统如何编排
+python src/agents/demo_runner.py --use-meta-orchestrator --issue "如何提高团队协作效率？"
+
+# 完整执行（规划 + 执行 + 报告）- 实际议事流程
+python src/agents/demo_runner.py --use-meta-orchestrator --issue "设计一个高可用分布式系统" --backend deepseek --model deepseek-chat
+```
+
+**命令行参数说明**：
+- `--use-meta-orchestrator`：启用 Meta-Orchestrator 模式
+- `--issue`：议题描述
+- `--backend`：模型后端（deepseek/openai/aliyun/ollama 等）
+- `--model`：具体模型名称（如 deepseek-chat、gpt-4o）
+
+#### 方式 2: API 端点
+
+```python
+import requests
+
+# Plan Only 模式：仅返回规划方案（推荐用于预览）
+response = requests.post("http://localhost:5000/api/orchestrate", json={
+    "issue": "如何优化代码性能？",
+    "mode": "plan_only",
+    "backend": "deepseek",
+    "model": "deepseek-chat"
+})
+plan = response.json()["plan"]
+print(f"选择的框架：{plan['framework_selection']['framework_name']}")
+print(f"总轮次：{plan['execution_config']['total_rounds']}")
+
+# Plan and Execute 模式：后台执行完整流程
+response = requests.post("http://localhost:5000/api/orchestrate", json={
+    "issue": "如何优化代码性能？",
+    "mode": "plan_and_execute",
+    "backend": "deepseek",
+    "model": "deepseek-chat"
+})
+workspace_dir = response.json()["workspace_dir"]
+# 通过 /api/status 轮询获取执行进度
+```
+
+**API 参数说明**：
+- `mode`：`plan_only`（仅规划）或 `plan_and_execute`（完整执行）
+- `issue`：议题描述
+- `backend`：模型后端
+- `model`：模型名称
+- `agent_configs`（可选）：为特定角色指定不同模型
+
+#### 方式 3: Web 界面（即将推出）
+
+在设置页面启用 **Meta-Orchestrator 模式**，系统将自动进行智能编排。
+
+### 📚 详细文档
+
+- **[Meta-Orchestrator 完整指南](docs/meta_orchestrator.md)**：深度解析架构设计、工作流程、框架库、API 参考
+- **[架构设计](docs/architecture.md)**：系统架构图和核心模块交互
+- **[框架库文档](docs/frameworks.md)**：预定义框架详解和自定义框架指南
+
+### 🎯 典型应用场景
+
+- **决策类问题**：产品方向选择、技术栈选型、预算分配 → **罗伯特议事规则**
+- **论证类问题**：学术假设验证、法律案例分析、因果关系推理 → **图尔敏论证模型**
+- **分析类问题**：风险评估、漏洞挖掘、质量审查 → **批判性思维框架**
 
 ---
 
@@ -350,6 +438,7 @@ AICouncil/
 - [x] **多语言文档**：提供中英文双语 README。
 - [x] **EXE 打包**：支持将应用打包为 Windows 可执行文件（双击即用，无需 Python）。
 - [x] **搜索源扩展**：接入 Google Search API 等专业搜索服务。
+- [x] **Meta-Orchestrator 智能编排**：实现自动框架匹配（罗伯特议事规则/图尔敏论证模型/批判性思维）、角色智能配置、阶段化执行。
 
 ### 计划中
 - [ ] **更多 Agent 类型**：增加经济学家、法律顾问、技术专家等垂直领域智能体。

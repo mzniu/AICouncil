@@ -13,7 +13,7 @@ stages:
       - final_data
       - search_references
 
-default_model: deepseek-chat
+default_model: deepseek-reasoner
 
 parameters:
   max_retries: 2

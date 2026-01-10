@@ -259,7 +259,7 @@ class AdapterLLM(LLM):
     def _get_model_config_dict(self) -> Dict[str, Any]:
         m_cfg = self.backend_config
         if hasattr(m_cfg, "dict"):
-            return m_cfg.dict()
+            return m_cfg.model_dump()
         elif hasattr(m_cfg, "model_dump"):
             return m_cfg.model_dump()
         return m_cfg
@@ -277,7 +277,7 @@ class AdapterLLM(LLM):
     def _identifying_params(self) -> Dict[str, Any]:
         m_cfg = self.backend_config
         if hasattr(m_cfg, "dict"):
-            m_cfg = m_cfg.dict()
+            m_cfg = m_cfg.model_dump()
         elif hasattr(m_cfg, "model_dump"):
             m_cfg = m_cfg.model_dump()
         return {"backend_config": m_cfg}
