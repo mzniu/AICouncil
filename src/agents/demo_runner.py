@@ -57,6 +57,26 @@ def run_meta_orchestrator_flow(issue_text: str, model_config: dict, agent_config
         print(f"  - Agent配置: {orchestration_plan.execution_config.agent_counts}")
         print(f"  - 预计时长: {orchestration_plan.execution_config.estimated_duration}")
         
+        # 详细输出：角色规划信息
+        print(f"\n📊 角色规划详情:")
+        print(f"  - 匹配的现有角色: {len(orchestration_plan.role_planning.existing_roles)} 个")
+        if orchestration_plan.role_planning.existing_roles:
+            for role in orchestration_plan.role_planning.existing_roles:
+                print(f"    • {role.display_name} ({role.name})")
+        
+        print(f"  - 需创建的角色: {len(orchestration_plan.role_planning.roles_to_create)} 个")
+        if orchestration_plan.role_planning.roles_to_create:
+            for role in orchestration_plan.role_planning.roles_to_create:
+                print(f"    • {role.capability}")
+        
+        # 详细输出：role_stage_mapping
+        if orchestration_plan.execution_config.role_stage_mapping:
+            print(f"\n🔗 专业角色映射:")
+            for role_name, stages in orchestration_plan.execution_config.role_stage_mapping.items():
+                print(f"    • {role_name} → {', '.join(stages)}")
+        else:
+            print(f"\n⚠️  未配置 role_stage_mapping")
+        
         # 处理需要创建的角色
         if orchestration_plan.role_planning.roles_to_create:
             logger.info(f"[meta_flow] 需要创建 {len(orchestration_plan.role_planning.roles_to_create)} 个新角色")
