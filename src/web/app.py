@@ -539,30 +539,41 @@ def intervene():
 @app.route('/api/rereport', methods=['POST'])
 def rereport():
     global is_running, current_session_id, current_config, final_report
-    if is_running:
-        return jsonify({"status": "error", "message": "讨论正在进行中，请稍后再试"}), 400
     
-    if not current_session_id:
-        return jsonify({"status": "error", "message": "未找到当前会话 ID"}), 400
-    
-    # 清空旧报告，确保前端显示加载状态
-    final_report = ""
-    
-    data = request.json or {}
-    selected_backend = data.get('backend') or current_config.get('backend', 'deepseek')
-    selected_model = data.get('model')  # 获取前端传递的模型
-    reasoning = data.get('reasoning')   # 获取推理配置
-    agent_configs = data.get('agent_configs')  # 获取各角色独立配置
-    
-    workspace_path = get_workspace_dir() / current_session_id
-    if not workspace_path.exists():
-        return jsonify({"status": "error", "message": f"工作区不存在: {current_session_id}"}), 404
+    try:
+        if is_running:
+            logger.warning("[rereport] 讨论正在进行中，拒绝请求")
+            return jsonify({"status": "error", "message": "讨论正在进行中，请稍后再试"}), 400
+        
+        if not current_session_id:
+            logger.warning("[rereport] 未找到当前会话 ID")
+            return jsonify({"status": "error", "message": "未找到当前会话 ID"}), 400
+        
+        logger.info(f"[rereport] 开始重新生成报告，Session ID: {current_session_id}")
+        
+        # 清空旧报告，确保前端显示加载状态
+        final_report = ""
+        
+        data = request.json or {}
+        selected_backend = data.get('backend') or current_config.get('backend', 'deepseek')
+        selected_model = data.get('model')  # 获取前端传递的模型
+        reasoning = data.get('reasoning')   # 获取推理配置
+        agent_configs = data.get('agent_configs')  # 获取各角色独立配置
+        
+        logger.info(f"[rereport] 配置: backend={selected_backend}, model={selected_model}, reasoning={reasoning}")
+        
+        workspace_path = get_workspace_dir() / current_session_id
+        if not workspace_path.exists():
+            logger.error(f"[rereport] 工作区不存在: {current_session_id}")
+            return jsonify({"status": "error", "message": f"工作区不存在: {current_session_id}"}), 404
 
-    # 在后台线程运行，避免阻塞
-    def run_rereport():
-        global is_running
-        is_running = True
-        try:
+        logger.info(f"[rereport] 工作区路径: {workspace_path}")
+
+        # 在后台线程运行，避免阻塞
+        def run_rereport():
+            global is_running
+            is_running = True
+            try:
             # 确定模型名称：优先使用前端传递的模型，否则使用默认值
             if not selected_model:
                 if selected_backend == 'deepseek':
@@ -595,18 +606,25 @@ def rereport():
                 model_cfg["reasoning"] = reasoning
             
             # 重新生成报告（注意：agent_configs不影响报告生成，因为使用的是已保存的讨论数据）
-            generate_report_from_workspace(workspace_path, model_cfg)
+            logger.info(f"[rereport] 调用 generate_report_from_workspace，workspace={workspace_path}, session_id={current_session_id}")
+            generate_report_from_workspace(str(workspace_path), model_cfg, current_session_id)
+            logger.info(f"[rereport] 报告生成完成")
         except Exception as e:
-            print(f"重新生成报告失败: {e}")
+            logger.error(f"[rereport] 重新生成报告失败: {e}")
             traceback.print_exc()
         finally:
             is_running = False
 
-    thread = threading.Thread(target=run_rereport)
-    thread.daemon = True
-    thread.start()
+        thread = threading.Thread(target=run_rereport)
+        thread.daemon = True
+        thread.start()
+        
+        return jsonify({"status": "ok"})
     
-    return jsonify({"status": "ok"})
+    except Exception as e:
+        logger.error(f"[rereport] 请求处理失败: {e}")
+        traceback.print_exc()
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/workspaces', methods=['GET'])
 def list_workspaces():
