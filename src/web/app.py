@@ -574,46 +574,46 @@ def rereport():
             global is_running
             is_running = True
             try:
-            # 确定模型名称：优先使用前端传递的模型，否则使用默认值
-            if not selected_model:
-                if selected_backend == 'deepseek':
-                    model_name = config.DEEPSEEK_MODEL
-                elif selected_backend == 'openrouter':
-                    model_name = config.OPENROUTER_MODEL
-                elif selected_backend == 'openai':
-                    model_name = config.OPENAI_MODEL
-                elif selected_backend == 'aliyun':
-                    model_name = config.ALIYUN_MODEL
-                elif selected_backend == 'azure':
-                    model_name = getattr(config, 'AZURE_OPENAI_DEPLOYMENT_NAME', 'gpt-4o')
-                elif selected_backend == 'anthropic':
-                    model_name = getattr(config, 'ANTHROPIC_MODEL', 'claude-3-5-sonnet-20241022')
-                elif selected_backend == 'gemini':
-                    model_name = getattr(config, 'GEMINI_MODEL', 'gemini-1.5-flash')
+                # 确定模型名称：优先使用前端传递的模型，否则使用默认值
+                if not selected_model:
+                    if selected_backend == 'deepseek':
+                        model_name = config.DEEPSEEK_MODEL
+                    elif selected_backend == 'openrouter':
+                        model_name = config.OPENROUTER_MODEL
+                    elif selected_backend == 'openai':
+                        model_name = config.OPENAI_MODEL
+                    elif selected_backend == 'aliyun':
+                        model_name = config.ALIYUN_MODEL
+                    elif selected_backend == 'azure':
+                        model_name = getattr(config, 'AZURE_OPENAI_DEPLOYMENT_NAME', 'gpt-4o')
+                    elif selected_backend == 'anthropic':
+                        model_name = getattr(config, 'ANTHROPIC_MODEL', 'claude-3-5-sonnet-20241022')
+                    elif selected_backend == 'gemini':
+                        model_name = getattr(config, 'GEMINI_MODEL', 'gemini-1.5-flash')
+                    else:
+                        model_name = config.MODEL_NAME
                 else:
-                    model_name = config.MODEL_NAME
-            else:
-                model_name = selected_model
+                    model_name = selected_model
 
-            # 构建模型配置
-            model_cfg = {
-                "type": selected_backend,
-                "model": model_name
-            }
-            
-            # 添加推理配置
-            if reasoning:
-                model_cfg["reasoning"] = reasoning
-            
-            # 重新生成报告（注意：agent_configs不影响报告生成，因为使用的是已保存的讨论数据）
-            logger.info(f"[rereport] 调用 generate_report_from_workspace，workspace={workspace_path}, session_id={current_session_id}")
-            generate_report_from_workspace(str(workspace_path), model_cfg, current_session_id)
-            logger.info(f"[rereport] 报告生成完成")
-        except Exception as e:
-            logger.error(f"[rereport] 重新生成报告失败: {e}")
-            traceback.print_exc()
-        finally:
-            is_running = False
+                # 构建模型配置
+                model_cfg = {
+                    "type": selected_backend,
+                    "model": model_name
+                }
+                
+                # 添加推理配置
+                if reasoning:
+                    model_cfg["reasoning"] = reasoning
+                
+                # 重新生成报告（注意：agent_configs不影响报告生成，因为使用的是已保存的讨论数据）
+                logger.info(f"[rereport] 调用 generate_report_from_workspace，workspace={workspace_path}, session_id={current_session_id}")
+                generate_report_from_workspace(str(workspace_path), model_cfg, current_session_id)
+                logger.info(f"[rereport] 报告生成完成")
+            except Exception as e:
+                logger.error(f"[rereport] 重新生成报告失败: {e}")
+                traceback.print_exc()
+            finally:
+                is_running = False
 
         thread = threading.Thread(target=run_rereport)
         thread.daemon = True
