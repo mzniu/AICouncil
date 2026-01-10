@@ -1041,9 +1041,55 @@ def generate_report_from_workspace(workspace_path: str, model_config: Dict[str, 
     logger.info(f"[report] 正在从工作区 {workspace_path} 重新生成报告（Session ID: {session_id}）...")
     
     try:
-        # 加载数据
-        with open(os.path.join(workspace_path, "final_session_data.json"), "r", encoding="utf-8") as f:
-            final_data = json.load(f)
+        # 尝试加载数据（支持两种文件结构）
+        final_data = None
+        
+        # 方式1：尝试加载新格式（Meta-Orchestrator）：orchestration_result.json
+        orchestration_file = os.path.join(workspace_path, "orchestration_result.json")
+        if os.path.exists(orchestration_file):
+            logger.info(f"[report] 检测到 Meta-Orchestrator 格式，从 orchestration_result.json 读取")
+            with open(orchestration_file, "r", encoding="utf-8") as f:
+                orchestration_data = json.load(f)
+            
+            # 从 orchestration_result.json 构造 final_data
+            final_data = {
+                "issue": orchestration_data.get("plan", {}).get("analysis", {}).get("problem_type", ""),
+                "decomposition": {},  # Meta-Orchestrator 没有分解步骤
+                "decomposition_challenge": "",
+                "history": orchestration_data.get("execution", {}),  # FrameworkEngine 的执行结果
+                "final_summary": orchestration_data.get("execution", {}).get("final_synthesis", {})
+            }
+            logger.info(f"[report] 成功从 orchestration_result.json 构造数据")
+        
+        # 方式2：尝试加载旧格式（传统 run_full_cycle）：final_session_data.json
+        else:
+            final_session_file = os.path.join(workspace_path, "final_session_data.json")
+            if os.path.exists(final_session_file):
+                logger.info(f"[report] 检测到传统格式，从 final_session_data.json 读取")
+                with open(final_session_file, "r", encoding="utf-8") as f:
+                    final_data = json.load(f)
+            else:
+                # 两种文件都不存在，尝试从 history.json 读取
+                history_file = os.path.join(workspace_path, "history.json")
+                if os.path.exists(history_file):
+                    logger.warning(f"[report] 未找到 final_session_data.json 或 orchestration_result.json，尝试从 history.json 构造")
+                    with open(history_file, "r", encoding="utf-8") as f:
+                        history_data = json.load(f)
+                    
+                    # 从 history.json 构造简化的 final_data
+                    final_data = {
+                        "issue": history_data.get("config", {}).get("issue", ""),
+                        "decomposition": {},
+                        "decomposition_challenge": "",
+                        "history": history_data.get("discussion_events", []),
+                        "final_summary": {}
+                    }
+                    logger.info(f"[report] 从 history.json 构造数据")
+                else:
+                    raise FileNotFoundError(f"工作区中找不到任何可用的数据文件: {workspace_path}")
+        
+        if not final_data:
+            raise ValueError("无法加载或构造 final_data")
         
         # 加载搜索参考资料，如果不存在则为空
         all_search_references = []
@@ -1548,6 +1594,17 @@ def execute_orchestration_plan(
             json.dump(final_result, f, ensure_ascii=False, indent=4)
         
         logger.info(f"[execute_orchestration_plan] 执行完成，结果已保存到 {result_file}")
+        
+        # 7. 生成报告
+        logger.info(f"[execute_orchestration_plan] 开始生成报告...")
+        try:
+            report_html = generate_report_from_workspace(str(workspace_path), model_config, session_id)
+            final_result["report_html"] = report_html
+            logger.info(f"[execute_orchestration_plan] 报告生成完成")
+        except Exception as e:
+            logger.error(f"[execute_orchestration_plan] 报告生成失败: {e}")
+            logger.error(traceback.format_exc())
+            final_result["report_html"] = f"<p>报告生成失败: {str(e)}</p>"
         
         send_web_event("system_info", message=f"✅ 框架执行完成", chunk_id=str(uuid.uuid4()))
         
