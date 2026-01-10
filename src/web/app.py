@@ -729,7 +729,46 @@ def load_workspace(session_id):
             "session_id": session_id
         })
         
-        if os.path.exists(history_path):
+        # 方式1：从 Meta-Orchestrator 格式重建事件
+        if os.path.exists(orch_path):
+            with open(orch_path, "r", encoding="utf-8") as f:
+                orch_data = json.load(f)
+                execution = orch_data.get("execution", {})
+                stages_data = execution.get("stages", {})
+                
+                # 遍历每个 stage
+                for stage_name, stage_output in stages_data.items():
+                    # 添加 stage 开始事件
+                    discussion_events.append({
+                        "type": "stage_start",
+                        "stage_name": stage_name,
+                        "description": stage_output.get("description", "")
+                    })
+                    
+                    # 添加每个 agent 的输出事件
+                    agents = stage_output.get("agents", [])
+                    for agent_data in agents:
+                        discussion_events.append({
+                            "type": "agent_action",
+                            "agent_name": agent_data.get("display_name", agent_data.get("agent_id")),
+                            "role_type": agent_data.get("role_type"),
+                            "content": agent_data.get("content", ""),
+                            "chunk_id": f"load_{session_id}_{agent_data.get('agent_id')}"
+                        })
+                
+                # 添加最终综合（如果存在）
+                final_synthesis = execution.get("final_synthesis")
+                if final_synthesis:
+                    discussion_events.append({
+                        "type": "agent_action",
+                        "agent_name": "议长",
+                        "role_type": "Leader",
+                        "content": json.dumps(final_synthesis, ensure_ascii=False),
+                        "chunk_id": f"load_{session_id}_final_synthesis"
+                    })
+        
+        # 方式2：从传统 history.json 重建事件
+        elif os.path.exists(history_path):
             with open(history_path, "r", encoding="utf-8") as f:
                 history = json.load(f)
                 if not history_data: # 如果 final_data 没拿到，从 history.json 拿
