@@ -733,11 +733,15 @@ def load_workspace(session_id):
         if os.path.exists(orch_path):
             with open(orch_path, "r", encoding="utf-8") as f:
                 orch_data = json.load(f)
-                execution = orch_data.get("execution", {})
-                stages_data = execution.get("stages", {})
+                # execution 字段本身就是包含所有 stage 的字典
+                stages_data = orch_data.get("execution", {})
                 
-                # 遍历每个 stage
+                # 遍历每个 stage（跳过 final_synthesis 等非 stage 字段）
                 for stage_name, stage_output in stages_data.items():
+                    # 跳过非 stage 字段（如 final_synthesis）
+                    if not isinstance(stage_output, dict) or "agents" not in stage_output:
+                        continue
+                    
                     # 添加 stage 开始事件
                     discussion_events.append({
                         "type": "stage_start",
@@ -757,7 +761,7 @@ def load_workspace(session_id):
                         })
                 
                 # 添加最终综合（如果存在）
-                final_synthesis = execution.get("final_synthesis")
+                final_synthesis = stages_data.get("final_synthesis")
                 if final_synthesis:
                     discussion_events.append({
                         "type": "agent_action",
