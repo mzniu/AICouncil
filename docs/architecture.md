@@ -13,6 +13,8 @@
 
 ## 组件与数据流
 
+### 传统模式（固定流程）
+
 ```mermaid
 graph TD
     subgraph Frontend ["前端 (Web UI)"]
@@ -98,6 +100,152 @@ graph TD
     style ModelAdapter fill:#f3e8ff,stroke:#9333ea
     style Storage fill:#f1f5f9,stroke:#64748b
 ```
+
+### Meta-Orchestrator 模式（智能编排）
+
+**新增组件**：
+- **Meta-Orchestrator Agent**：根据需求自动选择框架、配置角色
+- **Frameworks 框架库**：预定义框架（罗伯特议事规则、图尔敏论证模型、批判性思维）
+- **Meta Tools**：工具函数库（list_roles、create_role、select_framework）
+- **FrameworkEngine**：框架执行引擎，逐 Stage 运行
+
+```mermaid
+graph TD
+    subgraph Frontend ["前端 (Web UI)"]
+        U[用户] -->|输入议题 + 启用Meta模式| FE(Flask 页面)
+        FE -->|实时轮询| STATUS[/api/status]
+        FE -->|查看规划| PLAN_VIEW[规划方案]
+    end
+
+    subgraph Backend ["后端服务层"]
+        API[Flask API] -->|POST /api/orchestrate| META_RUNNER[run_meta_orchestrator_flow]
+        META_RUNNER -->|mode=plan_only| RETURN_PLAN[返回规划方案]
+        META_RUNNER -->|mode=plan_and_execute| EXECUTE[execute_orchestration_plan]
+    end
+
+    subgraph MetaLayer ["Meta-Orchestrator 层 (Stage 0)"]
+        META[Meta-Orchestrator Agent]
+        META --> ANALYSIS[需求分析]
+        
+        ANALYSIS -->|Function Calling| TOOLS[Meta Tools]
+        
+        subgraph TOOLS_DETAIL ["Meta Tools"]
+            TOOL1[list_roles: 列出可用角色]
+            TOOL2[create_role: 创建新角色]
+            TOOL3[select_framework: 匹配框架]
+        end
+        
+        TOOLS --> TOOL3
+        TOOL3 --> FRAMEWORKS[Frameworks 框架库]
+        
+        subgraph FRAMEWORKS_DETAIL ["预定义框架"]
+            FW1[罗伯特议事规则<br/>Roberts Rules of Order]
+            FW2[图尔敏论证模型<br/>Toulmin Model]
+            FW3[批判性思维框架<br/>Critical Thinking]
+        end
+        
+        FRAMEWORKS --> FW1 & FW2 & FW3
+        TOOL3 --> SELECTED_FW[选中的框架]
+        
+        ANALYSIS --> TOOLS
+        TOOLS --> TOOL1
+        TOOL1 --> ROLE_MATCH[匹配现有角色]
+        TOOLS --> TOOL2
+        TOOL2 --> ROLE_CREATE[创建新角色<br/>调用 Role Designer]
+        
+        ROLE_MATCH & ROLE_CREATE & SELECTED_FW --> ORCHESTRATION_PLAN[OrchestrationPlan]
+        ORCHESTRATION_PLAN --> PLAN_VIEW
+    end
+
+    subgraph FrameworkExecution ["FrameworkEngine 执行 (Stage 1-N)"]
+        ENGINE[FrameworkEngine]
+        ORCHESTRATION_PLAN --> ENGINE
+        
+        ENGINE --> STAGE1[Stage 1: 议题提出]
+        STAGE1 --> STAGE2[Stage 2: 开放讨论<br/>Planner + Auditor]
+        STAGE2 --> STAGE3[Stage 3: 质疑与反驳<br/>Devil's Advocate]
+        STAGE3 --> STAGE4[Stage 4: 方案总结<br/>Leader]
+        STAGE4 --> STAGE5[Stage 5: Reporter 生成报告]
+        
+        STAGE5 --> MERMAID_CHART[生成 Mermaid 流程图<br/>展示框架执行过程]
+    end
+
+    subgraph AgentLayer ["Agent 协作层"]
+        ROLE_POOL[角色池]
+        LEADER_R[Leader]
+        PLANNER_R[Planner]
+        AUDITOR_R[Auditor]
+        DA_R[Devil's Advocate]
+        REPORTER_R[Reporter]
+        CUSTOM_R[自定义角色]
+        
+        ROLE_POOL --> LEADER_R & PLANNER_R & AUDITOR_R & DA_R & REPORTER_R & CUSTOM_R
+        ENGINE -.->|调用| ROLE_POOL
+    end
+
+    subgraph SearchLayer ["搜索增强层"]
+        SEARCH_DETECT["[SEARCH: query] 检测"]
+        MULTI_ENGINE["多引擎并行搜索"]
+        
+        AgentLayer -.->|触发| SEARCH_DETECT
+        SEARCH_DETECT --> MULTI_ENGINE
+    end
+
+    subgraph ModelAdapter ["模型适配层"]
+        ADAPTER[AdapterLLM + Function Calling]
+        DEEPSEEK[DeepSeek]
+        OPENAI[OpenAI]
+        ANTHROPIC[Anthropic]
+        GEMINI[Google Gemini]
+        
+        ADAPTER --> DEEPSEEK & OPENAI & ANTHROPIC & GEMINI
+    end
+
+    subgraph Storage ["数据存储"]
+        WS[Workspace 目录]
+        DECOMP[decomposition.json:<br/>Meta-Orchestrator 规划]
+        HISTORY[history.json:<br/>完整对话历史]
+        ROUND_DATA[round_N_data.json:<br/>每轮数据]
+        REPORT_HTML[report.html:<br/>含 Mermaid 流程图]
+        
+        WS --> DECOMP & HISTORY & ROUND_DATA & REPORT_HTML
+        ORCHESTRATION_PLAN --> DECOMP
+    end
+
+    %% 连接关系
+    FE -->|POST /api/orchestrate| API
+    RETURN_PLAN --> PLAN_VIEW
+    EXECUTE -->|POST /api/update| STATUS
+    STAGE5 --> REPORT_HTML
+    MetaLayer & FrameworkExecution & AgentLayer --> ADAPTER
+
+    %% 样式
+    style Frontend fill:#e0f2fe,stroke:#0284c7
+    style Backend fill:#fef3c7,stroke:#d97706
+    style MetaLayer fill:#dbeafe,stroke:#3b82f6,stroke-width:3px
+    style FrameworkExecution fill:#d1fae5,stroke:#10b981,stroke-width:3px
+    style AgentLayer fill:#f0fdf4,stroke:#16a34a
+    style SearchLayer fill:#fefce8,stroke:#ca8a04,stroke-dasharray: 5 5
+    style ModelAdapter fill:#f3e8ff,stroke:#9333ea
+    style Storage fill:#f1f5f9,stroke:#64748b
+    
+    style ORCHESTRATION_PLAN fill:#fbbf24,stroke:#f59e0b,stroke-width:2px
+    style MERMAID_CHART fill:#34d399,stroke:#10b981,stroke-width:2px
+```
+
+### 关键流程对比
+
+| 步骤 | 传统模式 | Meta-Orchestrator 模式 |
+|-----|---------|----------------------|
+| **1. 初始化** | 固定的 Leader-Planner-Auditor 流程 | Meta-Orchestrator 分析需求 |
+| **2. 框架选择** | 无框架概念，固定流程 | 从 3 个预定义框架中选择最优方案 |
+| **3. 角色配置** | 固定角色（Leader、Planner、Auditor、DA） | 自动匹配现有角色 + 创建新角色 |
+| **4. 执行流程** | 单一流程：拆解 → 讨论 → 汇总 | 多阶段执行：Stage 1 → Stage N |
+| **5. 报告生成** | 标准 HTML 报告 | 包含 Mermaid 流程图的增强报告 |
+
+---
+
+## 核心模块说明
 
 ## 主要设计要点
 

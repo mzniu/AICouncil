@@ -151,7 +151,62 @@
       * **重复引用处理**：如果同一信源在报告中多次使用，后续引用应继续使用首次出现时分配的编号。
       * **示例**：假设联网搜索返回表格中 #5 的结果在报告中首次被引用，应该标记为 [1]；表格中 #2 的结果在报告中第二个被引用，应标记为 [2]。
     - **末尾列表**：在报告末尾添加"参考资料"章节，按照 [1], [2], [3]... 的引用编号顺序列出所有参考链接。建议使用列表或表格形式，包含标题、来源和链接。
-13. **禁止废话**：不要包含任何关于报告生成过程的描述（如"基于多轮讨论形成"、"本报告整合自..."）、版权声明、讲解时长建议或任何前言/后记。直接从报告标题和正文内容开始。
+13. **框架执行流程图（Meta-Orchestrator模式专用）**：
+    - **适用场景**：当议事记录中包含"智能规划方案"章节（说明使用了Meta-Orchestrator框架编排）时，**必须**在报告开头或显著位置添加框架执行流程图。
+    - **数据来源**：从"智能规划方案"部分提取以下信息：
+      * 推荐框架名称
+      * 框架包含的Stages（阶段名称、描述、参与角色）
+      * 总轮次配置
+    - **使用Mermaid流程图**：使用 `flowchart TD` 或 `flowchart LR` 格式绘制框架执行流程。
+    - **流程图结构要求**：
+      * **Stage 0（规划阶段）**：Meta-Orchestrator分析需求 → 选择框架 → 配置角色
+      * **Stage 1-N（执行阶段）**：按照框架定义的各个Stage顺序展示，每个Stage显示：
+        - Stage名称和简短描述
+        - 参与的角色类型（如Planner、Auditor等）
+        - 轮次信息（如Round 1-3）
+      * **最终输出**：Reporter生成综合报告
+    - **流程图样式建议**：
+      * 使用不同形状区分阶段类型（规划用圆角矩形`[]`，执行用矩形`[]`，决策用菱形`{{}}`）
+      * 使用子图`subgraph`组织复杂流程
+      * 添加适当的箭头标签说明阶段间的关系
+    - **示例代码**：
+      ```html
+      <div class="card" style="page-break-inside: avoid;">
+          <h2>🧭 框架执行流程</h2>
+          <div class="mermaid" data-mermaid-source="flowchart TD\n    Start[用户需求] --> Stage0[Stage 0: 智能规划]\n    Stage0 --> |分析需求|S0A[选择框架: DeepAnalysisFramework]\n    Stage0 --> |配置角色|S0B[分配Agent数量]\n    S0A --> Stage1\n    S0B --> Stage1\n    \n    subgraph Stage1[Stage 1: 问题分析 Round 1-2]\n        S1A[Planner x2: 提出方案]\n        S1B[Auditor x1: 批判性审查]\n        S1A --> S1B\n    end\n    \n    subgraph Stage2[Stage 2: 深度论证 Round 2-3]\n        S2A[Planner x2: 深化论证]\n        S2B[Auditor x1: 风险评估]\n        S2A --> S2B\n    end\n    \n    Stage1 --> Stage2\n    Stage2 --> Final[Reporter: 生成综合报告]\n    Final --> End[最终方案]">
+      flowchart TD
+          Start[用户需求] --> Stage0[Stage 0: 智能规划]
+          Stage0 --> |分析需求|S0A[选择框架: DeepAnalysisFramework]
+          Stage0 --> |配置角色|S0B[分配Agent数量]
+          S0A --> Stage1
+          S0B --> Stage1
+          
+          subgraph Stage1[Stage 1: 问题分析 Round 1-2]
+              S1A[Planner x2: 提出方案]
+              S1B[Auditor x1: 批判性审查]
+              S1A --> S1B
+          end
+          
+          subgraph Stage2[Stage 2: 深度论证 Round 2-3]
+              S2A[Planner x2: 深化论证]
+              S2B[Auditor x1: 风险评估]
+              S2A --> S2B
+          end
+          
+          Stage1 --> Stage2
+          Stage2 --> Final[Reporter: 生成综合报告]
+          Final --> End[最终方案]
+      </div>
+      <p class="text-sm text-slate-600 mt-2">
+          <strong>说明</strong>：本报告基于 <em>DeepAnalysisFramework</em> 框架生成，经过2个执行阶段、共4轮深度讨论形成。
+      </p>
+      </div>
+      ```
+    - **注意事项**：
+      * **禁止虚构Stage信息**：流程图中的所有Stage、角色、轮次必须来自"智能规划方案"的真实数据
+      * **传统模式无需生成**：如果议事记录中不包含"智能规划方案"章节（说明使用传统多轮讨论模式），则不生成此流程图
+      * **布局优化**：流程图应放置在报告开头的"执行概览"或"方案背景"章节，帮助读者快速理解讨论流程
+14. **禁止废话**：不要包含任何关于报告生成过程的描述（如"基于多轮讨论形成"、"本报告整合自..."）、版权声明、讲解时长建议或任何前言/后记。直接从报告标题和正文内容开始。
 
 请确保 HTML 代码在 <iframe> 中能完美渲染。
 

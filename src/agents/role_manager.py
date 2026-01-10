@@ -216,6 +216,48 @@ class RoleManager:
     
     # === 角色编辑功能 ===
     
+    BUILTIN_ROLES = ['leader', 'planner', 'auditor', 'reporter', 'report_auditor', 'role_designer']
+    
+    def delete_role(self, role_name: str) -> tuple[bool, Optional[str]]:
+        """删除角色（保护内置角色）
+        
+        Args:
+            role_name: 角色名称
+            
+        Returns:
+            (success, error_message)
+        """
+        try:
+            # 1. 检查是否为内置角色
+            if role_name in self.BUILTIN_ROLES:
+                return False, f"无法删除系统内置角色: {role_name}"
+            
+            # 2. 检查角色是否存在
+            if not self.has_role(role_name):
+                return False, f"角色不存在: {role_name}"
+            
+            # 3. 删除YAML配置文件
+            yaml_file = ROLES_DIR / f"{role_name}.yaml"
+            if yaml_file.exists():
+                yaml_file.unlink()
+            
+            # 4. 删除关联的prompt文件
+            role = self.get_role(role_name)
+            for stage_name, stage in role.stages.items():
+                prompt_file = ROLES_DIR / stage.prompt_file
+                if prompt_file.exists():
+                    prompt_file.unlink()
+            
+            # 5. 从内存中移除
+            del self._roles[role_name]
+            self.load_prompt.cache_clear()
+            
+            print(f"[RoleManager] 已删除角色: {role_name}")
+            return True, None
+            
+        except Exception as e:
+            return False, f"删除失败: {str(e)}"
+    
     def get_role_yaml_content(self, role_name: str) -> str:
         """获取角色的原始YAML内容"""
         yaml_file = ROLES_DIR / f"{role_name}.yaml"
