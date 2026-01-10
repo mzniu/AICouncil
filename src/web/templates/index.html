@@ -2156,11 +2156,16 @@ function confirmSatisfied() {
                     });
                     const data = await response.json();
                     if (data.status !== 'ok') {
-                        showAlert(t('msg_request_failed'), t('title_error'), 'error');
+                        const errorMsg = data.message || t('msg_request_failed');
+                        showAlert(errorMsg, t('title_error'), 'error');
+                        toggleReportLoading(false);
+                        isReportingPhase = false;
                     }
                 } catch (error) {
                     console.error('Re-report error:', error);
                     showAlert(t('msg_request_failed'), t('title_error'), 'error');
+                    toggleReportLoading(false);
+                    isReportingPhase = false;
                 }
             }
 
