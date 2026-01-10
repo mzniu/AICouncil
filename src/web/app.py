@@ -638,16 +638,23 @@ def list_workspaces():
             # 尝试获取议题内容
             issue = "未知议题"
             try:
-                # 从 final_session_data.json 或 decomposition.json 获取
-                data_path = d / "final_session_data.json"
-                if data_path.exists():
-                    with open(str(data_path), "r", encoding="utf-8") as f:
-                        issue = json.load(f).get("issue", issue)
+                # 方式1：Meta-Orchestrator 格式
+                orch_path = d / "orchestration_result.json"
+                if orch_path.exists():
+                    with open(str(orch_path), "r", encoding="utf-8") as f:
+                        orch_data = json.load(f)
+                        issue = orch_data.get("plan", {}).get("analysis", {}).get("problem_type", issue)
+                # 方式2：传统格式
                 else:
-                    decomp_path = d / "decomposition.json"
-                    if decomp_path.exists():
-                        with open(str(decomp_path), "r", encoding="utf-8") as f:
-                            issue = json.load(f).get("core_goal", issue)
+                    data_path = d / "final_session_data.json"
+                    if data_path.exists():
+                        with open(str(data_path), "r", encoding="utf-8") as f:
+                            issue = json.load(f).get("issue", issue)
+                    else:
+                        decomp_path = d / "decomposition.json"
+                        if decomp_path.exists():
+                            with open(str(decomp_path), "r", encoding="utf-8") as f:
+                                issue = json.load(f).get("core_goal", issue)
             except:
                 pass
             
@@ -688,10 +695,24 @@ def load_workspace(session_id):
         # 2. 加载历史记录并重建事件流
         history_path = os.path.join(workspace_path, "history.json")
         final_data_path = os.path.join(workspace_path, "final_session_data.json")
+        orch_path = os.path.join(workspace_path, "orchestration_result.json")
         
         issue_text = "已加载的议题"
         max_rounds = 3
-        if os.path.exists(final_data_path):
+        history_data = []
+        
+        # 方式1：Meta-Orchestrator 格式
+        if os.path.exists(orch_path):
+            with open(orch_path, "r", encoding="utf-8") as f:
+                orch_data = json.load(f)
+                issue_text = orch_data.get("plan", {}).get("analysis", {}).get("problem_type", issue_text)
+                # Meta-Orchestrator 的执行数据在 execution 字段
+                execution = orch_data.get("execution", {})
+                stages = execution.get("stages", [])
+                max_rounds = len(stages) if stages else 1
+                current_config = {"issue": issue_text, "rounds": max_rounds}
+        # 方式2：传统格式
+        elif os.path.exists(final_data_path):
             with open(final_data_path, "r", encoding="utf-8") as f:
                 fd = json.load(f)
                 issue_text = fd.get("issue", issue_text)
