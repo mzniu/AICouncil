@@ -8,8 +8,9 @@ from pydantic import ValidationError
 import json
 import requests
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 import uuid
 import traceback
 from datetime import datetime
@@ -205,6 +206,43 @@ def stream_agent_output(chain, prompt_vars, agent_name, role_type, event_type="a
                 
     return full_content, search_results
 
+def make_generic_role_chain(role_name: str, stage_name: str, model_config: Dict[str, Any]):
+    """通用的角色chain创建函数，支持任意自定义角色
+    
+    Args:
+        role_name: 角色名称（如 "international_law_expert"）
+        stage_name: Stage名称（如 "analysis"）
+        model_config: 模型配置
+        
+    Returns:
+        LangChain chain对象
+    """
+    from src.agents.role_manager import RoleManager
+    
+    llm = AdapterLLM(backend_config=ModelConfig(**model_config))
+    role_manager = RoleManager()
+    
+    # 从RoleManager加载角色配置
+    role_config = role_manager.get_role(role_name)
+    if not role_config:
+        raise ValueError(f"未找到角色: {role_name}")
+    
+    # 获取stage配置（如果没有指定stage，使用第一个stage）
+    if stage_name not in role_config.stages:
+        available_stages = list(role_config.stages.keys())
+        if not available_stages:
+            raise ValueError(f"角色 {role_name} 没有任何stage配置")
+        stage_name = available_stages[0]
+        logger.warning(f"[make_generic_role_chain] 角色 {role_name} 没有 stage '{stage_name}'，使用第一个stage: {available_stages[0]}")
+    
+    # 加载prompt和输入变量
+    prompt_text = role_manager.load_prompt(role_name, stage_name)
+    input_vars = role_config.stages[stage_name].input_vars
+    
+    prompt = PromptTemplate(template=prompt_text, input_variables=input_vars)
+    return prompt | llm
+
+
 def make_planner_chain(model_config: Dict[str, Any]):
     """创建策论家链（使用RoleManager）"""
     from src.agents.role_manager import RoleManager
@@ -307,12 +345,19 @@ def make_reporter_chain(model_config: Dict[str, Any]):
     """创建记录员链（使用RoleManager）"""
     from src.agents.role_manager import RoleManager
     
-    llm = AdapterLLM(backend_config=ModelConfig(**model_config))
     role_manager = RoleManager()
+    role_config = role_manager.get_role("reporter")
+    
+    # 如果 model_config 没有明确指定 model，使用 reporter 的 default_model
+    if not model_config or not model_config.get('model'):
+        model_config = model_config or {}
+        model_config['model'] = role_config.default_model
+        model_config['type'] = model_config.get('type', 'deepseek')  # 默认使用 deepseek backend
+    
+    llm = AdapterLLM(backend_config=ModelConfig(**model_config))
     
     # 从RoleManager加载prompt和配置
     prompt_text = role_manager.load_prompt("reporter", "generate")
-    role_config = role_manager.get_role("reporter")
     input_vars = role_config.stages["generate"].input_vars
     
     prompt = PromptTemplate(template=prompt_text, input_variables=input_vars)
@@ -390,7 +435,7 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
                 
             parsed = json.loads(cleaned)
             summary = schemas.LeaderSummary(**parsed)
-            decomposition = summary.decomposition.dict()
+            decomposition = summary.decomposition.model_dump()
             
             # 保存初始拆解结果
             with open(os.path.join(workspace_path, "decomposition.json"), "w", encoding="utf-8") as f:
@@ -433,7 +478,7 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
                 
             parsed = json.loads(cleaned)
             da_obj = schemas.DevilsAdvocateSchema(**parsed)
-            decomposition_da_result = da_obj.dict()
+            decomposition_da_result = da_obj.model_dump()
             logger.info(f"[cycle] 质疑官验证拆解成功 (尝试 {attempt + 1})")
             
             # 保存拆解质疑结果
@@ -480,7 +525,7 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
                     
                 parsed = json.loads(cleaned)
                 summary = schemas.LeaderSummary(**parsed)
-                decomposition = summary.decomposition.dict()
+                decomposition = summary.decomposition.model_dump()
                 
                 # 更新保存的拆解结果
                 with open(os.path.join(workspace_path, "decomposition_revised.json"), "w", encoding="utf-8") as f:
@@ -560,7 +605,7 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
                         
                     parsed = json.loads(cleaned)
                     p = schemas.PlanSchema(**parsed)
-                    plan_dict = p.dict()
+                    plan_dict = p.model_dump()
                     logger.info(f"[round {r}] 策论家 {i} 成功 (尝试 {attempt + 1})")
                     return plan_dict
                 except Exception as e:
@@ -600,7 +645,7 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
                     parsed = json.loads(cleaned)
                     a = schemas.AuditorSchema(**parsed)
                     logger.info(f"[round {r}] 监察官 {j} 成功 (尝试 {attempt + 1})")
-                    return a.dict()
+                    return a.model_dump()
                 except Exception as e:
                     logger.warning(f"[round {r}] 监察官 {j} 尝试 {attempt + 1} 失败: {e}")
                     logger.error(traceback.format_exc())
@@ -659,7 +704,7 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
                     parsed["decomposition"]["core_goal"] = decomposition["core_goal"]
                 
                 summary_obj = schemas.LeaderSummary(**parsed)
-                final_summary = summary_obj.dict()
+                final_summary = summary_obj.model_dump()
                 logger.info(f"[round {r}] 议长汇总成功 (尝试 {attempt + 1})")
                 break
             except Exception as e:
@@ -705,7 +750,7 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
                     
                 parsed = json.loads(cleaned)
                 da_obj = schemas.DevilsAdvocateSchema(**parsed)
-                da_result = da_obj.dict()
+                da_result = da_obj.model_dump()
                 logger.info(f"[round {r}] 质疑官验证成功 (尝试 {attempt + 1})")
                 
                 # 将DA结果附加到本轮history
@@ -767,7 +812,7 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
                         parsed["decomposition"]["core_goal"] = decomposition["core_goal"]
                     
                     revised_summary = schemas.LeaderSummary(**parsed)
-                    final_summary = revised_summary.dict()
+                    final_summary = revised_summary.model_dump()
                     
                     # 更新history中的summary
                     history[-1]["summary"] = final_summary
@@ -1091,4 +1136,275 @@ def call_role_designer(requirement: str) -> schemas.RoleDesignOutput:
         logger.error(traceback.format_exc())
         raise
 
+
+# ========== Meta-Orchestrator Agent ==========
+
+def run_meta_orchestrator(user_requirement: str, model_config: Dict[str, Any] = None) -> schemas.OrchestrationPlan:
+    """
+    运行Meta-Orchestrator进行智能规划
+    
+    Args:
+        user_requirement: 用户需求描述
+        model_config: 模型配置（可选）
+        
+    Returns:
+        OrchestrationPlan对象，包含完整的规划方案
+    """
+    try:
+        logger.info(f"[meta_orchestrator] 开始规划，需求: {user_requirement[:100]}...")
+        
+        # 发送Web事件
+        send_web_event("agent_action", agent_name="元调度器", role_type="meta_orchestrator", 
+                      content="🧭 开始分析需求并规划讨论方案...", chunk_id=str(uuid.uuid4()))
+        
+        # 获取可用角色列表
+        from src.agents.role_manager import RoleManager
+        rm = RoleManager()
+        available_roles_raw = rm.list_roles()
+        
+        # 格式化角色信息
+        available_roles = "\n".join([
+            f"• {role.display_name} ({role.name}): {role.description[:100]}..."
+            for role in available_roles_raw[:20]  # 只显示前20个，避免prompt过长
+        ])
+        
+        # 获取可用框架列表
+        from src.agents.frameworks import list_frameworks
+        frameworks_list = list_frameworks()
+        available_frameworks = "\n".join([
+            f"{i+1}. {fw['name']} ({fw['id']}): {fw['description'][:100]}..."
+            for i, fw in enumerate(frameworks_list)
+        ])
+        
+        # 加载prompt模板
+        from src.agents.role_manager import RoleManager
+        rm = RoleManager()
+        prompt_text = rm.load_prompt("meta_orchestrator", "planning")
+        
+        # 替换变量
+        prompt_filled = prompt_text.replace("{user_requirement}", user_requirement)
+        prompt_filled = prompt_filled.replace("{available_roles}", available_roles)
+        prompt_filled = prompt_filled.replace("{available_frameworks}", available_frameworks)
+        
+        # 准备初始消息
+        initial_messages = [{"role": "user", "content": prompt_filled}]
+        
+        # 获取工具schemas
+        from src.agents.meta_tools import get_tool_schemas
+        tools = get_tool_schemas()
+        
+        logger.info(f"[meta_orchestrator] 使用 {len(tools)} 个工具: {[t['function']['name'] for t in tools]}")
+        
+        # 调用带工具的模型
+        from src.agents.model_adapter import call_model_with_tools
+        
+        send_web_event("agent_action", agent_name="元调度器", role_type="meta_orchestrator", 
+                      content="🔍 正在调用LLM分析需求...\n可用工具：list_roles, create_role, select_framework", 
+                      chunk_id=str(uuid.uuid4()))
+        
+        response_text = call_model_with_tools(
+            agent_id="meta_orchestrator",
+            messages=initial_messages,
+            model_config=model_config,
+            tools=tools,
+            max_tool_rounds=10  # Meta-Orchestrator可能需要多次调用工具
+        )
+        
+        logger.info(f"[meta_orchestrator] LLM返回响应，长度: {len(response_text)}")
+        
+        # 清理JSON
+        cleaned = clean_json_string(response_text)
+        
+        send_web_event("agent_action", agent_name="元调度器", role_type="meta_orchestrator", 
+                      content=f"📋 解析规划方案...\n响应长度: {len(cleaned)} 字符", 
+                      chunk_id=str(uuid.uuid4()))
+        
+        # 解析为OrchestrationPlan
+        try:
+            plan_dict = json.loads(cleaned)
+            plan = schemas.OrchestrationPlan(**plan_dict)
+            
+            logger.info(f"[meta_orchestrator] ✅ 成功生成规划方案")
+            logger.info(f"  - 问题类型: {plan.analysis.problem_type}")
+            logger.info(f"  - 推荐框架: {plan.framework_selection.framework_name}")
+            logger.info(f"  - 现有角色: {len(plan.role_planning.existing_roles)} 个")
+            logger.info(f"  - 需创建角色: {len(plan.role_planning.roles_to_create)} 个")
+            
+            # 构建详细的输出信息
+            existing_roles_detail = ""
+            if plan.role_planning.existing_roles:
+                existing_roles_detail = "\n".join([
+                    f"  • {role.display_name} ({role.role_name}): {role.match_reason}"
+                    for role in plan.role_planning.existing_roles[:10]  # 最多显示10个
+                ])
+            else:
+                existing_roles_detail = "  （未使用现有角色）"
+            
+            new_roles_detail = ""
+            if plan.role_planning.roles_to_create:
+                new_roles_detail = "\n".join([
+                    f"  • {role.capability}: {role.requirement[:80]}..."
+                    for role in plan.role_planning.roles_to_create[:5]  # 最多显示5个
+                ])
+            else:
+                new_roles_detail = "  （无需创建新角色）"
+            
+            # 发送综合事件
+            summary_text = f"""
+🧭 **元调度器规划完成**
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 **需求分析**
+• 问题类型：{plan.analysis.problem_type}
+• 复杂度：{plan.analysis.complexity}
+• 所需能力：{', '.join(plan.analysis.required_capabilities[:5])}
+{'  ...' if len(plan.analysis.required_capabilities) > 5 else ''}
+
+🎯 **推荐框架**
+• 框架：{plan.framework_selection.framework_name}
+• 理由：{plan.framework_selection.selection_reason[:150]}{'...' if len(plan.framework_selection.selection_reason) > 150 else ''}
+
+👥 **角色配置**
+
+**✅ 匹配到 {len(plan.role_planning.existing_roles)} 个现有角色**
+{existing_roles_detail}
+
+**🔧 需要创建 {len(plan.role_planning.roles_to_create)} 个新角色**
+{new_roles_detail}
+
+⚙️ **执行配置**
+• 讨论轮次：{plan.execution_config.total_rounds} 轮
+• Agent数量：{sum(plan.execution_config.agent_counts.values())} 个
+• 预估耗时：{plan.execution_config.estimated_duration}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            """.strip()
+            
+            send_web_event("agent_action", agent_name="元调度器", role_type="meta_orchestrator", 
+                          content=summary_text, chunk_id=str(uuid.uuid4()))
+            
+            return plan
+            
+        except (json.JSONDecodeError, ValidationError) as e:
+            logger.error(f"[meta_orchestrator] JSON解析失败: {e}")
+            logger.error(f"[meta_orchestrator] 清理后的JSON: {cleaned[:500]}")
+            logger.error(f"[meta_orchestrator] 原始响应: {response_text[:500]}")
+            
+            send_web_event("error", agent_name="元调度器", role_type="meta_orchestrator", 
+                          content=f"❌ 规划方案解析失败: {str(e)}", chunk_id=str(uuid.uuid4()))
+            
+            raise Exception(f"规划方案格式错误: {str(e)}")
+        
+    except Exception as e:
+        logger.error(f"[meta_orchestrator] 调用失败: {e}")
+        logger.error(traceback.format_exc())
+        
+        send_web_event("error", agent_name="元调度器", role_type="meta_orchestrator", 
+                      content=f"❌ 规划失败: {str(e)}", chunk_id=str(uuid.uuid4()))
+        
+        raise
+
+
+def execute_orchestration_plan(
+    plan: schemas.OrchestrationPlan, 
+    user_requirement: str, 
+    model_config: Dict[str, Any] = None,
+    workspace_path: Path = None,
+    session_id: str = None,
+    agent_configs: Dict[str, Any] = None
+) -> Dict[str, Any]:
+    """
+    执行Meta-Orchestrator生成的规划方案
+    
+    Args:
+        plan: OrchestrationPlan规划方案
+        user_requirement: 原始用户需求
+        model_config: 模型配置
+        workspace_path: 工作目录路径（可选，如果不提供会自动创建）
+        session_id: 会话ID（可选，如果不提供会自动生成）
+        agent_configs: 可选的每个Agent的模型配置覆盖
+        
+    Returns:
+        执行结果字典
+    """
+    from src.agents.framework_engine import FrameworkEngine
+    from src.agents.frameworks import get_framework
+    from datetime import datetime
+    from pathlib import Path
+    import uuid
+    
+    try:
+        logger.info(f"[execute_orchestration_plan] 开始执行规划方案")
+        logger.info(f"  - 框架: {plan.framework_selection.framework_name} (ID: {plan.framework_selection.framework_id})")
+        logger.info(f"  - 轮次: {plan.execution_config.total_rounds}")
+        logger.info(f"  - Agent配置: {plan.execution_config.agent_counts}")
+        
+        # 1. 创建workspace（如果未提供）
+        if not workspace_path or not session_id:
+            session_id = session_id or datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + str(uuid.uuid4())[:8]
+            workspace_path = get_workspace_dir() / session_id
+            workspace_path.mkdir(parents=True, exist_ok=True)
+            logger.info(f"[execute_orchestration_plan] 创建workspace: {workspace_path}")
+        
+        # 2. 获取框架定义
+        framework = get_framework(plan.framework_selection.framework_id)
+        if not framework:
+            raise ValueError(f"未找到框架: {plan.framework_selection.framework_id}")
+        
+        # 3. 准备Agent数量配置（从规划方案中提取）
+        agent_counts = plan.execution_config.agent_counts
+        
+        # 4. 准备模型配置
+        model_config = model_config or {
+            "type": model_adapter.config.MODEL_BACKEND, 
+            "model": model_adapter.config.MODEL_NAME
+        }
+        agent_configs = agent_configs or {}
+        
+        # 5. 创建并执行FrameworkEngine
+        send_web_event("system_info", message=f"🚀 开始执行框架: {framework.name}", chunk_id=str(uuid.uuid4()))
+        
+        engine = FrameworkEngine(
+            framework=framework,
+            model_config=model_config,
+            workspace_path=workspace_path,
+            session_id=session_id
+        )
+        
+        execution_result = engine.execute(
+            user_requirement=user_requirement,
+            agent_counts=agent_counts,
+            agent_configs=agent_configs
+        )
+        
+        # 6. 保存完整结果
+        final_result = {
+            "success": True,
+            "session_id": session_id,
+            "workspace_path": str(workspace_path),
+            "plan": plan.model_dump(),
+            "execution": execution_result,
+            "all_outputs": engine.get_all_outputs(),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        # 保存到workspace
+        result_file = workspace_path / "orchestration_result.json"
+        with open(result_file, "w", encoding="utf-8") as f:
+            json.dump(final_result, f, ensure_ascii=False, indent=4)
+        
+        logger.info(f"[execute_orchestration_plan] 执行完成，结果已保存到 {result_file}")
+        
+        send_web_event("system_info", message=f"✅ 框架执行完成", chunk_id=str(uuid.uuid4()))
+        
+        return final_result
+        
+    except Exception as e:
+        logger.error(f"[execute_orchestration_plan] 执行失败: {e}")
+        logger.error(traceback.format_exc())
+        
+        send_web_event("error", message=f"❌ 执行失败: {str(e)}", chunk_id=str(uuid.uuid4()))
+        
+        raise
 

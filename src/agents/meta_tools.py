@@ -39,12 +39,6 @@ def list_roles() -> Dict[str, Any]:
         - error: Optional[str], 错误信息（如有）
     """
     try:
-        # 发送 Web 事件
-        from src.agents.langchain_agents import send_web_event
-        import uuid
-        send_web_event("agent_action", agent_name="元调度器", role_type="meta_orchestrator", 
-                      content="📚 正在查看系统现有角色库...", chunk_id=str(uuid.uuid4()))
-        
         rm = RoleManager()
         roles_data = rm.list_roles()
         
@@ -63,11 +57,6 @@ def list_roles() -> Dict[str, Any]:
             })
         
         logger.info(f"[list_roles] 成功获取 {len(formatted_roles)} 个角色")
-        
-        # 发送结果事件
-        send_web_event("agent_action", agent_name="元调度器", role_type="meta_orchestrator", 
-                      content=f"✅ 已查看完毕，系统中共有 {len(formatted_roles)} 个可用角色", 
-                      chunk_id=str(uuid.uuid4()))
         
         return {
             "success": True,
@@ -137,16 +126,6 @@ def create_role(requirement: str) -> Dict[str, Any]:
         - error: Optional[str], 错误信息（如有）
     """
     try:
-        # 发送 Web 事件
-        from src.agents.langchain_agents import send_web_event
-        import uuid
-        
-        # 提取需求摘要
-        requirement_summary = requirement[:80] + "..." if len(requirement) > 80 else requirement
-        send_web_event("agent_action", agent_name="元调度器", role_type="meta_orchestrator", 
-                      content=f"🔧 正在生成新角色...\n需求：{requirement_summary}", 
-                      chunk_id=str(uuid.uuid4()))
-        
         # 验证需求描述
         if not requirement or len(requirement.strip()) < 20:
             return {
@@ -162,11 +141,6 @@ def create_role(requirement: str) -> Dict[str, Any]:
         try:
             design_output = call_role_designer(requirement)
             logger.info(f"[create_role] RoleDesigner 返回角色: {design_output.display_name}")
-            
-            # 发送设计完成事件
-            send_web_event("agent_action", agent_name="元调度器", role_type="meta_orchestrator", 
-                          content=f"🎨 角色设计完成：{design_output.display_name} ({design_output.role_name})", 
-                          chunk_id=str(uuid.uuid4()))
         except Exception as e:
             logger.error(f"[create_role] RoleDesigner 调用失败: {e}")
             return {
@@ -206,11 +180,6 @@ def create_role(requirement: str) -> Dict[str, Any]:
         }
         
         logger.info(f"[create_role] ✅ 成功创建角色: {design_output.role_name}")
-        
-        # 发送成功事件
-        send_web_event("agent_action", agent_name="元调度器", role_type="meta_orchestrator", 
-                      content=f"✅ 角色创建成功！\n名称：{design_output.display_name}\n技术名：{design_output.role_name}", 
-                      chunk_id=str(uuid.uuid4()))
         
         return {
             "success": True,
@@ -275,12 +244,6 @@ def select_framework(requirement: str) -> Dict[str, Any]:
         - error: Optional[str], 错误信息（如有）
     """
     try:
-        # 发送 Web 事件
-        from src.agents.langchain_agents import send_web_event
-        import uuid
-        send_web_event("agent_action", agent_name="元调度器", role_type="meta_orchestrator", 
-                      content="🎯 正在匹配最佳讨论框架...", chunk_id=str(uuid.uuid4()))
-        
         # 验证输入
         if not requirement or len(requirement.strip()) < 5:
             return {
@@ -297,10 +260,6 @@ def select_framework(requirement: str) -> Dict[str, Any]:
             # 如果没有匹配，返回默认框架（罗伯特议事规则）
             default_fw = get_framework("roberts_rules")
             
-            send_web_event("agent_action", agent_name="元调度器", role_type="meta_orchestrator", 
-                          content=f"✅ 已选择框架：{default_fw.name}\n（通用默认框架）", 
-                          chunk_id=str(uuid.uuid4()))
-            
             return {
                 "success": True,
                 "framework_id": default_fw.id,
@@ -313,11 +272,6 @@ def select_framework(requirement: str) -> Dict[str, Any]:
         # 返回最佳匹配
         best_match = matched_frameworks[0]
         alternatives = matched_frameworks[1:3] if len(matched_frameworks) > 1 else []
-        
-        # 发送匹配成功事件
-        send_web_event("agent_action", agent_name="元调度器", role_type="meta_orchestrator", 
-                      content=f"✅ 已选择框架：{best_match.name}\n阶段数：{len(best_match.stages)} 个", 
-                      chunk_id=str(uuid.uuid4()))
         
         return {
             "success": True,
