@@ -148,7 +148,7 @@ def _auto_fix_orchestration_plan(plan: schemas.OrchestrationPlan) -> schemas.Orc
     
     return plan
 
-def _find_suitable_stages(role_match: schemas.RoleMatch, framework) -> List[str]:
+def _find_suitable_stages(role_match: schemas.ExistingRoleMatch, framework) -> List[str]:
     """为专业角色寻找合适的参与 stage
     
     策略：
