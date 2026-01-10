@@ -1371,6 +1371,38 @@ def execute_orchestration_plan(
         agent_counts = plan.execution_config.agent_counts
         role_stage_mapping = plan.execution_config.role_stage_mapping
         
+        # 3.5. Fallback机制：如果有专业角色但role_stage_mapping为空，自动创建专业分析stage
+        framework_roles = {"planner", "auditor", "leader", "devils_advocate", "reporter"}
+        professional_roles = [role for role in agent_counts.keys() if role not in framework_roles]
+        
+        if professional_roles and (not role_stage_mapping or len(role_stage_mapping) == 0):
+            logger.warning(f"[execute_orchestration_plan] 检测到专业角色但role_stage_mapping为空，启动fallback机制")
+            logger.info(f"  - 专业角色: {professional_roles}")
+            
+            # 创建专业分析stage
+            from agents.frameworks import FrameworkStage
+            professional_stage = FrameworkStage(
+                name="专业分析",
+                description="专业角色基于其专长领域对议题进行深入分析",
+                roles=professional_roles,  # 包含所有专业角色
+                min_agents=1,
+                max_agents=len(professional_roles),
+                rounds=1,
+                prompt_suffix="请从你的专业角度分析议题，提供独特的见解和建议。"
+            )
+            
+            # 将专业分析stage插入到框架中（在第一个stage之后）
+            framework.stages.insert(1, professional_stage)
+            logger.info(f"[execute_orchestration_plan] 已插入'专业分析'stage到框架第2位")
+            
+            # 为所有专业角色创建role_stage_mapping
+            role_stage_mapping = {role: ["专业分析"] for role in professional_roles}
+            logger.info(f"[execute_orchestration_plan] 自动创建 role_stage_mapping: {role_stage_mapping}")
+            
+            send_web_event("system_info", 
+                          message=f"🔧 检测到{len(professional_roles)}个专业角色，自动启用fallback机制创建专业分析stage",
+                          chunk_id=str(uuid.uuid4()))
+        
         # 4. 准备模型配置
         model_config = model_config or {
             "type": model_adapter.config.MODEL_BACKEND, 
