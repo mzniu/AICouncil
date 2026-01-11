@@ -175,7 +175,7 @@ def create_role(requirement: str) -> Dict[str, Any]:
             "ui": {
                 "icon": design_output.ui.icon,
                 "color": design_output.ui.color,
-                "short_description": design_output.ui.short_description
+                "short_description": design_output.ui.description_short
             }
         }
         

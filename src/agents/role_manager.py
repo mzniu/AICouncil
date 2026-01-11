@@ -511,11 +511,12 @@ class RoleManager:
 """
         return prompt_template
     
-    def create_new_role(self, design: 'RoleDesignOutput') -> tuple[bool, Optional[str]]:
+    def create_new_role(self, design: 'RoleDesignOutput', overwrite: bool = False) -> tuple[bool, Optional[str]]:
         """创建新角色
         
         Args:
             design: 角色设计输出（Pydantic模型）
+            overwrite: 如果角色已存在，是否覆盖（默认False）
         
         Returns:
             (success, error_message)
@@ -523,11 +524,21 @@ class RoleManager:
         try:
             # 1. 检查重名
             if self.has_role(design.role_name):
-                return False, f"角色 {design.role_name} 已存在，请使用不同的名称"
+                if not overwrite:
+                    return False, f"角色 {design.role_name} 已存在，请使用不同的名称"
+                else:
+                    # 覆盖模式：删除旧角色文件
+                    yaml_file = ROLES_DIR / f"{design.role_name}.yaml"
+                    if yaml_file.exists():
+                        yaml_file.unlink()
+                    
+                    # 删除旧的prompt文件
+                    for prompt_file in ROLES_DIR.glob(f"{design.role_name}_*.md"):
+                        prompt_file.unlink()
+                    
+                    print(f"[RoleManager] ⚠️ 覆盖已存在的角色: {design.role_name}")
             
             yaml_file = ROLES_DIR / f"{design.role_name}.yaml"
-            if yaml_file.exists():
-                return False, f"角色文件 {yaml_file.name} 已存在"
             
             # 2. 生成YAML配置
             yaml_content = self.generate_yaml_from_design(design)

@@ -1,4 +1,4 @@
-# Meta-Orchestrator 完整指南
+﻿# 议事编排官 完整指南
 
 ## 目录
 - [1. 概述](#1-概述)
@@ -14,9 +14,9 @@
 
 ## 1. 概述
 
-### 1.1 什么是 Meta-Orchestrator
+### 1.1 什么是 议事编排官
 
-**Meta-Orchestrator**（元编排器）是 AICouncil 的智能决策引擎，负责根据用户需求自动配置最优的议事框架和角色组合。与传统的固定流程不同，Meta-Orchestrator 能够：
+**议事编排官**（元编排器）是 AICouncil 的智能决策引擎，负责根据用户需求自动配置最优的议事框架和角色组合。与传统的固定流程不同，议事编排官 能够：
 
 - **理解需求本质**：分析问题类型（决策/论证/分析）和复杂度
 - **匹配最优框架**：从预定义框架库中选择最合适的讨论结构
@@ -26,7 +26,7 @@
 
 ### 1.2 核心价值
 
-| 传统模式 | Meta-Orchestrator 模式 |
+| 传统模式 | 议事编排官 模式 |
 |---------|----------------------|
 | 固定的 Leader-Planner-Auditor 流程 | 根据需求动态选择框架（罗伯特议事规则/图尔敏模型/批判性思维） |
 | 角色配置依赖人工经验 | AI 自动分析需求并配置最优角色组合 |
@@ -44,7 +44,7 @@
 
 ## 2. 核心组件
 
-Meta-Orchestrator 由 5 个核心模块组成：
+议事编排官 由 5 个核心模块组成：
 
 ### 2.1 框架库（Frameworks）
 
@@ -86,7 +86,7 @@ ROBERTS_RULES = Framework(
 
 **位置**：[src/agents/meta_tools.py](../src/agents/meta_tools.py)
 
-**功能**：提供 Meta-Orchestrator 所需的工具函数，支持 Function Calling：
+**功能**：提供 议事编排官 所需的工具函数，支持 Function Calling：
 
 | 工具名称 | 功能描述 | 返回格式 |
 |---------|---------|---------|
@@ -112,7 +112,7 @@ ROBERTS_RULES = Framework(
 }
 ```
 
-### 2.3 Meta-Orchestrator Agent
+### 2.3 议事编排官 Agent
 
 **位置**：[src/agents/langchain_agents.py](../src/agents/langchain_agents.py) → `run_meta_orchestrator()`
 
@@ -164,7 +164,7 @@ ROBERTS_RULES = Framework(
 
 **执行流程**：
 ```
-Stage 0: Meta-Orchestrator 规划
+Stage 0: 议事编排官 规划
   ↓
 Stage 1: 议题提出与界定 (Leader)
   ↓
@@ -188,7 +188,7 @@ Stage 4: Reporter 生成报告
 **流程图示例**：
 ```mermaid
 flowchart TD
-    A[用户需求分析] --> B[Meta-Orchestrator 规划]
+    A[用户需求分析] --> B[议事编排官 规划]
     B --> C[Stage 1: 议题提出]
     C --> D[Stage 2: 开放讨论]
     D --> E[Stage 3: 方案总结]
@@ -208,7 +208,7 @@ flowchart TD
 sequenceDiagram
     participant User as 用户
     participant API as Web API
-    participant MetaO as Meta-Orchestrator
+    participant MetaO as 议事编排官
     participant Tools as Meta Tools
     participant Engine as FrameworkEngine
     participant Agent as 各角色Agent
@@ -465,7 +465,7 @@ FRAMEWORK_REGISTRY["agile_retro"] = AGILE_RETRO
 #### 仅生成规划方案（Plan Only）
 ```bash
 python src/agents/demo_runner.py \
-  --use-meta-orchestrator \
+  --use-议事编排官 \
   --issue "如何提高团队协作效率？" \
   --backend deepseek \
   --model deepseek-chat
@@ -474,7 +474,7 @@ python src/agents/demo_runner.py \
 **输出示例**：
 ```
 ========================================
-Meta-Orchestrator 智能规划方案
+议事编排官 智能规划方案
 ========================================
 
 1️⃣  需求分析
@@ -514,7 +514,7 @@ Stage 5: 记录与存档 (Reporter)
 #### 完整执行（Plan and Execute）
 ```bash
 python src/agents/demo_runner.py \
-  --use-meta-orchestrator \
+  --use-议事编排官 \
   --issue "设计一个高可用分布式系统" \
   --backend deepseek \
   --model deepseek-chat \
@@ -572,7 +572,7 @@ while True:
 ### 5.3 Web UI 使用（即将推出）
 
 1. 打开 AICouncil Web 界面
-2. 点击"设置" → "Meta-Orchestrator 模式" → 启用
+2. 点击"设置" → "议事编排官 模式" → 启用
 3. 输入议题并开始讨论
 4. 系统自动生成规划方案并执行
 5. 查看生成的报告（含 Mermaid 流程图）
@@ -714,7 +714,7 @@ FRAMEWORK_REGISTRY["my_custom_framework"] = MY_FRAMEWORK
 
 # 3. 使用框架
 python src/agents/demo_runner.py \
-  --use-meta-orchestrator \
+  --use-议事编排官 \
   --issue "你的议题" \
   --framework my_custom_framework
 ```
@@ -747,7 +747,7 @@ response = requests.post("http://localhost:5000/api/orchestrate", json={
 ### 7.3 调整执行配置
 
 ```python
-# 修改 ExecutionConfig（需要自定义 Meta-Orchestrator prompt）
+# 修改 ExecutionConfig（需要自定义 议事编排官 prompt）
 execution_config = {
     "total_rounds": 5,  # 增加总轮次
     "agent_counts": {
@@ -766,7 +766,7 @@ execution_config = {
 
 ### 8.1 常见问题
 
-#### Q1: Meta-Orchestrator 没有选择合适的框架？
+#### Q1: 议事编排官 没有选择合适的框架？
 **原因**：需求描述不够明确，或者关键词匹配失败
 
 **解决**：
@@ -775,11 +775,11 @@ execution_config = {
 - 手动指定框架：`--framework roberts_rules`
 
 #### Q2: 生成的角色配置不符合预期？
-**原因**：Meta-Orchestrator 的角色规划逻辑可能需要优化
+**原因**：议事编排官 的角色规划逻辑可能需要优化
 
 **解决**：
 - 检查 `role_planning.existing_roles` 和 `roles_to_create` 字段
-- 修改 Meta-Orchestrator 的 prompt（[src/agents/roles/meta_orchestrator.yaml](../src/agents/roles/meta_orchestrator.yaml)）
+- 修改 议事编排官 的 prompt（[src/agents/roles/meta_orchestrator.yaml](../src/agents/roles/meta_orchestrator.yaml)）
 - 在 `agent_configs` 中手动覆盖角色配置
 
 #### Q3: Stage 执行失败？
@@ -794,7 +794,7 @@ execution_config = {
 **原因**：议事记录中缺少"智能规划方案"章节
 
 **解决**：
-- 确认使用 `--use-meta-orchestrator` 模式
+- 确认使用 `--use-议事编排官` 模式
 - 检查 `workspaces/{session}/history.json` 中是否包含 `orchestration_plan` 字段
 - 查看 Reporter 的输出日志，确认是否触发第 13 条规则
 
@@ -806,11 +806,11 @@ execution_config = {
 LOG_LEVEL = "DEBUG"  # 默认为 INFO
 ```
 
-#### 查看 Meta-Orchestrator 的推理过程
+#### 查看 议事编排官 的推理过程
 ```bash
 # 使用 DeepSeek Reasoner 模型
 python src/agents/demo_runner.py \
-  --use-meta-orchestrator \
+  --use-议事编排官 \
   --issue "你的议题" \
   --backend deepseek \
   --model deepseek-reasoner
@@ -843,3 +843,4 @@ print(result)
 **更新日期**：2025-01-29  
 **版本**：v1.0.0  
 **作者**：AICouncil Team
+

@@ -690,6 +690,24 @@ def call_model_with_tools(agent_id: str, messages: list, model_config: dict = No
                     tool_args = json.loads(tool_args_str) if isinstance(tool_args_str, str) else tool_args_str
                     logger.info(f"[call_model_with_tools] Executing tool: {tool_name} with args: {tool_args}")
                     
+                    # 发送工具调用事件到Web界面
+                    try:
+                        from src.agents.langchain_agents import send_web_event
+                        import uuid
+                        
+                        # 格式化工具参数显示
+                        args_preview = str(tool_args)[:200] + "..." if len(str(tool_args)) > 200 else str(tool_args)
+                        
+                        send_web_event(
+                            "agent_action",
+                            agent_name="议事编排官",
+                            role_type="meta_orchestrator",
+                            content=f"🔧 **调用工具**: `{tool_name}`\n\n**参数**: {args_preview}",
+                            chunk_id=str(uuid.uuid4())
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to send web event: {e}")
+                    
                     # 执行工具
                     tool_result = execute_tool(tool_name, tool_args)
                     
@@ -705,6 +723,31 @@ def call_model_with_tools(agent_id: str, messages: list, model_config: dict = No
                     })
                     
                     logger.info(f"[call_model_with_tools] Tool {tool_name} executed successfully")
+                    
+                    # 发送工具执行成功事件
+                    try:
+                        from src.agents.langchain_agents import send_web_event
+                        import uuid
+                        
+                        # 格式化工具结果预览
+                        if isinstance(tool_result, dict):
+                            if tool_result.get("success"):
+                                status = "✅ 成功"
+                            else:
+                                status = "❌ 失败"
+                            result_preview = f"{status}: {str(tool_result)[:150]}..."
+                        else:
+                            result_preview = f"✅ 完成: {str(tool_result)[:150]}..."
+                        
+                        send_web_event(
+                            "agent_action",
+                            agent_name="议事编排官",
+                            role_type="meta_orchestrator",
+                            content=f"🔧 **工具执行结果**: `{tool_name}`\n\n{result_preview}",
+                            chunk_id=str(uuid.uuid4())
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to send web event: {e}")
                     
                 except Exception as e:
                     logger.error(f"[call_model_with_tools] Tool {tool_name} execution failed: {str(e)}")

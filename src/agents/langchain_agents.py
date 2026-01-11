@@ -26,15 +26,23 @@ def send_web_event(event_type: str, **kwargs):
         pass
 
 def clean_json_string(s: str) -> str:
-    """清理字符串中的 Markdown JSON 标签，并尝试提取第一个完整的 JSON 对象。"""
+    """清理字符串中的 Markdown JSON 标签，并尝试提取第一个完整的 JSON 对象。
+    
+    修复内容：
+    1. 移除 Markdown 代码块标记（```json 和 ```）
+    2. 提取完整的 JSON 对象/数组（使用括号匹配）
+    3. 修复常见的格式问题（尾随逗号、未闭合的字符串等）
+    """
     if not s:
         return ""
     s = s.strip()
     
-    # 寻找第一个 {
+    # 移除 Markdown 代码块标记
+    s = s.replace('```json', '').replace('```', '').strip()
+    
+    # 寻找第一个 { 或 [
     start = s.find('{')
     if start == -1:
-        # 尝试寻找数组 [
         start = s.find('[')
         if start == -1:
             return s
@@ -56,7 +64,9 @@ def clean_json_string(s: str) -> str:
             elif char == '}' or char == ']':
                 brace_count -= 1
                 if brace_count == 0:
-                    return s[start:i+1]
+                    extracted = s[start:i+1]
+                    # 尝试修复常见格式问题
+                    return _fix_json_format(extracted)
         
         if char == '\\':
             escape = not escape
@@ -69,9 +79,50 @@ def clean_json_string(s: str) -> str:
         end = s.rfind(']')
         
     if start != -1 and end != -1 and end > start:
-        return s[start:end+1]
+        extracted = s[start:end+1]
+        return _fix_json_format(extracted)
     
     return s.strip()
+
+
+def _fix_json_format(json_str: str) -> str:
+    """修复常见的 JSON 格式问题。
+    
+    修复内容：
+    1. 移除对象/数组末尾的尾随逗号（,}、,]）
+    2. 修复未转义的引号（简单场景）
+    3. 移除注释（// 和 /* */）
+    """
+    if not json_str:
+        return json_str
+    
+    # 1. 移除单行注释 //
+    lines = []
+    for line in json_str.split('\n'):
+        # 简单处理：移除 // 后的内容（不考虑字符串内的情况）
+        comment_pos = line.find('//')
+        if comment_pos != -1:
+            # 检查是否在字符串内
+            before_comment = line[:comment_pos]
+            quote_count = before_comment.count('"') - before_comment.count('\\"')
+            if quote_count % 2 == 0:  # 偶数个引号，说明在字符串外
+                line = line[:comment_pos].rstrip()
+        lines.append(line)
+    json_str = '\n'.join(lines)
+    
+    # 2. 移除多行注释 /* */
+    import re
+    json_str = re.sub(r'/\*.*?\*/', '', json_str, flags=re.DOTALL)
+    
+    # 3. 修复尾随逗号（对象和数组）
+    # 匹配 ,} 或 ,] 前可能有空白字符
+    json_str = re.sub(r',\s*}', '}', json_str)
+    json_str = re.sub(r',\s*]', ']', json_str)
+    
+    # 4. 修复多余的逗号（连续逗号）
+    json_str = re.sub(r',\s*,', ',', json_str)
+    
+    return json_str.strip()
 
 def _auto_fix_orchestration_plan(plan: schemas.OrchestrationPlan) -> schemas.OrchestrationPlan:
     """自动修正 OrchestrationPlan 的不完整配置（方案E核心逻辑）
@@ -529,12 +580,28 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
             if search_res:
                 all_search_references.append(search_res)
             
+            # 保存原始输出用于调试
+            debug_file = os.path.join(workspace_path, f"debug_leader_raw_attempt_{attempt + 1}.txt")
+            with open(debug_file, "w", encoding="utf-8") as f:
+                f.write(out)
+            
             cleaned = clean_json_string(out)
             if not cleaned:
-                logger.error(f"[cycle] 议长输出为空或不包含 JSON。原始输出: {out}")
+                logger.error(f"[cycle] 议长输出为空或不包含 JSON。原始输出已保存到: {debug_file}")
                 raise ValueError("议长未返回有效的 JSON 拆解结果")
+            
+            # 保存清理后的JSON用于调试
+            cleaned_file = os.path.join(workspace_path, f"debug_leader_cleaned_attempt_{attempt + 1}.json")
+            with open(cleaned_file, "w", encoding="utf-8") as f:
+                f.write(cleaned)
                 
-            parsed = json.loads(cleaned)
+            try:
+                parsed = json.loads(cleaned)
+            except json.JSONDecodeError as json_err:
+                logger.error(f"[cycle] JSON解析失败: {json_err}")
+                logger.error(f"清理后的JSON已保存到: {cleaned_file}")
+                raise
+                
             summary = schemas.LeaderSummary(**parsed)
             decomposition = summary.decomposition.model_dump()
             
@@ -546,7 +613,11 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
             break
         except Exception as e:
             logger.warning(f"[cycle] 议长拆解尝试 {attempt + 1} 失败: {e}")
-            logger.error(traceback.format_exc())
+            if attempt < max_retries - 1:
+                logger.info(f"[cycle] 将进行第 {attempt + 2} 次尝试...")
+            else:
+                logger.error(f"[cycle] 议长拆解失败，已达最大重试次数 ({max_retries})")
+                logger.error(traceback.format_exc())
 
     # Devil's Advocate 质疑初始拆解
     logger.info("[cycle] 质疑官正在验证问题拆解...")
@@ -1044,17 +1115,17 @@ def generate_report_from_workspace(workspace_path: str, model_config: Dict[str, 
         # 尝试加载数据（支持两种文件结构）
         final_data = None
         
-        # 方式1：尝试加载新格式（Meta-Orchestrator）：orchestration_result.json
+        # 方式1：尝试加载新格式（议事编排官）：orchestration_result.json
         orchestration_file = os.path.join(workspace_path, "orchestration_result.json")
         if os.path.exists(orchestration_file):
-            logger.info(f"[report] 检测到 Meta-Orchestrator 格式，从 orchestration_result.json 读取")
+            logger.info(f"[report] 检测到议事编排官格式，从 orchestration_result.json 读取")
             with open(orchestration_file, "r", encoding="utf-8") as f:
                 orchestration_data = json.load(f)
             
             # 从 orchestration_result.json 构造 final_data
             final_data = {
                 "issue": orchestration_data.get("plan", {}).get("analysis", {}).get("problem_type", ""),
-                "decomposition": {},  # Meta-Orchestrator 没有分解步骤
+                "decomposition": {},  # 议事编排官没有分解步骤
                 "decomposition_challenge": "",
                 "history": orchestration_data.get("execution", {}),  # FrameworkEngine 的执行结果
                 "final_summary": orchestration_data.get("execution", {}).get("final_synthesis", {})
@@ -1284,11 +1355,11 @@ def call_role_designer(requirement: str) -> schemas.RoleDesignOutput:
         raise
 
 
-# ========== Meta-Orchestrator Agent ==========
+# ========== 议事编排官 Agent ==========
 
 def run_meta_orchestrator(user_requirement: str, model_config: Dict[str, Any] = None) -> schemas.OrchestrationPlan:
     """
-    运行Meta-Orchestrator进行智能规划
+    运行议事编排官进行智能规划
     
     Args:
         user_requirement: 用户需求描述
@@ -1301,7 +1372,7 @@ def run_meta_orchestrator(user_requirement: str, model_config: Dict[str, Any] = 
         logger.info(f"[meta_orchestrator] 开始规划，需求: {user_requirement[:100]}...")
         
         # 发送Web事件
-        send_web_event("agent_action", agent_name="元调度器", role_type="meta_orchestrator", 
+        send_web_event("agent_action", agent_name="议事编排官", role_type="meta_orchestrator", 
                       content="🧭 开始分析需求并规划讨论方案...", chunk_id=str(uuid.uuid4()))
         
         # 获取可用角色列表
@@ -1345,7 +1416,7 @@ def run_meta_orchestrator(user_requirement: str, model_config: Dict[str, Any] = 
         # 调用带工具的模型
         from src.agents.model_adapter import call_model_with_tools
         
-        send_web_event("agent_action", agent_name="元调度器", role_type="meta_orchestrator", 
+        send_web_event("agent_action", agent_name="议事编排官", role_type="meta_orchestrator", 
                       content="🔍 正在调用LLM分析需求...\n可用工具：list_roles, create_role, select_framework", 
                       chunk_id=str(uuid.uuid4()))
         
@@ -1354,7 +1425,7 @@ def run_meta_orchestrator(user_requirement: str, model_config: Dict[str, Any] = 
             messages=initial_messages,
             model_config=model_config,
             tools=tools,
-            max_tool_rounds=10  # Meta-Orchestrator可能需要多次调用工具
+            max_tool_rounds=10  # 议事编排官可能需要多次调用工具
         )
         
         logger.info(f"[meta_orchestrator] LLM返回响应，长度: {len(response_text)}")
@@ -1362,7 +1433,7 @@ def run_meta_orchestrator(user_requirement: str, model_config: Dict[str, Any] = 
         # 清理JSON
         cleaned = clean_json_string(response_text)
         
-        send_web_event("agent_action", agent_name="元调度器", role_type="meta_orchestrator", 
+        send_web_event("agent_action", agent_name="议事编排官", role_type="meta_orchestrator", 
                       content=f"📋 解析规划方案...\n响应长度: {len(cleaned)} 字符", 
                       chunk_id=str(uuid.uuid4()))
         
@@ -1416,7 +1487,7 @@ def run_meta_orchestrator(user_requirement: str, model_config: Dict[str, Any] = 
             
             # 发送综合事件
             summary_text = f"""
-🧭 **元调度器规划完成**
+🧭 **议事编排官规划完成**
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -1446,7 +1517,7 @@ def run_meta_orchestrator(user_requirement: str, model_config: Dict[str, Any] = 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             """.strip()
             
-            send_web_event("agent_action", agent_name="元调度器", role_type="meta_orchestrator", 
+            send_web_event("agent_action", agent_name="议事编排官", role_type="meta_orchestrator", 
                           content=summary_text, chunk_id=str(uuid.uuid4()))
             
             return plan
@@ -1456,7 +1527,7 @@ def run_meta_orchestrator(user_requirement: str, model_config: Dict[str, Any] = 
             logger.error(f"[meta_orchestrator] 清理后的JSON: {cleaned[:500]}")
             logger.error(f"[meta_orchestrator] 原始响应: {response_text[:500]}")
             
-            send_web_event("error", agent_name="元调度器", role_type="meta_orchestrator", 
+            send_web_event("error", agent_name="议事编排官", role_type="meta_orchestrator", 
                           content=f"❌ 规划方案解析失败: {str(e)}", chunk_id=str(uuid.uuid4()))
             
             raise Exception(f"规划方案格式错误: {str(e)}")
@@ -1465,7 +1536,7 @@ def run_meta_orchestrator(user_requirement: str, model_config: Dict[str, Any] = 
         logger.error(f"[meta_orchestrator] 调用失败: {e}")
         logger.error(traceback.format_exc())
         
-        send_web_event("error", agent_name="元调度器", role_type="meta_orchestrator", 
+        send_web_event("error", agent_name="议事编排官", role_type="meta_orchestrator", 
                       content=f"❌ 规划失败: {str(e)}", chunk_id=str(uuid.uuid4()))
         
         raise
@@ -1480,7 +1551,7 @@ def execute_orchestration_plan(
     agent_configs: Dict[str, Any] = None
 ) -> Dict[str, Any]:
     """
-    执行Meta-Orchestrator生成的规划方案
+    执行议事编排官生成的规划方案
     
     Args:
         plan: OrchestrationPlan规划方案
@@ -1582,6 +1653,7 @@ def execute_orchestration_plan(
             "success": True,
             "session_id": session_id,
             "workspace_path": str(workspace_path),
+            "user_requirement": user_requirement,
             "plan": plan.model_dump(),
             "execution": execution_result,
             "all_outputs": engine.get_all_outputs(),

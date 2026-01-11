@@ -101,10 +101,10 @@ graph TD
     style Storage fill:#f1f5f9,stroke:#64748b
 ```
 
-### Meta-Orchestrator 模式（智能编排）
+### 议事编排官 模式（智能编排）
 
 **新增组件**：
-- **Meta-Orchestrator Agent**：根据需求自动选择框架、配置角色
+- **议事编排官 Agent**：根据需求自动选择框架、配置角色
 - **Frameworks 框架库**：预定义框架（罗伯特议事规则、图尔敏论证模型、批判性思维）
 - **Meta Tools**：工具函数库（list_roles、create_role、select_framework）
 - **FrameworkEngine**：框架执行引擎，逐 Stage 运行
@@ -123,8 +123,8 @@ graph TD
         META_RUNNER -->|mode=plan_and_execute| EXECUTE[execute_orchestration_plan]
     end
 
-    subgraph MetaLayer ["Meta-Orchestrator 层 (Stage 0)"]
-        META[Meta-Orchestrator Agent]
+    subgraph MetaLayer ["议事编排官 层 (Stage 0)"]
+        META[议事编排官 Agent]
         META --> ANALYSIS[需求分析]
         
         ANALYSIS -->|Function Calling| TOOLS[Meta Tools]
@@ -203,7 +203,7 @@ graph TD
 
     subgraph Storage ["数据存储"]
         WS[Workspace 目录]
-        DECOMP[decomposition.json:<br/>Meta-Orchestrator 规划]
+        DECOMP[decomposition.json:<br/>议事编排官 规划]
         HISTORY[history.json:<br/>完整对话历史]
         ROUND_DATA[round_N_data.json:<br/>每轮数据]
         REPORT_HTML[report.html:<br/>含 Mermaid 流程图]
@@ -235,9 +235,9 @@ graph TD
 
 ### 关键流程对比
 
-| 步骤 | 传统模式 | Meta-Orchestrator 模式 |
+| 步骤 | 传统模式 | 议事编排官 模式 |
 |-----|---------|----------------------|
-| **1. 初始化** | 固定的 Leader-Planner-Auditor 流程 | Meta-Orchestrator 分析需求 |
+| **1. 初始化** | 固定的 Leader-Planner-Auditor 流程 | 议事编排官 分析需求 |
 | **2. 框架选择** | 无框架概念，固定流程 | 从 3 个预定义框架中选择最优方案 |
 | **3. 角色配置** | 固定角色（Leader、Planner、Auditor、DA） | 自动匹配现有角色 + 创建新角色 |
 | **4. 执行流程** | 单一流程：拆解 → 讨论 → 汇总 | 多阶段执行：Stage 1 → Stage N |
