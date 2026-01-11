@@ -24,8 +24,8 @@ from src import config_manager as config
 
 def run_meta_orchestrator_flow(issue_text: str, model_config: dict, agent_configs: dict = None):
     """
-    使用Meta-Orchestrator的新流程：
-    1. Meta-Orchestrator分析需求并生成规划
+    使用议事编排官的新流程：
+    1. 议事编排官分析需求并生成规划
     2. 如果需要创建新角色，调用RoleDesigner
     3. FrameworkEngine执行规划
     4. Reporter生成最终报告
@@ -38,12 +38,12 @@ def run_meta_orchestrator_flow(issue_text: str, model_config: dict, agent_config
     Returns:
         执行结果字典
     """
-    logger.info("[meta_flow] 启动Meta-Orchestrator智能规划流程")
+    logger.info("[meta_flow] 启动议事编排官智能规划流程")
     
     try:
-        # Stage 0: Meta-Orchestrator智能规划
+        # Stage 0: 议事编排官智能规划
         logger.info("[meta_flow] Stage 0: 智能规划中...")
-        print("\n🧭 Stage 0: Meta-Orchestrator 智能规划")
+        print("\n🧭 Stage 0: 议事编排官智能规划")
         print("-" * 60)
         
         orchestration_plan = run_meta_orchestrator(
@@ -184,7 +184,7 @@ def run_meta_orchestrator_flow(issue_text: str, model_config: dict, agent_config
             reporter_chain,
             {
                 "final_data": reporter_input,
-                "search_references": ""  # Meta-Orchestrator模式下搜索引用由各Agent自行处理
+                "search_references": ""  # 议事编排官模式下搜索引用由各Agent自行处理
             },
             "记录员",
             "reporter",
@@ -216,7 +216,7 @@ def run_meta_orchestrator_flow(issue_text: str, model_config: dict, agent_config
             "report_content": report_content
         }
         
-        logger.info("[meta_flow] Meta-Orchestrator流程完成")
+        logger.info("[meta_flow] 议事编排官流程完成")
         return final_result
         
     except Exception as e:
@@ -239,7 +239,7 @@ def _build_reporter_input(user_requirement: str, orchestration_plan, execution_r
     
     Args:
         user_requirement: 用户需求
-        orchestration_plan: Meta-Orchestrator规划
+        orchestration_plan: 议事编排官规划
         execution_result: 框架执行结果
         
     Returns:
@@ -298,7 +298,7 @@ def parse_args():
     p.add_argument('--agent_configs', type=str, help='JSON string of per-agent model configurations')
     p.add_argument('--reasoning', type=str, help='JSON string of reasoning configuration')
     p.add_argument('--use-meta-orchestrator', action='store_true', 
-                   help='使用Meta-Orchestrator进行智能规划和框架执行（新流程）')
+                   help='使用议事编排官进行智能规划和框架执行（新流程）')
     return p.parse_args()
 
 
@@ -358,8 +358,8 @@ def run_demo():
 
     # 判断使用哪种流程
     if args.use_meta_orchestrator:
-        # 新流程：Meta-Orchestrator智能规划 + 框架执行
-        logger.info("[demo] 使用Meta-Orchestrator新流程")
+        # 新流程：议事编排官智能规划 + 框架执行
+        logger.info("[demo] 使用议事编排官新流程")
         result = run_meta_orchestrator_flow(
             issue_text=issue_text,
             model_config=model_cfg,

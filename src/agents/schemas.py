@@ -252,7 +252,7 @@ class PlanSummary(BaseModel):
 
 
 class OrchestrationPlan(BaseModel):
-    """元调度器输出的完整规划方案"""
+    """议事编排官输出的完整规划方案"""
     analysis: RequirementAnalysis  # 需求分析
     role_planning: RolePlanning  # 角色规划
     framework_selection: FrameworkSelection  # 框架选择

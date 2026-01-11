@@ -358,33 +358,69 @@ class FrameworkEngine:
             
             round_outputs = []
             
-            # 并行执行所有Agents
-            with ThreadPoolExecutor(max_workers=len(chains)) as executor:
-                futures = {}
-                
-                for chain, agent_id, role_type, display_name in chains:
-                    # 构建该Agent的输入（包含stage提示和上下文）
-                    agent_input = self._build_agent_input(
-                        stage, context, round_num, round_outputs, role_type, agent_id
-                    )
+            # 🔧 按角色类型分组执行（确保 Auditor 能看到 Planner 的输出）
+            # 第一组：非 Auditor 角色（Planner、Leader、专业角色等）
+            non_auditor_chains = [(c, aid, rt, dn) for c, aid, rt, dn in chains if rt != 'auditor']
+            auditor_chains = [(c, aid, rt, dn) for c, aid, rt, dn in chains if rt == 'auditor']
+            
+            # 先执行非 Auditor 角色（并行）
+            if non_auditor_chains:
+                logger.info(f"[FrameworkEngine] 执行 {len(non_auditor_chains)} 个非 Auditor 角色")
+                with ThreadPoolExecutor(max_workers=len(non_auditor_chains)) as executor:
+                    futures = {}
                     
-                    # 提交执行任务
-                    future = executor.submit(
-                        self._run_agent,
-                        chain, agent_id, role_type, display_name, agent_input
-                    )
-                    futures[future] = (agent_id, display_name)
-                
-                # 收集结果
-                for future in as_completed(futures):
-                    agent_id, display_name = futures[future]
-                    try:
-                        agent_output = future.result()
-                        round_outputs.append(agent_output)
-                        logger.info(f"[FrameworkEngine] Agent {agent_id} 完成")
-                    except Exception as e:
-                        logger.error(f"[FrameworkEngine] Agent {agent_id} 执行失败: {e}")
-                        logger.error(traceback.format_exc())
+                    for chain, agent_id, role_type, display_name in non_auditor_chains:
+                        # 使用前一轮的输出（第一轮时为空）
+                        previous_round = stage_output["agents"] if round_num > 1 else []
+                        agent_input = self._build_agent_input(
+                            stage, context, round_num, previous_round, role_type, agent_id
+                        )
+                        
+                        future = executor.submit(
+                            self._run_agent,
+                            chain, agent_id, role_type, display_name, agent_input
+                        )
+                        futures[future] = (agent_id, display_name)
+                    
+                    # 收集结果
+                    for future in as_completed(futures):
+                        agent_id, display_name = futures[future]
+                        try:
+                            agent_output = future.result()
+                            round_outputs.append(agent_output)
+                            logger.info(f"[FrameworkEngine] Agent {agent_id} 完成")
+                        except Exception as e:
+                            logger.error(f"[FrameworkEngine] Agent {agent_id} 执行失败: {e}")
+                            logger.error(traceback.format_exc())
+            
+            # 再执行 Auditor 角色（并行），传入本轮已完成的输出
+            if auditor_chains:
+                logger.info(f"[FrameworkEngine] 执行 {len(auditor_chains)} 个 Auditor 角色")
+                with ThreadPoolExecutor(max_workers=len(auditor_chains)) as executor:
+                    futures = {}
+                    
+                    for chain, agent_id, role_type, display_name in auditor_chains:
+                        # Auditor 需要看到本轮 Planner 的输出
+                        agent_input = self._build_agent_input(
+                            stage, context, round_num, round_outputs, role_type, agent_id
+                        )
+                        
+                        future = executor.submit(
+                            self._run_agent,
+                            chain, agent_id, role_type, display_name, agent_input
+                        )
+                        futures[future] = (agent_id, display_name)
+                    
+                    # 收集结果
+                    for future in as_completed(futures):
+                        agent_id, display_name = futures[future]
+                        try:
+                            agent_output = future.result()
+                            round_outputs.append(agent_output)
+                            logger.info(f"[FrameworkEngine] Agent {agent_id} 完成")
+                        except Exception as e:
+                            logger.error(f"[FrameworkEngine] Agent {agent_id} 执行失败: {e}")
+                            logger.error(traceback.format_exc())
             
             # 保存该轮的输出
             stage_output["agents"].extend(round_outputs)
@@ -485,9 +521,21 @@ class FrameworkEngine:
                     if auditor_feedbacks:
                         feedback = "\n\n".join(auditor_feedbacks)
                 
+                # 构建Stage任务指导（如果在框架模式下）
+                stage_task = ""
+                if stage.description:
+                    stage_task = f"\n\n【本Stage任务】：{stage.description}"
+                    if stage.prompt_suffix:
+                        stage_task += f"\n【任务要求】：{stage.prompt_suffix}"
+                
+                # 将Stage任务融入到issue或作为单独的guidance
+                enhanced_issue = self.user_requirement
+                if stage_task:
+                    enhanced_issue = f"{self.user_requirement}{stage_task}\n\n请围绕上述Stage任务提出方案。"
+                
                 agent_input = {
                     "planner_id": agent_id,
-                    "issue": self.user_requirement,
+                    "issue": enhanced_issue,
                     "previous_plan": previous_plan,
                     "feedback": feedback
                 }
@@ -500,13 +548,26 @@ class FrameworkEngine:
                         if out.get('role_type') == 'planner':
                             plans_data.append(out.get('content', ''))
                 
+                logger.info(f"[FrameworkEngine] Auditor {agent_id} 收到 {len(plans_data)} 个方案")
+                
+                # 构建Stage任务指导
+                stage_task = ""
+                if stage.description:
+                    stage_task = f"\n\n【本Stage审查重点】：{stage.description}"
+                    if stage.prompt_suffix:
+                        stage_task += f"\n【审查要求】：{stage.prompt_suffix}"
+                
+                enhanced_issue = self.user_requirement
+                if stage_task:
+                    enhanced_issue = f"{self.user_requirement}{stage_task}\n\n请围绕上述审查重点进行方案评估。"
+                
                 agent_input = {
                     "auditor_id": agent_id,
-                    "issue": self.user_requirement,
+                    "issue": enhanced_issue,
                     "plans": json.dumps(plans_data, ensure_ascii=False) if plans_data else "[]"
                 }
             
-            logger.info(f"[FrameworkEngine] 为传统角色 {role_type} 构建变量: {list(agent_input.keys())}")
+            logger.info(f"[FrameworkEngine] 为传统角色 {role_type} 构建变量（已注入Stage任务）: {list(agent_input.keys())}")
         
         # 检查是否为自定义角色（不在固定角色映射表中）
         elif role_type not in self.ROLE_CHAIN_MAPPING:

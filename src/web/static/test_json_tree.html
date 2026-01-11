@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON树形组件测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f8fafc;
+        }
+        h1 {
+            color: #1e293b;
+            margin-bottom: 20px;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #334155;
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 8px;
+        }
+        
+        /* JSON树形组件样式 */
+        .json-tree-container {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border: 1px solid #cbd5e1;
+            border-radius: 0.75rem;
+            padding: 1rem;
+            margin: 0.5rem 0;
+            overflow-x: auto;
+        }
+        .json-tree-header {
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #cbd5e1;
+        }
+        .json-root {
+            font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+            font-size: 0.875rem;
+            line-height: 1.6;
+        }
+        .json-node {
+            margin: 0.25rem 0;
+        }
+        .json-node-header {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            cursor: pointer;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            transition: background-color 0.2s;
+        }
+        .json-node-header:hover {
+            background-color: rgba(148, 163, 184, 0.1);
+        }
+        .json-toggle {
+            color: #64748b;
+            font-size: 0.75rem;
+            width: 12px;
+            display: inline-block;
+            transition: transform 0.2s;
+        }
+        .json-children {
+            margin-left: 1rem;
+            border-left: 1px dashed #cbd5e1;
+            padding-left: 0.5rem;
+            transition: all 0.2s;
+        }
+        .json-leaf {
+            margin: 0.125rem 0;
+            padding: 0.125rem 0;
+        }
+        .json-key {
+            color: #0369a1;
+            font-weight: 600;
+            margin-right: 0.5rem;
+        }
+        .json-string {
+            color: #059669;
+        }
+        .json-number {
+            color: #dc2626;
+        }
+        .json-boolean {
+            color: #7c3aed;
+            font-weight: 500;
+        }
+        .json-null {
+            color: #94a3b8;
+            font-style: italic;
+        }
+        .json-bracket {
+            color: #64748b;
+            font-weight: bold;
+        }
+        .json-count {
+            color: #94a3b8;
+            font-size: 0.75rem;
+            font-style: italic;
+            margin: 0 0.25rem;
+        }
+    </style>
+</head>
+<body>
+    <h1>🌳 JSON树形组件测试</h1>
+    
+    <div class="test-section">
+        <h2>测试1：自定义角色输出（辩论方法论分析）</h2>
+        <div id="test1"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>测试2：复杂嵌套结构</h2>
+        <div id="test2"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>测试3：数组和原始类型</h2>
+        <div id="test3"></div>
+    </div>
+
+    <script>
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function renderJsonTree(data, depth = 0, key = null) {
+            const indent = depth * 16;
+            const isRoot = depth === 0;
+            const nodeId = `json-node-${Math.random().toString(36).substr(2, 9)}`;
+            
+            if (data === null || data === undefined) {
+                return `<span class="json-null">${data === null ? 'null' : 'undefined'}</span>`;
+            }
+            
+            if (typeof data !== 'object') {
+                let className = 'json-primitive';
+                let displayValue = data;
+                
+                if (typeof data === 'string') {
+                    className = 'json-string';
+                    displayValue = `"${escapeHtml(data)}"`;
+                } else if (typeof data === 'number') {
+                    className = 'json-number';
+                } else if (typeof data === 'boolean') {
+                    className = 'json-boolean';
+                }
+                
+                if (key !== null) {
+                    return `
+                        <div class="json-leaf" style="margin-left: ${indent}px;">
+                            <span class="json-key">${escapeHtml(key)}:</span>
+                            <span class="${className}">${displayValue}</span>
+                        </div>
+                    `;
+                }
+                return `<span class="${className}">${displayValue}</span>`;
+            }
+            
+            if (Array.isArray(data)) {
+                if (data.length === 0) {
+                    if (key !== null) {
+                        return `
+                            <div class="json-leaf" style="margin-left: ${indent}px;">
+                                <span class="json-key">${escapeHtml(key)}:</span>
+                                <span class="json-bracket">[]</span>
+                            </div>
+                        `;
+                    }
+                    return '<span class="json-bracket">[]</span>';
+                }
+                
+                const allPrimitive = data.every(item => typeof item !== 'object' || item === null);
+                
+                if (allPrimitive && data.length <= 5) {
+                    const items = data.map(item => {
+                        if (typeof item === 'string') return `"${escapeHtml(item)}"`;
+                        if (item === null) return 'null';
+                        return String(item);
+                    }).join(', ');
+                    
+                    if (key !== null) {
+                        return `
+                            <div class="json-leaf" style="margin-left: ${indent}px;">
+                                <span class="json-key">${escapeHtml(key)}:</span>
+                                <span class="json-bracket">[</span><span class="json-string">${items}</span><span class="json-bracket">]</span>
+                            </div>
+                        `;
+                    }
+                    return `<span class="json-bracket">[</span>${items}<span class="json-bracket">]</span>`;
+                }
+                
+                let html = `
+                    <div class="json-node" style="margin-left: ${indent}px;">
+                        <div class="json-node-header" onclick="toggleJsonNode('${nodeId}')">
+                            <span class="json-toggle" id="${nodeId}-icon">▼</span>
+                            ${key !== null ? `<span class="json-key">${escapeHtml(key)}:</span>` : ''}
+                            <span class="json-bracket">[</span>
+                            <span class="json-count">${data.length} items</span>
+                            <span class="json-bracket">]</span>
+                        </div>
+                        <div class="json-children" id="${nodeId}">
+                `;
+                
+                data.forEach((item, index) => {
+                    html += renderJsonTree(item, depth + 1, `[${index}]`);
+                });
+                
+                html += `
+                        </div>
+                    </div>
+                `;
+                return html;
+            }
+            
+            const keys = Object.keys(data);
+            if (keys.length === 0) {
+                if (key !== null) {
+                    return `
+                        <div class="json-leaf" style="margin-left: ${indent}px;">
+                            <span class="json-key">${escapeHtml(key)}:</span>
+                            <span class="json-bracket">{}</span>
+                        </div>
+                    `;
+                }
+                return '<span class="json-bracket">{}</span>';
+            }
+            
+            let html = `
+                <div class="json-node ${isRoot ? 'json-root' : ''}" style="margin-left: ${indent}px;">
+                    <div class="json-node-header" onclick="toggleJsonNode('${nodeId}')">
+                        <span class="json-toggle" id="${nodeId}-icon">▼</span>
+                        ${key !== null ? `<span class="json-key">${escapeHtml(key)}:</span>` : ''}
+                        <span class="json-bracket">{</span>
+                        <span class="json-count">${keys.length} fields</span>
+                        <span class="json-bracket">}</span>
+                    </div>
+                    <div class="json-children" id="${nodeId}">
+            `;
+            
+            keys.forEach(k => {
+                html += renderJsonTree(data[k], depth + 1, k);
+            });
+            
+            html += `
+                    </div>
+                </div>
+            `;
+            return html;
+        }
+        
+        function toggleJsonNode(nodeId) {
+            const content = document.getElementById(nodeId);
+            const icon = document.getElementById(`${nodeId}-icon`);
+            if (!content || !icon) return;
+            
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                icon.textContent = '▼';
+            } else {
+                content.style.display = 'none';
+                icon.textContent = '▶';
+            }
+        }
+
+        // 测试数据
+        const test1Data = {
+            "methodology_name": "罗伯特议事规则",
+            "historical_background": "起源于19世纪美国，由Henry Martyn Robert将军编写",
+            "core_principles": [
+                "一次只讨论一个议题",
+                "平等发言权",
+                "多数决定原则",
+                "少数权利保护"
+            ],
+            "applicable_scenarios": {
+                "formal_meetings": {
+                    "description": "正式会议、股东大会、董事会",
+                    "effectiveness": 0.95
+                },
+                "democratic_debates": {
+                    "description": "民主决策场景",
+                    "effectiveness": 0.90
+                }
+            },
+            "comparison": {
+                "vs_toulmin": {
+                    "similarities": ["都强调逻辑性", "都有明确规则"],
+                    "differences": ["罗伯特侧重程序，图尔敏侧重论证结构"]
+                }
+            },
+            "limitations": [
+                "过于正式，不适合快速决策",
+                "对主持人要求较高",
+                "在非正式场合可能显得繁琐"
+            ],
+            "practical_tips": {
+                "preparation": "提前准备动议文本",
+                "execution": "严格按照议程进行",
+                "follow_up": "记录决议并追踪执行"
+            }
+        };
+
+        const test2Data = {
+            "framework_integration": {
+                "scenario_mapping": [
+                    {
+                        "scenario": "产品规划会议",
+                        "recommended_frameworks": ["罗伯特议事规则", "SWOT分析"],
+                        "rationale": "需要结构化讨论和战略分析",
+                        "expected_outcomes": {
+                            "decision_quality": "高",
+                            "team_alignment": "强",
+                            "time_efficiency": "中等"
+                        }
+                    },
+                    {
+                        "scenario": "技术辩论",
+                        "recommended_frameworks": ["图尔敏论证法", "批判性思维"],
+                        "rationale": "需要逻辑论证和证据支持"
+                    }
+                ],
+                "hybrid_approaches": {
+                    "name": "敏捷议事",
+                    "components": [
+                        {"framework": "罗伯特议事规则", "weight": 0.4},
+                        {"framework": "Design Thinking", "weight": 0.6}
+                    ],
+                    "benefits": ["快速迭代", "保持秩序", "激发创新"]
+                }
+            },
+            "metadata": {
+                "version": "1.0",
+                "last_updated": "2026-01-11",
+                "confidence_score": 0.88
+            }
+        };
+
+        const test3Data = {
+            "simple_array": [1, 2, 3, 4, 5],
+            "string_array": ["apple", "banana", "cherry"],
+            "boolean": true,
+            "number": 42,
+            "null_value": null,
+            "empty_object": {},
+            "empty_array": []
+        };
+
+        // 渲染测试
+        document.getElementById('test1').innerHTML = `
+            <div class="json-tree-container">
+                <div class="json-tree-header">
+                    <span class="text-xs font-bold" style="color: #64748b; text-transform: uppercase; display: flex; align-items: center;">
+                        <span style="margin-right: 0.25rem;">🌳</span> 结构化输出
+                    </span>
+                </div>
+                ${renderJsonTree(test1Data, 0)}
+            </div>
+        `;
+
+        document.getElementById('test2').innerHTML = `
+            <div class="json-tree-container">
+                <div class="json-tree-header">
+                    <span class="text-xs font-bold" style="color: #64748b; text-transform: uppercase; display: flex; align-items: center;">
+                        <span style="margin-right: 0.25rem;">🌳</span> 结构化输出
+                    </span>
+                </div>
+                ${renderJsonTree(test2Data, 0)}
+            </div>
+        `;
+
+        document.getElementById('test3').innerHTML = `
+            <div class="json-tree-container">
+                <div class="json-tree-header">
+                    <span class="text-xs font-bold" style="color: #64748b; text-transform: uppercase; display: flex; align-items: center;">
+                        <span style="margin-right: 0.25rem;">🌳</span> 结构化输出
+                    </span>
+                </div>
+                ${renderJsonTree(test3Data, 0)}
+            </div>
+        `;
+    </script>
+</body>
+</html>

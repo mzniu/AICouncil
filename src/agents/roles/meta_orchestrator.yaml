@@ -1,5 +1,5 @@
 name: meta_orchestrator
-display_name: 元调度器 (Meta-Orchestrator)
+display_name: 议事编排官 (Deliberation Orchestrator)
 version: "1.0.0"
 description: |
   AICouncil的智能规划器，负责分析用户需求并设计最优讨论方案。
@@ -53,7 +53,7 @@ ui:
   color: "#7C3AED"
   description_short: "智能分析需求，规划讨论方案"
   description_full: |
-    元调度器是AICouncil的智能规划层，在讨论开始前分析用户需求，
+    议事编排官是AICouncil的智能规划层，在讨论开始前分析用户需求，
     自动匹配或生成合适的角色，选择最优的讨论框架，
     为复杂问题设计结构化的解决方案。
 

@@ -43,67 +43,27 @@ class ReportEditor {
     }
     
     showCriticalError() {
-        // 显示醒目的错误提示
-        const errorBanner = document.createElement('div');
-        errorBanner.className = 'critical-error-banner';
-        errorBanner.innerHTML = `
-            <div class="error-content">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="8" x2="12" y2="12"></line>
-                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                </svg>
-                <div>
-                    <h3>⚠️ 无法使用编辑器</h3>
-                    <p>报告必须通过 Flask 服务器访问才能编辑。</p>
-                    <p><strong>正确方式</strong>: 访问 <code>http://127.0.0.1:5000/report/${this.extractSessionIdFromPath()}</code></p>
-                    <p><strong>错误方式</strong>: 直接打开本地 HTML 文件 (file:///...)</p>
-                </div>
-            </div>
-        `;
-        document.body.insertBefore(errorBanner, document.body.firstChild);
+        // 禁用编辑按钮，并在 tooltip 中说明原因
+        console.warn('[Editor] 编辑器不可用 - workspace_id 无效或通过本地文件打开');
         
-        // 添加错误样式
-        const style = document.createElement('style');
-        style.textContent = `
-            .critical-error-banner {
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
-                color: white;
-                padding: 20px;
-                z-index: 10000;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        // 等待 DOM 加载完成后禁用按钮
+        const disableEditButton = () => {
+            const editBtn = document.getElementById('toggleEditMode');
+            if (editBtn) {
+                editBtn.disabled = true;
+                editBtn.title = '⚠️ 无法使用编辑器\n报告必须通过 Flask 服务器访问才能编辑\n\n请访问: http://127.0.0.1:5000/report/' + this.extractSessionIdFromPath();
+                editBtn.style.cursor = 'not-allowed';
+                editBtn.style.opacity = '0.5';
             }
-            .critical-error-banner .error-content {
-                display: flex;
-                align-items: flex-start;
-                gap: 16px;
-                max-width: 1200px;
-                margin: 0 auto;
-            }
-            .critical-error-banner svg {
-                flex-shrink: 0;
-                margin-top: 4px;
-            }
-            .critical-error-banner h3 {
-                margin: 0 0 8px 0;
-                font-size: 18px;
-            }
-            .critical-error-banner p {
-                margin: 4px 0;
-                font-size: 14px;
-            }
-            .critical-error-banner code {
-                background: rgba(255,255,255,0.2);
-                padding: 2px 8px;
-                border-radius: 4px;
-                font-family: monospace;
-            }
-        `;
-        document.head.appendChild(style);
+        };
+        
+        // 立即尝试禁用，并在 DOM 加载完成后再次尝试
+        disableEditButton();
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', disableEditButton);
+        } else {
+            setTimeout(disableEditButton, 100);
+        }
     }
     
     extractSessionIdFromPath() {
@@ -476,7 +436,7 @@ class ReportEditor {
         document.body.classList.add('edit-mode-active');
         
         this.updateStatus('编辑模式', 'editing');
-        this.showNotification('已进入编辑模式，可以直接点击文本进行编辑', 'info');
+        this.showNotification('已进入编辑模式，可以直接点击文本进行编辑', 'info', 3000);
         console.log('[Editor] ✅ UI更新完成，已显示提示消息');
         
         // 启动自动保存（每60秒）
@@ -831,9 +791,12 @@ class ReportEditor {
     }
     
     showNotification(message, type = 'info', duration = 5000) {
-        // 移除已存在的通知
+        // 移除已存在的通知（包括正在淡出的）
         const existingNotifications = document.querySelectorAll('.notification');
-        existingNotifications.forEach(n => n.remove());
+        existingNotifications.forEach(n => {
+            n.classList.remove('show');
+            n.remove();
+        });
         
         const notification = document.createElement('div');
         notification.className = `notification notification-${type}`;
@@ -841,14 +804,27 @@ class ReportEditor {
         
         document.body.appendChild(notification);
         
-        // 触发动画
-        setTimeout(() => notification.classList.add('show'), 100);
+        // 触发动画（确保DOM更新后再添加class）
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                notification.classList.add('show');
+            });
+        });
         
         // 自动关闭
-        setTimeout(() => {
+        const closeTimeout = setTimeout(() => {
             notification.classList.remove('show');
-            setTimeout(() => notification.remove(), 300);
+            const removeTimeout = setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 300);
+            // 保存timeout ID以便可能的清理
+            notification._removeTimeout = removeTimeout;
         }, duration);
+        
+        // 保存timeout ID以便可能的清理
+        notification._closeTimeout = closeTimeout;
     }
     
     

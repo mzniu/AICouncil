@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+﻿from flask import Flask, render_template, request, jsonify
 import json
 import subprocess
 import threading
@@ -126,7 +126,7 @@ def start_discussion():
     planners = data.get('planners', 2)
     auditors = data.get('auditors', 2)
     agent_configs = data.get('agent_configs') # 获取 agent_configs
-    use_meta_orchestrator = data.get('use_meta_orchestrator', False)  # Meta-Orchestrator 模式
+    use_meta_orchestrator = data.get('use_meta_orchestrator', False)  # 议事编排官 模式
 
     if not issue:
         return jsonify({"status": "error", "message": "议题不能为空"}), 400
@@ -179,9 +179,9 @@ def run_backend(issue, backend, model, rounds, planners, auditors, agent_configs
             if reasoning:
                 model_cfg["reasoning"] = reasoning
             
-            logger.info(f"[app] 使用模型配置: {model_cfg}, 轮数: {rounds}, 策论家: {planners}, 监察官: {auditors}, Meta-Orchestrator: {use_meta_orchestrator}")
+            logger.info(f"[app] 使用模型配置: {model_cfg}, 轮数: {rounds}, 策论家: {planners}, 监察官: {auditors}, 议事编排官: {use_meta_orchestrator}")
             
-            # 如果启用 Meta-Orchestrator 模式
+            # 如果启用 议事编排官 模式
             if use_meta_orchestrator:
                 from src.agents.demo_runner import run_meta_orchestrator_flow
                 result = run_meta_orchestrator_flow(
@@ -250,7 +250,7 @@ def run_backend(issue, backend, model, rounds, planners, auditors, agent_configs
 @app.route('/api/orchestrate', methods=['POST'])
 def orchestrate_discussion():
     """
-    Meta-Orchestrator智能规划端点
+    议事编排官智能规划端点
     
     接收用户需求，返回规划方案或直接执行
     """
@@ -306,8 +306,8 @@ def orchestrate_discussion():
             if reasoning:
                 model_cfg["reasoning"] = reasoning
             
-            # 调用Meta-Orchestrator生成规划
-            logger.info("[app] 执行Meta-Orchestrator规划（仅规划模式）")
+            # 调用议事编排官生成规划
+            logger.info("[app] 执行议事编排官规划（仅规划模式）")
             plan = run_meta_orchestrator(
                 user_requirement=issue,
                 model_config=model_cfg
@@ -321,7 +321,7 @@ def orchestrate_discussion():
             })
             
         except Exception as e:
-            logger.error(f"[app] Meta-Orchestrator规划失败: {e}")
+            logger.error(f"[app] 议事编排官规划失败: {e}")
             logger.error(traceback.format_exc())
             return jsonify({
                 "status": "error",
@@ -345,7 +345,7 @@ def orchestrate_discussion():
 
 def run_meta_orchestrator_backend(issue, backend, model, agent_configs=None, reasoning=None):
     """
-    后台执行Meta-Orchestrator完整流程
+    后台执行议事编排官完整流程
     
     Args:
         issue: 用户需求
@@ -372,7 +372,7 @@ def run_meta_orchestrator_backend(issue, backend, model, agent_configs=None, rea
         if reasoning:
             model_cfg["reasoning"] = reasoning
         
-        logger.info(f"[app] 启动Meta-Orchestrator流程，模型: {model_cfg}")
+        logger.info(f"[app] 启动议事编排官流程，模型: {model_cfg}")
         
         # 打包环境：直接调用函数
         if is_frozen():
@@ -389,13 +389,13 @@ def run_meta_orchestrator_backend(issue, backend, model, agent_configs=None, rea
             # 保存session_id
             if result.get('success'):
                 current_session_id = result.get('session_id')
-                logger.info(f"[app] Meta-Orchestrator流程完成，Session ID: {current_session_id}")
+                logger.info(f"[app] 议事编排官流程完成，Session ID: {current_session_id}")
             else:
-                logger.error(f"[app] Meta-Orchestrator流程失败: {result.get('error')}")
+                logger.error(f"[app] 议事编排官流程失败: {result.get('error')}")
         
         else:
             # 开发环境：启动子进程
-            logger.info("[app] 开发环境：启动 demo_runner.py 子进程（Meta-Orchestrator模式）")
+            logger.info("[app] 开发环境：启动 demo_runner.py 子进程（议事编排官模式）")
             
             python_exe = sys.executable
             cmd = [
@@ -424,7 +424,7 @@ def run_meta_orchestrator_backend(issue, backend, model, agent_configs=None, rea
             current_process.wait()
     
     except Exception as e:
-        logger.error(f"[app] Meta-Orchestrator后台执行失败: {e}")
+        logger.error(f"[app] 议事编排官后台执行失败: {e}")
         logger.error(traceback.format_exc())
     
     finally:
@@ -638,12 +638,13 @@ def list_workspaces():
             # 尝试获取议题内容
             issue = "未知议题"
             try:
-                # 方式1：Meta-Orchestrator 格式
+                # 方式1：议事编排官 格式
                 orch_path = d / "orchestration_result.json"
                 if orch_path.exists():
                     with open(str(orch_path), "r", encoding="utf-8") as f:
                         orch_data = json.load(f)
-                        issue = orch_data.get("plan", {}).get("analysis", {}).get("problem_type", issue)
+                        # 直接从顶层获取 user_requirement
+                        issue = orch_data.get("user_requirement", issue)
                 # 方式2：传统格式
                 else:
                     data_path = d / "final_session_data.json"
@@ -701,12 +702,12 @@ def load_workspace(session_id):
         max_rounds = 3
         history_data = []
         
-        # 方式1：Meta-Orchestrator 格式
+        # 方式1：议事编排官 格式
         if os.path.exists(orch_path):
             with open(orch_path, "r", encoding="utf-8") as f:
                 orch_data = json.load(f)
                 issue_text = orch_data.get("plan", {}).get("analysis", {}).get("problem_type", issue_text)
-                # Meta-Orchestrator 的执行数据在 execution 字段
+                # 议事编排官 的执行数据在 execution 字段
                 execution = orch_data.get("execution", {})
                 stages = execution.get("stages", [])
                 max_rounds = len(stages) if stages else 1
@@ -729,7 +730,7 @@ def load_workspace(session_id):
             "session_id": session_id
         })
         
-        # 方式1：从 Meta-Orchestrator 格式重建事件
+        # 方式1：从 议事编排官 格式重建事件
         if os.path.exists(orch_path):
             with open(orch_path, "r", encoding="utf-8") as f:
                 orch_data = json.load(f)
