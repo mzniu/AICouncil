@@ -620,7 +620,7 @@ def call_model(agent_id: str, prompt: str, model_config: dict = None, stream: bo
 
 # ========== Function Calling支持 ==========
 
-def call_model_with_tools(agent_id: str, messages: list, model_config: dict = None, tools: list = None, max_tool_rounds: int = 5):
+def call_model_with_tools(agent_id: str, messages: list, model_config: dict = None, tools: list = None, max_tool_rounds: int = 5, stream_chunk_id: str = None):
     """
     支持Function Calling的模型调用（多轮工具调用循环）
     
@@ -630,6 +630,7 @@ def call_model_with_tools(agent_id: str, messages: list, model_config: dict = No
         model_config: 模型配置
         tools: 工具定义列表（OpenAI Function Calling格式）
         max_tool_rounds: 最大工具调用轮次
+        stream_chunk_id: 固定的chunk_id，用于将多个事件追加到同一个UI卡片
         
     Returns:
         最终的文本响应或消息对象
@@ -695,15 +696,21 @@ def call_model_with_tools(agent_id: str, messages: list, model_config: dict = No
                         from src.agents.langchain_agents import send_web_event
                         import uuid
                         
-                        # 格式化工具参数显示
-                        args_preview = str(tool_args)[:200] + "..." if len(str(tool_args)) > 200 else str(tool_args)
+                        # 格式化工具参数显示（简洁模式）
+                        if tool_args:
+                            args_brief = ", ".join([f"{k}={str(v)[:30]}" for k, v in tool_args.items()][:3])
+                        else:
+                            args_brief = "(无参数)"
+                        
+                        # 使用传入的chunk_id或创建新的
+                        chunk_id = stream_chunk_id or str(uuid.uuid4())
                         
                         send_web_event(
                             "agent_action",
                             agent_name="议事编排官",
                             role_type="meta_orchestrator",
-                            content=f"🔧 **调用工具**: `{tool_name}`\n\n**参数**: {args_preview}",
-                            chunk_id=str(uuid.uuid4())
+                            content=f"\n\n🔧 调用工具: `{tool_name}` ({args_brief})",
+                            chunk_id=chunk_id
                         )
                     except Exception as e:
                         logger.warning(f"Failed to send web event: {e}")
@@ -729,22 +736,35 @@ def call_model_with_tools(agent_id: str, messages: list, model_config: dict = No
                         from src.agents.langchain_agents import send_web_event
                         import uuid
                         
-                        # 格式化工具结果预览
+                        # 格式化工具结果预览（简洁模式）
                         if isinstance(tool_result, dict):
                             if tool_result.get("success"):
-                                status = "✅ 成功"
+                                # 提取关键信息
+                                if "roles" in tool_result:
+                                    result_brief = f"返回 {len(tool_result['roles'])} 个角色"
+                                elif "role" in tool_result:
+                                    role_info = tool_result['role']
+                                    result_brief = f"角色: {role_info.get('display_name', role_info.get('name', '未知'))}"
+                                elif "framework" in tool_result:
+                                    fw = tool_result['framework']
+                                    result_brief = f"框架: {fw.get('name', '未知')}"
+                                else:
+                                    result_brief = "执行成功"
+                                status = f"✅ {result_brief}"
                             else:
-                                status = "❌ 失败"
-                            result_preview = f"{status}: {str(tool_result)[:150]}..."
+                                status = f"❌ {tool_result.get('error', '失败')[:50]}"
                         else:
-                            result_preview = f"✅ 完成: {str(tool_result)[:150]}..."
+                            status = f"✅ 完成"
+                        
+                        # 使用传入的chunk_id或创建新的
+                        chunk_id = stream_chunk_id or str(uuid.uuid4())
                         
                         send_web_event(
                             "agent_action",
                             agent_name="议事编排官",
                             role_type="meta_orchestrator",
-                            content=f"🔧 **工具执行结果**: `{tool_name}`\n\n{result_preview}",
-                            chunk_id=str(uuid.uuid4())
+                            content=f" → {status}",
+                            chunk_id=chunk_id
                         )
                     except Exception as e:
                         logger.warning(f"Failed to send web event: {e}")

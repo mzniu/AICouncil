@@ -786,6 +786,33 @@ def refine_search_references(
         json.dump(output.model_dump(), f, ensure_ascii=False, indent=2)
     logger.info(f"[refine] 已保存精简引用到: {refined_path}")
     
+    # 5. 回写到orchestration_result.json（更新search_references字段）
+    orch_path = os.path.join(workspace_path, "orchestration_result.json")
+    if os.path.exists(orch_path):
+        try:
+            with open(orch_path, "r", encoding="utf-8") as f:
+                orch_data = json.load(f)
+            
+            # 更新all_outputs中的search_references为精简后的格式化文本列表
+            refined_refs_formatted = [
+                f"[{ref.title}]({ref.url})\n要点: {ref.summary}"
+                for ref in output.refined_references
+            ]
+            if "all_outputs" in orch_data:
+                orch_data["all_outputs"]["search_references"] = refined_refs_formatted
+                orch_data["all_outputs"]["refined_references_meta"] = {
+                    "original_count": output.original_count,
+                    "after_dedup_count": output.after_dedup_count,
+                    "refined_count": len(output.refined_references),
+                    "filtering_notes": output.filtering_notes
+                }
+            
+            with open(orch_path, "w", encoding="utf-8") as f:
+                json.dump(orch_data, f, ensure_ascii=False, indent=4)
+            logger.info(f"[refine] 已更新orchestration_result.json中的search_references")
+        except Exception as e:
+            logger.warning(f"[refine] 更新orchestration_result.json失败: {e}")
+    
     # 发送完成事件
     send_web_event("agent_action",
                    agent_name="参考资料整理官",
@@ -1448,6 +1475,15 @@ def generate_report_from_workspace(workspace_path: str, model_config: Dict[str, 
         if os.path.exists(refs_path):
             with open(refs_path, "r", encoding="utf-8") as f:
                 all_search_references = json.load(f)
+        else:
+            # Fallback: 尝试从orchestration_result.json读取
+            orch_path = os.path.join(workspace_path, "orchestration_result.json")
+            if os.path.exists(orch_path):
+                with open(orch_path, "r", encoding="utf-8") as f:
+                    orch_data = json.load(f)
+                all_search_references = orch_data.get("all_outputs", {}).get("search_references", [])
+                if all_search_references:
+                    logger.info(f"[report] 从orchestration_result.json加载搜索结果: {len(all_search_references)}条")
         
         # ===== 参考资料整理环节 =====
         # 获取原始议题用于相关性判断
@@ -1679,9 +1715,12 @@ def run_meta_orchestrator(user_requirement: str, model_config: Dict[str, Any] = 
     try:
         logger.info(f"[meta_orchestrator] 开始规划，需求: {user_requirement[:100]}...")
         
-        # 发送Web事件
+        # 使用固定的chunk_id，所有议事编排官的输出都追加到同一个卡片
+        orchestrator_chunk_id = str(uuid.uuid4())
+        
+        # 发送Web事件 - 开始
         send_web_event("agent_action", agent_name="议事编排官", role_type="meta_orchestrator", 
-                      content="🧭 开始分析需求并规划讨论方案...", chunk_id=str(uuid.uuid4()))
+                      content="🧭 开始分析需求并规划讨论方案...\n", chunk_id=orchestrator_chunk_id)
         
         # 获取可用角色列表
         from src.agents.role_manager import RoleManager
@@ -1725,15 +1764,16 @@ def run_meta_orchestrator(user_requirement: str, model_config: Dict[str, Any] = 
         from src.agents.model_adapter import call_model_with_tools
         
         send_web_event("agent_action", agent_name="议事编排官", role_type="meta_orchestrator", 
-                      content="🔍 正在调用LLM分析需求...\n可用工具：list_roles, create_role, select_framework", 
-                      chunk_id=str(uuid.uuid4()))
+                      content="🔍 正在调用LLM分析需求...", 
+                      chunk_id=orchestrator_chunk_id)
         
         response_text = call_model_with_tools(
             agent_id="meta_orchestrator",
             messages=initial_messages,
             model_config=model_config,
             tools=tools,
-            max_tool_rounds=10  # 议事编排官可能需要多次调用工具
+            max_tool_rounds=10,  # 议事编排官可能需要多次调用工具
+            stream_chunk_id=orchestrator_chunk_id  # 传入固定chunk_id
         )
         
         logger.info(f"[meta_orchestrator] LLM返回响应，长度: {len(response_text)}")
@@ -1742,8 +1782,8 @@ def run_meta_orchestrator(user_requirement: str, model_config: Dict[str, Any] = 
         cleaned = clean_json_string(response_text)
         
         send_web_event("agent_action", agent_name="议事编排官", role_type="meta_orchestrator", 
-                      content=f"📋 解析规划方案...\n响应长度: {len(cleaned)} 字符", 
-                      chunk_id=str(uuid.uuid4()))
+                      content=f"\n\n📋 解析规划方案... (响应长度: {len(cleaned)} 字符)", 
+                      chunk_id=orchestrator_chunk_id)
         
         # 解析为OrchestrationPlan
         try:
@@ -1826,7 +1866,7 @@ def run_meta_orchestrator(user_requirement: str, model_config: Dict[str, Any] = 
             """.strip()
             
             send_web_event("agent_action", agent_name="议事编排官", role_type="meta_orchestrator", 
-                          content=summary_text, chunk_id=str(uuid.uuid4()))
+                          content="\n\n" + summary_text, chunk_id=orchestrator_chunk_id)
             
             return plan
             
@@ -1836,7 +1876,7 @@ def run_meta_orchestrator(user_requirement: str, model_config: Dict[str, Any] = 
             logger.error(f"[meta_orchestrator] 原始响应: {response_text[:500]}")
             
             send_web_event("error", agent_name="议事编排官", role_type="meta_orchestrator", 
-                          content=f"❌ 规划方案解析失败: {str(e)}", chunk_id=str(uuid.uuid4()))
+                          content=f"\n\n❌ 规划方案解析失败: {str(e)}", chunk_id=orchestrator_chunk_id)
             
             raise Exception(f"规划方案格式错误: {str(e)}")
         
@@ -1844,6 +1884,7 @@ def run_meta_orchestrator(user_requirement: str, model_config: Dict[str, Any] = 
         logger.error(f"[meta_orchestrator] 调用失败: {e}")
         logger.error(traceback.format_exc())
         
+        # 注意：这里可能没有orchestrator_chunk_id，使用新的
         send_web_event("error", agent_name="议事编排官", role_type="meta_orchestrator", 
                       content=f"❌ 规划失败: {str(e)}", chunk_id=str(uuid.uuid4()))
         
@@ -1972,6 +2013,15 @@ def execute_orchestration_plan(
         result_file = workspace_path / "orchestration_result.json"
         with open(result_file, "w", encoding="utf-8") as f:
             json.dump(final_result, f, ensure_ascii=False, indent=4)
+        
+        # 单独保存search_references.json（供报告生成流程使用）
+        all_outputs = engine.get_all_outputs()
+        search_refs = all_outputs.get("search_references", [])
+        if search_refs:
+            refs_file = workspace_path / "search_references.json"
+            with open(refs_file, "w", encoding="utf-8") as f:
+                json.dump(search_refs, f, ensure_ascii=False, indent=4)
+            logger.info(f"[execute_orchestration_plan] 搜索结果已保存到 {refs_file}，共 {len(search_refs)} 条")
         
         logger.info(f"[execute_orchestration_plan] 执行完成，结果已保存到 {result_file}")
         
