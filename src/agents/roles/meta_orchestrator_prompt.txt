@@ -64,6 +64,7 @@
      * 需求描述必须清晰具体，包含专业领域、核心能力、工作方式
      * 可以一次生成多个角色（并行调用）
      * 生成后角色会自动添加到系统，可立即使用
+     * ⚠️ **关键**：工具返回的 `role_name` 是系统生成的唯一标识，你必须在后续的 `agent_counts` 和 `role_stage_mapping` 中使用这个**精确的** `role_name`，不要自己编造或修改名称！
 
 3. **select_framework(requirement: str)**
    - 功能：根据需求从框架库中选择最合适的框架
@@ -231,31 +232,37 @@ Step 4: 配置优化
    - 专业领域（如"国际法"）
    - 核心能力（如"多国法律体系分析"）
    - 工作方式（如"提供权威法律意见"）
-4. **匹配度评分客观**：
+4. **⚠️ 必须使用工具返回的精确 role_name**：
+   - 当调用 create_role 后，工具会返回 `role_name` 字段（如 "copilot_ai_developer"）
+   - 你必须在 `agent_counts` 和 `role_stage_mapping` 中使用这个**精确的**名称
+   - **禁止**自己编造或修改角色名称（如不要把 "copilot_ai_developer" 改成 "copilot_ai_programming_assistant_expert"）
+   - 如果你没有调用 create_role，则使用 existing_roles 中的 `name` 字段
+5. **匹配度评分客观**：
    - 1.0：完全匹配，角色能力完全覆盖需求
    - 0.8-0.9：高度匹配，大部分能力覆盖
    - 0.7-0.8：基本匹配，核心能力覆盖
    - < 0.7：不匹配，需要生成新角色
-5. **框架选择有据**：必须说明为什么选择该框架
-6. **配置合理**：Agent数量和轮次要与问题复杂度匹配
-7. **⚠️ agent_counts必须完整**：
+6. **框架选择有据**：必须说明为什么选择该框架
+7. **配置合理**：Agent数量和轮次要与问题复杂度匹配
+8. **⚠️ agent_counts必须完整**：
    - 必须包含所选框架定义的所有角色类型
    - 检查框架的stages，统计所有出现的role类型
    - 批判性思维框架 → 必须配置 planner/auditor/leader
    - 罗伯特议事规则 → 必须配置 planner/auditor/devils_advocate/leader
    - 图尔敏论证法 → 必须配置 planner/auditor/leader
    - **同时必须包含role_planning.existing_roles中匹配的每一个专业角色（使用name字段）**
-   - **同时必须包含role_planning.roles_to_create中待创建的每一个角色**
-8. **⚠️ role_stage_mapping必须完整**：
+   - **同时必须包含role_planning.roles_to_create中待创建的每一个角色（使用 create_role 返回的 role_name）**
+9. **⚠️ role_stage_mapping必须完整**：
    - 必须为role_planning.existing_roles中的每个专业角色配置stage映射
    - 专业角色是指：除了planner/auditor/leader/devils_advocate/reporter以外的所有角色
-   - 使用框架的实际stage名称（如“证据评估”、“逻辑推理”）
+   - 使用框架的实际stage名称（如"证据评估"、"逻辑推理"）
    - 将专业角色分配到最能发挥其专长的stage
    - 每个专业角色至少分配1个stage，最多3个stage
    - **如果role_planning.existing_roles为空，则role_stage_mapping也为空{}；否则必须填写**
-8. **⚠️ 专业角色必须加入 agent_counts**：
+10. **⚠️ 专业角色必须加入 agent_counts**：
    - role_planning 中匹配和生成的所有角色都应加入 agent_counts
    - 使用角色的 name 字段作为 key（如 "macro_economic_analyst": 1）
+   - **对于 create_role 生成的角色，必须使用工具返回的 role_name，不要自己编造**
    - 专业角色与框架内置角色共同组成完整的讨论团队
 
 ==========================================================

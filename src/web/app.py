@@ -706,7 +706,10 @@ def load_workspace(session_id):
         if os.path.exists(orch_path):
             with open(orch_path, "r", encoding="utf-8") as f:
                 orch_data = json.load(f)
-                issue_text = orch_data.get("plan", {}).get("analysis", {}).get("problem_type", issue_text)
+                # 优先使用 user_requirement，回退到 plan.summary.title
+                issue_text = orch_data.get("user_requirement") or \
+                             orch_data.get("plan", {}).get("summary", {}).get("title") or \
+                             issue_text
                 # 议事编排官 的执行数据在 execution 字段
                 execution = orch_data.get("execution", {})
                 stages = execution.get("stages", [])
@@ -734,10 +737,23 @@ def load_workspace(session_id):
         if os.path.exists(orch_path):
             with open(orch_path, "r", encoding="utf-8") as f:
                 orch_data = json.load(f)
+                
+                # 首先添加议事编排官的规划方案事件
+                plan_data = orch_data.get("plan")
+                if plan_data:
+                    discussion_events.append({
+                        "type": "agent_action",
+                        "agent_name": "议事编排官",
+                        "role_type": "meta_orchestrator",
+                        "content": json.dumps(plan_data, ensure_ascii=False),
+                        "chunk_id": f"load_{session_id}_orchestration_plan"
+                    })
+                
                 # execution 字段本身就是包含所有 stage 的字典
                 stages_data = orch_data.get("execution", {})
                 
                 # 遍历每个 stage（跳过 final_synthesis 等非 stage 字段）
+                agent_event_counter = 0  # 用于生成唯一的chunk_id
                 for stage_name, stage_output in stages_data.items():
                     # 跳过非 stage 字段（如 final_synthesis）
                     if not isinstance(stage_output, dict) or "agents" not in stage_output:
@@ -753,12 +769,13 @@ def load_workspace(session_id):
                     # 添加每个 agent 的输出事件
                     agents = stage_output.get("agents", [])
                     for agent_data in agents:
+                        agent_event_counter += 1
                         discussion_events.append({
                             "type": "agent_action",
                             "agent_name": agent_data.get("display_name", agent_data.get("agent_id")),
                             "role_type": agent_data.get("role_type"),
                             "content": agent_data.get("content", ""),
-                            "chunk_id": f"load_{session_id}_{agent_data.get('agent_id')}"
+                            "chunk_id": f"load_{session_id}_{stage_name}_{agent_event_counter}"
                         })
                 
                 # 添加最终综合（如果存在）

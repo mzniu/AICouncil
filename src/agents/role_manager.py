@@ -1,11 +1,15 @@
 """角色管理器 - 负责加载和管理所有角色定义"""
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, TYPE_CHECKING
 import yaml
 import shutil
 import sys
 from functools import lru_cache
 from dataclasses import dataclass, field
+
+if TYPE_CHECKING:
+    # 延迟导入仅用于类型检查，避免运行时循环依赖
+    from src.agents.schemas import RoleDesignOutput, RoleStageDefinition
 
 def get_roles_directory() -> Path:
     """获取roles目录路径（优先用户目录，支持打包环境）"""

@@ -251,6 +251,25 @@ class PlanSummary(BaseModel):
     potential_risks: Optional[List[str]] = None  # 潜在风险
 
 
+# ========== 参考资料整理官 Schemas ==========
+
+class RefinedReference(BaseModel):
+    """精简后的单条引用"""
+    title: str  # 标题
+    url: str  # 链接
+    summary: str  # 一句话要点（15-50字）
+    relevance: str  # 相关性说明（为何相关）
+
+
+class ReferenceRefinerOutput(BaseModel):
+    """参考资料整理官输出"""
+    topic: str  # 原始议题
+    original_count: int  # 原始搜索结果数量
+    after_dedup_count: int  # 算法去重后数量
+    refined_references: List[RefinedReference]  # 精简后的引用列表（最多15条）
+    filtering_notes: str  # 过滤说明（排除了哪些类型的内容）
+
+
 class OrchestrationPlan(BaseModel):
     """议事编排官输出的完整规划方案"""
     analysis: RequirementAnalysis  # 需求分析

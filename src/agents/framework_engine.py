@@ -293,13 +293,15 @@ class FrameworkEngine:
                     if role_name in stage.roles:
                         continue
                     
+                    # 先检查角色是否存在
+                    if not role_manager.has_role(role_name):
+                        logger.warning(f"[FrameworkEngine] 角色 '{role_name}' 不存在于系统中，跳过（可能是议事编排官建议的自定义角色）")
+                        continue
+                    
                     count = agent_counts.get(role_name, 1)
                     
                     # 从RoleManager加载角色配置
                     role_config = role_manager.get_role(role_name)
-                    if not role_config:
-                        logger.warning(f"[FrameworkEngine] 未找到角色 '{role_name}'，跳过")
-                        continue
                     
                     display_name = role_config.display_name
                     logger.info(f"[FrameworkEngine] 映射专业角色 '{role_name}' ({display_name}) 到 stage '{stage.name}'")

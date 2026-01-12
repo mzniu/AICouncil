@@ -516,6 +516,286 @@ def make_reporter_chain(model_config: Dict[str, Any]):
     return prompt | llm
 
 
+# ========== 参考资料整理功能 ==========
+
+
+def _extract_url_from_reference(ref_text: str) -> Optional[str]:
+    """从搜索结果文本中提取URL"""
+    import re
+    # 匹配markdown链接格式 [title](url)
+    match = re.search(r'\[([^\]]+)\]\(([^)]+)\)', ref_text)
+    if match:
+        return match.group(2)
+    # 匹配纯URL
+    match = re.search(r'https?://[^\s\)]+', ref_text)
+    if match:
+        return match.group(0)
+    return None
+
+
+def _extract_title_from_reference(ref_text: str) -> Optional[str]:
+    """从搜索结果文本中提取标题"""
+    import re
+    # 匹配markdown链接格式 [title](url)
+    match = re.search(r'\[([^\]]+)\]\(', ref_text)
+    if match:
+        return match.group(1)
+    # 匹配表格格式中的标题
+    match = re.search(r'\| \d+ \| \[([^\]]+)\]', ref_text)
+    if match:
+        return match.group(1)
+    return None
+
+
+def _title_similarity(title1: str, title2: str) -> float:
+    """计算两个标题的相似度（简单的字符重叠率）"""
+    if not title1 or not title2:
+        return 0.0
+    set1 = set(title1)
+    set2 = set(title2)
+    intersection = len(set1 & set2)
+    union = len(set1 | set2)
+    return intersection / union if union > 0 else 0.0
+
+
+def deduplicate_search_references(raw_references: List[str]) -> tuple[List[str], dict]:
+    """算法层面去重搜索结果
+    
+    去重策略：
+    1. URL完全相同的去重
+    2. 标题相似度>80%的去重
+    
+    注意：不做内容过滤（如域名/标题黑名单），由后续LLM相关性筛选处理
+    
+    Returns:
+        (去重后的引用列表, 统计信息dict)
+    """
+    stats = {
+        "original_count": len(raw_references),
+        "url_duplicates": 0,
+        "title_duplicates": 0,
+    }
+    
+    seen_urls = set()
+    seen_titles = []
+    deduplicated = []
+    
+    for ref in raw_references:
+        url = _extract_url_from_reference(ref)
+        title = _extract_title_from_reference(ref)
+        
+        # 1. URL去重
+        if url and url in seen_urls:
+            stats["url_duplicates"] += 1
+            continue
+        
+        # 2. 标题相似度去重
+        is_similar = False
+        for existing_title in seen_titles:
+            if _title_similarity(title, existing_title) > 0.8:
+                is_similar = True
+                stats["title_duplicates"] += 1
+                break
+        
+        if is_similar:
+            continue
+        
+        # 通过所有检查，保留
+        if url:
+            seen_urls.add(url)
+        if title:
+            seen_titles.append(title)
+        deduplicated.append(ref)
+    
+    stats["after_dedup_count"] = len(deduplicated)
+    logger.info(f"[dedup] 去重统计: 原始{stats['original_count']} -> 去重后{stats['after_dedup_count']} "
+                f"(URL重复:{stats['url_duplicates']}, 标题相似:{stats['title_duplicates']})")
+    
+    return deduplicated, stats
+
+
+def make_reference_refiner_chain(model_config: Dict[str, Any]):
+    """创建参考资料整理官链"""
+    llm = AdapterLLM(backend_config=ModelConfig(**model_config))
+    
+    prompt_text = """你是一位专业的参考资料整理官，负责从搜索结果中筛选与议题相关的高质量引用。
+
+## 原始议题
+{topic}
+
+## 待筛选的搜索结果（已经过算法去重）
+{deduplicated_references}
+
+## 你的任务
+
+1. **相关性过滤**：只保留与议题直接相关的结果，排除：
+   - 与议题无关的内容（如日历、节假日、纪念币等）
+   - 过于泛泛的内容（如百度百科年份页）
+   - 重复/冗余的信息
+
+2. **精简格式**：将每条保留的引用精简为：
+   - title: 标题
+   - url: 链接
+   - summary: 一句话要点（15-50字，提炼核心信息）
+   - relevance: 与议题的相关性说明
+
+3. **数量控制**：最多保留15条最相关的引用
+
+## 输出格式（严格JSON）
+```json
+{{
+    "topic": "原始议题",
+    "original_count": 去重前数量,
+    "after_dedup_count": 去重后数量,
+    "refined_references": [
+        {{
+            "title": "文章标题",
+            "url": "https://...",
+            "summary": "一句话要点",
+            "relevance": "相关性说明"
+        }}
+    ],
+    "filtering_notes": "过滤说明，如：排除了X条日历相关、Y条政策公告等"
+}}
+```
+
+**重要**：只输出JSON，不要任何其他文字。"""
+    
+    prompt = PromptTemplate(
+        template=prompt_text,
+        input_variables=["topic", "deduplicated_references"]
+    )
+    return prompt | llm
+
+
+def refine_search_references(
+    raw_references: List[str],
+    topic: str,
+    model_config: Dict[str, Any],
+    workspace_path: str
+) -> tuple[str, schemas.ReferenceRefinerOutput]:
+    """执行完整的参考资料整理流程
+    
+    流程：
+    1. 算法去重（URL、标题相似度、黑名单）
+    2. LLM相关性过滤+精简
+    3. 保存结果到refined_references.json
+    
+    Returns:
+        (精简后的文本用于报告生成, 结构化输出)
+    """
+    # 发送开始事件
+    send_web_event("agent_action", 
+                   agent_name="参考资料整理官", 
+                   role_type="reference_refiner",
+                   content=f"📚 开始整理参考资料...\n原始搜索结果: {len(raw_references)}条",
+                   chunk_id=str(uuid.uuid4()))
+    
+    # 1. 算法去重
+    deduplicated, stats = deduplicate_search_references(raw_references)
+    
+    send_web_event("agent_action",
+                   agent_name="参考资料整理官",
+                   role_type="reference_refiner", 
+                   content=f"✅ 算法去重完成\n├─ URL重复: {stats['url_duplicates']}条\n├─ 标题相似: {stats['title_duplicates']}条\n└─ 保留: {stats['after_dedup_count']}条",
+                   chunk_id=str(uuid.uuid4()))
+    
+    # 如果去重后为空，直接返回
+    if not deduplicated:
+        empty_output = schemas.ReferenceRefinerOutput(
+            topic=topic,
+            original_count=stats["original_count"],
+            after_dedup_count=0,
+            refined_references=[],
+            filtering_notes="所有搜索结果均被算法过滤（无关内容）"
+        )
+        send_web_event("agent_action",
+                       agent_name="参考资料整理官",
+                       role_type="reference_refiner",
+                       content="⚠️ 算法过滤后无有效结果",
+                       chunk_id=str(uuid.uuid4()))
+        return "无有效的联网搜索参考资料。", empty_output
+    
+    # 2. LLM相关性过滤+精简
+    send_web_event("agent_action",
+                   agent_name="参考资料整理官",
+                   role_type="reference_refiner",
+                   content="🔍 正在进行相关性筛选...",
+                   chunk_id=str(uuid.uuid4()))
+    
+    refiner_chain = make_reference_refiner_chain(model_config)
+    
+    # 限制输入长度，避免超token
+    deduplicated_text = "\n\n".join(deduplicated)
+    if len(deduplicated_text) > 30000:
+        deduplicated_text = deduplicated_text[:30000] + "\n\n...(内容过长已截断)"
+    
+    try:
+        raw_output, _ = stream_agent_output(
+            refiner_chain,
+            {
+                "topic": topic,
+                "deduplicated_references": deduplicated_text
+            },
+            "参考资料整理官",
+            "reference_refiner"
+        )
+        
+        # 解析JSON
+        cleaned = clean_json_string(raw_output)
+        parsed = json.loads(cleaned)
+        
+        # 更新统计数据
+        parsed["original_count"] = stats["original_count"]
+        parsed["after_dedup_count"] = stats["after_dedup_count"]
+        
+        output = schemas.ReferenceRefinerOutput(**parsed)
+        
+    except Exception as e:
+        logger.error(f"[refine] LLM精简失败: {e}")
+        # 降级：直接使用去重后的结果（截断）
+        output = schemas.ReferenceRefinerOutput(
+            topic=topic,
+            original_count=stats["original_count"],
+            after_dedup_count=stats["after_dedup_count"],
+            refined_references=[],
+            filtering_notes=f"LLM精简失败，使用原始去重结果: {str(e)[:100]}"
+        )
+        # 构造简单的文本
+        fallback_text = "\n\n".join(deduplicated[:10])
+        if len(fallback_text) > 8000:
+            fallback_text = fallback_text[:8000] + "\n\n...(内容过长已截断)"
+        
+        send_web_event("agent_action",
+                       agent_name="参考资料整理官",
+                       role_type="reference_refiner",
+                       content=f"⚠️ LLM精简失败，使用降级方案\n保留前10条去重结果",
+                       chunk_id=str(uuid.uuid4()))
+        return fallback_text, output
+    
+    # 3. 生成精简文本
+    refined_text_parts = []
+    for i, ref in enumerate(output.refined_references, 1):
+        refined_text_parts.append(f"{i}. [{ref.title}]({ref.url})\n   要点: {ref.summary}")
+    
+    refined_text = "\n\n".join(refined_text_parts) if refined_text_parts else "无相关联网搜索参考资料。"
+    
+    # 4. 保存到文件
+    refined_path = os.path.join(workspace_path, "refined_references.json")
+    with open(refined_path, "w", encoding="utf-8") as f:
+        json.dump(output.model_dump(), f, ensure_ascii=False, indent=2)
+    logger.info(f"[refine] 已保存精简引用到: {refined_path}")
+    
+    # 发送完成事件
+    send_web_event("agent_action",
+                   agent_name="参考资料整理官",
+                   role_type="reference_refiner",
+                   content=f"✅ 参考资料整理完成\n├─ 原始结果: {output.original_count}条\n├─ 算法去重后: {output.after_dedup_count}条\n├─ 相关性筛选后: {len(output.refined_references)}条\n└─ {output.filtering_notes}",
+                   chunk_id=str(uuid.uuid4()))
+    
+    return refined_text, output
+
+
 def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rounds: int = 3, num_planners: int = 2, num_auditors: int = 2, agent_configs: Dict[str, Any] = None) -> Dict[str, Any]:
     """Run a multi-round LangChain-driven cycle: leader decomposes, planners generate plans, auditors review, leader summarizes.
     """
@@ -1168,19 +1448,47 @@ def generate_report_from_workspace(workspace_path: str, model_config: Dict[str, 
         if os.path.exists(refs_path):
             with open(refs_path, "r", encoding="utf-8") as f:
                 all_search_references = json.load(f)
+        
+        # ===== 参考资料整理环节 =====
+        # 获取原始议题用于相关性判断
+        issue_text = final_data.get("issue", "")
+        if not issue_text:
+            # 尝试从其他字段获取
+            issue_text = final_data.get("decomposition", {}).get("core_goal", "")
+        
+        if all_search_references and len(all_search_references) > 0:
+            logger.info(f"[report] 开始参考资料整理，原始结果: {len(all_search_references)}条")
+            
+            # 检查是否已有精简后的引用文件
+            refined_path = os.path.join(workspace_path, "refined_references.json")
+            if os.path.exists(refined_path):
+                # 已整理过，直接加载
+                logger.info(f"[report] 发现已有精简引用文件，直接加载")
+                with open(refined_path, "r", encoding="utf-8") as f:
+                    refined_data = json.load(f)
+                
+                # 生成精简文本
+                refined_refs = refined_data.get("refined_references", [])
+                if refined_refs:
+                    search_refs_parts = []
+                    for i, ref in enumerate(refined_refs, 1):
+                        search_refs_parts.append(f"{i}. [{ref['title']}]({ref['url']})\n   要点: {ref['summary']}")
+                    search_refs_text = "\n\n".join(search_refs_parts)
+                else:
+                    search_refs_text = "无相关联网搜索参考资料。"
+            else:
+                # 执行整理流程
+                search_refs_text, refined_output = refine_search_references(
+                    all_search_references,
+                    issue_text,
+                    model_config,
+                    workspace_path
+                )
+        else:
+            search_refs_text = "无联网搜索参考资料。"
+            logger.info(f"[report] 无搜索结果需要整理")
             
         reporter_chain = make_reporter_chain(model_config)
-        
-        unique_refs = []
-        seen_refs = set()
-        for ref in all_search_references:
-            if ref not in seen_refs:
-                unique_refs.append(ref)
-                seen_refs.add(ref)
-        
-        search_refs_text = "\n\n".join(unique_refs) if unique_refs else "无联网搜索参考资料。"
-        if len(search_refs_text) > 15000:
-            search_refs_text = search_refs_text[:15000] + "\n\n...(内容过长已截断)"
 
         max_retries = 3
         report_html = "报告生成失败"
