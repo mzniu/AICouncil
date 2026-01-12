@@ -536,11 +536,10 @@ class RoleManager:
             (success, error_message)
         """
         try:
-            # 1. 检查重名
+            # 1. 检查重名并自动处理
+            original_role_name = design.role_name
             if self.has_role(design.role_name):
-                if not overwrite:
-                    return False, f"角色 {design.role_name} 已存在，请使用不同的名称"
-                else:
+                if overwrite:
                     # 覆盖模式：删除旧角色文件
                     yaml_file = ROLES_DIR / f"{design.role_name}.yaml"
                     if yaml_file.exists():
@@ -551,6 +550,16 @@ class RoleManager:
                         prompt_file.unlink()
                     
                     print(f"[RoleManager] ⚠️ 覆盖已存在的角色: {design.role_name}")
+                else:
+                    # 自动重命名：添加数字后缀
+                    suffix = 2
+                    new_role_name = f"{original_role_name}_{suffix}"
+                    while self.has_role(new_role_name):
+                        suffix += 1
+                        new_role_name = f"{original_role_name}_{suffix}"
+                    
+                    print(f"[RoleManager] ⚠️ 角色名重复，自动重命名: {design.role_name} → {new_role_name}")
+                    design.role_name = new_role_name
             
             yaml_file = ROLES_DIR / f"{design.role_name}.yaml"
             
