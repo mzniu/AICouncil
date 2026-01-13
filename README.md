@@ -279,80 +279,143 @@ pip install -r requirements-optional.txt
 - `requirements-minimal.txt`: 核心依赖（基本功能，体积更小）
 - `requirements-optional.txt`: 可选增强（PDF导出、浏览器搜索）
 
-#### 4. 配置 API 密钥
-1. 复制配置模板文件：
+#### 4. 配置系统（环境变量方式）
+
+**⚠️ 重要变更**：配置已从 `src/config.py` 迁移到 `.env` 文件（更安全、更易管理）。
+
+##### 方式 1: 使用 .env 文件（推荐）
+
+1. **复制配置模板**：
    ```bash
-   cp src/config_template.py src/config.py
+   cp .env.example .env
    ```
-2. 编辑 `src/config.py`，填入您的 API 密钥及相关配置：
-   ```python
+
+2. **编辑 .env 文件**，配置以下必需项：
+   ```ini
+   # ========================================
+   # Flask 应用配置
+   # ========================================
+   SECRET_KEY=your-secret-key-min-32-bytes  # 生成密钥：python -c "import secrets; print(secrets.token_hex(32))"
+   
+   # ========================================
+   # 数据库配置（如需认证功能）
+   # ========================================
+   DATABASE_URL=sqlite:///D:/git/MyCouncil/data/users.db  # 或使用 PostgreSQL
+   
+   # ========================================
+   # 用户认证配置（可选）
+   # ========================================
+   ALLOW_PUBLIC_REGISTRATION=false  # 是否允许公开注册
+   
+   # ========================================
+   # AI 模型配置（议事系统）
+   # ========================================
+   MODEL_BACKEND=deepseek  # 可选: deepseek | openai | azure | anthropic | gemini | openrouter | aliyun | ollama
+   MODEL_NAME=deepseek-chat
+   
    # DeepSeek API（推荐，性价比高）
-   DEEPSEEK_API_KEY = "您的密钥"
-   DEEPSEEK_MODEL = "deepseek-chat"  # 或 deepseek-reasoner
+   DEEPSEEK_API_KEY=您的DeepSeek密钥
+   DEEPSEEK_BASE_URL=https://api.deepseek.com
+   DEEPSEEK_MODEL=deepseek-chat  # 或 deepseek-reasoner
    
    # OpenAI API
-   OPENAI_API_KEY = "您的密钥"
-   OPENAI_MODEL = "gpt-4o"
+   OPENAI_API_KEY=您的OpenAI密钥
+   OPENAI_BASE_URL=https://api.openai.com/v1
+   OPENAI_MODEL=gpt-4o
    
    # Azure OpenAI（支持中国区和全球区）
-   AZURE_OPENAI_API_KEY = "您的Azure密钥"
-   AZURE_OPENAI_ENDPOINT = "https://your-resource.openai.azure.cn"  # 中国区
-   # AZURE_OPENAI_ENDPOINT = "https://your-resource.openai.azure.com"  # 全球区
-   AZURE_OPENAI_API_VERSION = "2024-12-01-preview"
-   AZURE_OPENAI_DEPLOYMENT_NAME = "gpt-4o"  # 您的部署名称
+   # 中国区示例：
+   # AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.cn
+   # 全球区示例：
+   # AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
    
    # Anthropic Claude API
-   ANTHROPIC_API_KEY = "您的Anthropic密钥"  # 获取地址：console.anthropic.com
-   ANTHROPIC_MODEL = "claude-3-5-sonnet-20241022"  # 推荐模型
+   ANTHROPIC_API_KEY=您的Anthropic密钥  # 获取地址: console.anthropic.com
+   ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
    
    # Google Gemini API
-   GEMINI_API_KEY = "您的Gemini密钥"  # 获取地址：aistudio.google.com
-   GEMINI_MODEL = "gemini-1.5-flash"  # 或 gemini-1.5-pro
-   
-   # Aliyun (Qwen)
-   ALIYUN_API_KEY = "您的密钥"
-   ALIYUN_MODEL = "qwen-plus"
+   GEMINI_API_KEY=您的Gemini密钥  # 获取地址: aistudio.google.com
+   GEMINI_MODEL=gemini-1.5-flash
    
    # OpenRouter（支持多种第三方模型）
-   OPENROUTER_API_KEY = "您的密钥"
-   OPENROUTER_MODEL = "google/gemini-3-flash-preview"
+   OPENROUTER_API_KEY=您的OpenRouter密钥
+   OPENROUTER_MODEL=google/gemini-3-flash-preview
    
-   # ... 其他配置
+   # Aliyun (Qwen)
+   ALIYUN_API_KEY=您的Aliyun密钥
+   ALIYUN_MODEL=qwen-plus
+   
+   # ========================================
+   # 搜索引擎配置
+   # ========================================
+   SEARCH_PROVIDER=baidu,yahoo,google  # 可选: tavily | duckduckgo | bing | baidu | yahoo | mojeek | google
+   
+   # Google 搜索 API（推荐）
+   GOOGLE_API_KEY=您的Google密钥  # 获取地址: developers.google.com/custom-search
+   GOOGLE_SEARCH_ENGINE_ID=您的搜索引擎ID  # 获取地址: programmablesearchengine.google.com
+   
+   # Tavily 搜索 API
+   TAVILY_API_KEY=您的Tavily密钥
    ```
-或者您也可以在项目根目录下创建 `.env` 文件，程序会自动读取环境变量。
 
-**【建议】或者您也可以在页面右上角的设置中进行配置。**
+3. **验证配置**（可选）：
+   ```bash
+   python scripts/validate_env.py
+   ```
+
+##### 方式 2: 在 Web 界面配置（推荐新手）
+
+启动应用后，点击页面右上角「⚙️ 高级配置 → 系统设置」，在线配置所有 API 密钥和搜索引擎。配置会自动保存到 `.env` 文件。
+
+##### 方式 3: 使用 config.py（已废弃，不推荐）
+
+如果您有旧版本的 `src/config.py` 文件，系统仍会读取（但 `.env` 优先级更高）。建议迁移到 `.env` 方式。
+
+**配置优先级**：环境变量 > .env 文件 > config.py > 默认值
 
 #### 5. 初始化认证系统（可选）
 
-如果您需要用户认证功能（登录/注册/MFA），需要先初始化数据库：
+如果您需要用户认证功能（登录/注册/MFA双因素认证），需要初始化数据库：
 
 ```bash
-# 创建 .env 文件（从模板复制）
-cp .env.example .env
+# 1. 确认 .env 文件已配置（参见上一步）
+# 必需配置项：
+# - SECRET_KEY（用于session加密）
+# - DATABASE_URL（数据库路径）
+# - ALLOW_PUBLIC_REGISTRATION（是否允许公开注册）
 
-# 编辑 .env，至少配置以下必需项：
-# SECRET_KEY=your-secret-key-min-32-bytes  # 生成密钥：python -c "import secrets; print(secrets.token_hex(32))"
-# DATABASE_URL=sqlite:///aicouncil.db      # 或使用 PostgreSQL
-# ALLOW_PUBLIC_REGISTRATION=true           # 是否允许公开注册
-
-# 初始化数据库
+# 2. 初始化数据库和表结构
 python -c "from src.models import db; from src.web.app import app; app.app_context().push(); db.create_all()"
 
-# 验证环境配置（可选）
+# 3. 创建测试用户（可选）
+python init_auth_db.py --username admin --password Admin123! --email admin@example.com
+
+# 4. 验证环境配置
 python scripts/validate_env.py
 ```
 
-**详细配置说明**：
-- 认证系统使用文档：[docs/authentication.md](docs/authentication.md)
-- 生产部署指南：[docs/production_deployment.md](docs/production_deployment.md)
-- 环境变量说明：参见 `.env.example` 文件
+**认证系统功能**：
+- ✅ **用户注册/登录**：支持密码强度策略、账户锁定（5次失败=5分钟锁定）
+- ✅ **双因素认证 (MFA)**：基于 TOTP (RFC 6238)，兼容 Google Authenticator / Microsoft Authenticator
+- ✅ **备份码**：每个用户10个一次性备份码，丢失设备时可用
+- ✅ **会话管理**：支持"记住我"（30天）、会话版本控制（登出所有设备）
+- ✅ **审计日志**：完整记录登录历史（IP、User-Agent、成功/失败状态）
+- ✅ **修改密码**：支持在用户设置中修改密码（修改后其他设备自动登出）
+- ✅ **MFA 管理**：支持禁用/重新配置双因素认证
+
+**详细使用文档**：
+- [认证系统完整文档](docs/authentication.md) - API端点、安全特性、使用指南
+- [生产部署指南](docs/production_deployment.md) - HTTPS、PostgreSQL、Redis配置
+- [认证测试指南](docs/auth_testing_guide.md) - 测试用例、常见问题
 
 **快速测试认证功能**：
 ```bash
-# 运行测试用例（需要先安装 pytest）
+# 运行完整测试套件（需要先安装 pytest）
 pip install pytest
 python -m pytest tests/test_auth_endpoints.py tests/test_mfa_security.py -v
+
+# 测试结果示例：
+# ✅ 41 passed, 1 skipped（MFA超时测试跳过）
 ```
 
 #### 6. 启动应用
