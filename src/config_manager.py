@@ -11,6 +11,17 @@ import sys
 from pathlib import Path
 from typing import Any, Optional
 
+# 加载 .env 文件（如果存在）
+try:
+    from dotenv import load_dotenv
+    # 从项目根目录加载 .env
+    env_path = Path(__file__).resolve().parent.parent / '.env'
+    if env_path.exists():
+        load_dotenv(dotenv_path=env_path, override=False)
+except ImportError:
+    # python-dotenv 未安装，跳过
+    pass
+
 # 确保可以导入项目模块
 if __name__ == '__main__':
     project_root = Path(__file__).resolve().parent.parent

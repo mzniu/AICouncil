@@ -1,4 +1,5 @@
 ﻿from flask import Flask, render_template, request, jsonify
+from flask_login import login_required, current_user
 import json
 import subprocess
 import threading
@@ -56,6 +57,45 @@ log.setLevel(logging.ERROR)
 
 app = Flask(__name__)
 
+# === 初始化认证系统（数据库、Flask-Login、Flask-Migrate） ===
+try:
+    from src.auth_config import init_auth
+    init_auth(app)
+    logger.info("✅ 认证系统初始化成功")
+    
+    # 注册认证路由蓝图
+    from src.auth_routes import auth_bp
+    app.register_blueprint(auth_bp)
+    logger.info("✅ 认证路由注册成功")
+    
+    # 速率限制配置（暂时禁用，使用账户锁定机制代替）
+    # 账户锁定机制：5次失败=5分钟锁定，已提供足够的暴力破解保护
+    try:
+        from flask_limiter import Limiter
+        from flask_limiter.util import get_remote_address
+        
+        # 创建limiter但不应用任何限制
+        limiter = Limiter(
+            app=app,
+            key_func=get_remote_address,
+            default_limits=[],
+            storage_uri="memory://",
+            enabled=False  # 禁用速率限制
+        )
+        
+        logger.info("✅ 速率限制器已创建（当前禁用）")
+    except ImportError:
+        logger.info("ℹ️  Flask-Limiter未安装（使用账户锁定机制保护）")
+    except Exception as e:
+        logger.warning(f"⚠️  速率限制配置失败: {e}")
+        
+except Exception as e:
+    logger.warning(f"⚠️  认证系统初始化失败（不影响现有功能）: {e}")
+    import traceback
+    traceback.print_exc()
+    # 如果认证初始化失败，继续运行但只有议事功能可用
+    pass
+
 # 存储讨论过程的全局变量
 discussion_events = []
 backend_logs = []
@@ -103,8 +143,29 @@ signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
 
 @app.route('/')
+@login_required
 def index():
     return render_template('index.html')
+
+@app.route('/login')
+def login_page():
+    """登录页面"""
+    return render_template('login.html')
+
+@app.route('/register')
+def register_page():
+    """注册页面"""
+    return render_template('register.html')
+
+@app.route('/mfa-setup')
+def mfa_setup_page():
+    """MFA设置页面"""
+    return render_template('mfa_setup.html')
+
+@app.route('/mfa-verify')
+def mfa_verify_page():
+    """MFA验证页面"""
+    return render_template('mfa_verify.html')
 
 @app.route('/api/start', methods=['POST'])
 def start_discussion():

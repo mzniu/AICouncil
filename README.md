@@ -12,6 +12,13 @@
 
 ## 🌟 核心特性
 
+- **🔐 企业级认证系统**：
+  - **用户注册与登录**：支持公开注册（可配置禁用）、密码强度策略、账户锁定机制。
+  - **多因素认证 (MFA)**：基于 TOTP (RFC 6238) 的双因素认证，支持 Google Authenticator / Microsoft Authenticator 等应用。
+  - **备份码系统**：每个用户生成 10 个一次性备份码，丢失设备时可用备份码登录。
+  - **会话管理**：支持"记住我"功能、会话版本控制（登出所有设备）、安全 Cookie 配置。
+  - **审计日志**：完整记录登录历史（成功/失败/IP/User-Agent），支持安全审计。
+  - **详细文档**：参见 [认证系统文档](docs/authentication.md)。
 - **🎭 多角色协同**：
   - **议长 (Leader)**：负责议题拆解、流程引导及最终报告汇总。
   - **策论家 (Planner)**：基于搜索增强（RAG）提供专业方案与深度见解。
@@ -316,13 +323,50 @@ pip install -r requirements-optional.txt
 
 **【建议】或者您也可以在页面右上角的设置中进行配置。**
 
-#### 5. 启动应用
+#### 5. 初始化认证系统（可选）
+
+如果您需要用户认证功能（登录/注册/MFA），需要先初始化数据库：
+
+```bash
+# 创建 .env 文件（从模板复制）
+cp .env.example .env
+
+# 编辑 .env，至少配置以下必需项：
+# SECRET_KEY=your-secret-key-min-32-bytes  # 生成密钥：python -c "import secrets; print(secrets.token_hex(32))"
+# DATABASE_URL=sqlite:///aicouncil.db      # 或使用 PostgreSQL
+# ALLOW_PUBLIC_REGISTRATION=true           # 是否允许公开注册
+
+# 初始化数据库
+python -c "from src.models import db; from src.web.app import app; app.app_context().push(); db.create_all()"
+
+# 验证环境配置（可选）
+python scripts/validate_env.py
+```
+
+**详细配置说明**：
+- 认证系统使用文档：[docs/authentication.md](docs/authentication.md)
+- 生产部署指南：[docs/production_deployment.md](docs/production_deployment.md)
+- 环境变量说明：参见 `.env.example` 文件
+
+**快速测试认证功能**：
+```bash
+# 运行测试用例（需要先安装 pytest）
+pip install pytest
+python -m pytest tests/test_auth_endpoints.py tests/test_mfa_security.py -v
+```
+
+#### 6. 启动应用
 ```bash
 python src/web/app.py
 ```
 启动后，在浏览器访问 `http://127.0.0.1:5000` 即可开始议事。
 
-### 6. 报告图表（ECharts + Mermaid）
+**首次访问**：
+- 如果启用了认证系统，将跳转到登录页面 `/login`
+- 如果允许公开注册，可点击"注册账号"创建用户
+- 如果未配置认证，直接访问首页开始议事
+
+#### 7. 报告图表（ECharts + Mermaid）
 
 #### ECharts 数据可视化
 - 已内置 ECharts 5.4.3：文件位于 `src/web/static/vendor/echarts.min.js`
@@ -400,15 +444,26 @@ AICouncil/
 ├── src/
 │   ├── agents/          # 智能体核心逻辑与提示词模板
 │   ├── web/             # Flask Web 服务与前端模板
+│   │   ├── templates/   # HTML 模板（包括认证页面）
+│   │   └── static/      # 静态资源
 │   ├── utils/           # 搜索、日志等工具类
+│   ├── models.py        # 数据库模型（User, LoginHistory）
+│   ├── auth_routes.py   # 认证 API 端点
+│   ├── auth_config.py   # 认证系统配置
 │   └── config.py        # 全局配置文件
 ├── build/               # 构建工具与打包脚本
 │   ├── build_config.py  # 构建配置
 │   ├── path_manager.py  # 路径管理
 │   └── config_manager.py # 配置管理
+├── scripts/             # 部署脚本
+│   └── validate_env.py  # 环境变量验证工具
 ├── workspaces/          # 议事历史记录存储目录
 ├── tests/               # 单元测试
+│   ├── test_auth_endpoints.py  # 认证端点测试
+│   └── test_mfa_security.py    # MFA 安全测试
 ├── docs/                # 项目文档
+│   ├── authentication.md    # 认证系统文档 🔐
+│   ├── production_deployment.md # 生产部署指南
 │   ├── build_guide.md       # 构建打包指南
 │   └── user_manual_exe.md   # 打包版用户手册
 ├── requirements.txt     # 完整依赖
@@ -427,6 +482,7 @@ AICouncil/
 
 ### 已完成
 - [x] **多智能体架构**：实现议长、策论家、监察官、记录员的协同工作流。
+- [x] **企业级认证系统**：用户注册/登录、MFA (TOTP)、备份码、会话管理、账户锁定、审计日志（42 个测试用例覆盖）。
 - [x] **增强型搜索**：集成 DrissionPage 支持多引擎（Baidu, Bing, DuckDuckGo, Yahoo, Mojeek）并行搜索。
 - [x] **UI 交互升级**：全站移除原生弹窗，采用 Tailwind CSS 自定义模态框。
 - [x] **历史记录管理**：支持议事记录的持久化存储、回溯及物理删除。

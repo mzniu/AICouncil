@@ -12,6 +12,13 @@
 
 ## 🌟 Core Features
 
+- **🔐 Enterprise-Grade Authentication System**:
+  - **User Registration & Login**: Supports public registration (configurable), password strength policies, and account lockout mechanisms.
+  - **Multi-Factor Authentication (MFA)**: TOTP-based (RFC 6238) two-factor authentication, compatible with Google Authenticator / Microsoft Authenticator.
+  - **Backup Code System**: Generates 10 one-time backup codes per user for device loss scenarios.
+  - **Session Management**: "Remember me" functionality, session versioning (logout all devices), secure cookie configuration.
+  - **Audit Logs**: Comprehensive login history (success/failure/IP/User-Agent) for security audits.
+  - **Documentation**: See [Authentication System Documentation](docs/authentication.md).
 - **🎭 Multi-Role Collaboration**:
   - **Leader**: Responsible for issue decomposition, process guidance, and final report summarization.
   - **Planner**: Provides professional solutions and deep insights based on Retrieval-Augmented Generation (RAG).

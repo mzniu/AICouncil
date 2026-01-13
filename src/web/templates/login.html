@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - AICouncil</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .login-card {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.95);
+        }
+        .input-field:focus {
+            border-color: #667eea;
+            ring-color: #667eea;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center p-4">
+    <div class="login-card w-full max-w-md rounded-2xl shadow-2xl p-8">
+        <!-- Logo & Title -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">AICouncil</h1>
+            <p class="text-gray-600">元老院多智能体协商系统</p>
+        </div>
+
+        <!-- Alert Message -->
+        <div id="alertBox" class="hidden mb-4 p-4 rounded-lg">
+            <p id="alertMessage" class="text-sm"></p>
+        </div>
+
+        <!-- Login Form -->
+        <form id="loginForm" class="space-y-6">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">用户名</label>
+                <input 
+                    type="text" 
+                    id="username" 
+                    name="username"
+                    required
+                    class="input-field w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
+                    placeholder="请输入用户名"
+                    autocomplete="username"
+                >
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">密码</label>
+                <input 
+                    type="password" 
+                    id="password" 
+                    name="password"
+                    required
+                    class="input-field w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
+                    placeholder="请输入密码"
+                    autocomplete="current-password"
+                >
+            </div>
+
+            <div class="flex items-center justify-between">
+                <label class="flex items-center">
+                    <input type="checkbox" id="remember" name="remember" class="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
+                    <span class="ml-2 text-sm text-gray-600">记住登录</span>
+                </label>
+                <a href="#" class="text-sm text-purple-600 hover:text-purple-700">忘记密码？</a>
+            </div>
+
+            <button 
+                type="submit" 
+                id="loginBtn"
+                class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-indigo-700 transition duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+                登录
+            </button>
+        </form>
+
+        <!-- Register Link -->
+        <div class="mt-6 text-center text-sm text-gray-600">
+            还没有账号？ <a href="/register" class="text-purple-600 hover:text-purple-700 font-semibold">立即注册</a>
+        </div>
+
+        <!-- Back to Home -->
+        <div class="mt-4 text-center">
+            <a href="/" class="text-sm text-gray-500 hover:text-gray-700">← 返回首页</a>
+        </div>
+    </div>
+
+    <script>
+        const loginForm = document.getElementById('loginForm');
+        const loginBtn = document.getElementById('loginBtn');
+        const alertBox = document.getElementById('alertBox');
+        const alertMessage = document.getElementById('alertMessage');
+
+        // Show alert message
+        function showAlert(message, type = 'error') {
+            alertBox.className = `mb-4 p-4 rounded-lg ${type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`;
+            alertMessage.textContent = message;
+            alertBox.classList.remove('hidden');
+            
+            setTimeout(() => {
+                alertBox.classList.add('hidden');
+            }, 5000);
+        }
+
+        // Set loading state
+        function setLoading(isLoading) {
+            loginBtn.disabled = isLoading;
+            loginBtn.textContent = isLoading ? '登录中...' : '登录';
+            loginBtn.style.opacity = isLoading ? '0.7' : '1';
+        }
+
+        // Handle login
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const remember = document.getElementById('remember').checked;
+
+            if (!username || !password) {
+                showAlert('请输入用户名和密码');
+                return;
+            }
+
+            setLoading(true);
+
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password, remember })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    if (data.requires_mfa) {
+                        // Redirect to MFA verification page
+                        window.location.href = '/mfa-verify';
+                    } else {
+                        // Login successful, redirect to home
+                        showAlert('登录成功！', 'success');
+                        setTimeout(() => {
+                            window.location.href = '/';
+                        }, 1000);
+                    }
+                } else {
+                    // Handle error
+                    if (response.status === 403 && data.error === 'account_locked') {
+                        showAlert(`账户已被锁定，请${data.retry_after}秒后再试`);
+                    } else {
+                        showAlert(data.error || '登录失败，请检查用户名和密码');
+                    }
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showAlert('网络错误，请稍后重试');
+            } finally {
+                setLoading(false);
+            }
+        });
+
+        // Check if already logged in
+        fetch('/api/auth/status')
+            .then(res => res.json())
+            .then(data => {
+                if (data.authenticated && !data.mfa_pending) {
+                    window.location.href = '/';
+                }
+            })
+            .catch(err => console.error('Status check error:', err));
+    </script>
+</body>
+</html>

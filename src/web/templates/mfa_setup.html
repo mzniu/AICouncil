@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设置双因素认证 - AICouncil</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .mfa-card {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.95);
+        }
+        .backup-code {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center p-4">
+    <div class="mfa-card w-full max-w-2xl rounded-2xl shadow-2xl p-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-purple-100 rounded-full mb-4">
+                <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                </svg>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">设置双因素认证</h1>
+            <p class="text-gray-600">增强您的账户安全性</p>
+        </div>
+
+        <!-- Alert Message -->
+        <div id="alertBox" class="hidden mb-6 p-4 rounded-lg">
+            <p id="alertMessage" class="text-sm"></p>
+        </div>
+
+        <!-- Setup Steps -->
+        <div id="setupSteps" class="space-y-6">
+            <!-- Step 1: Generate QR Code -->
+            <div id="step1" class="border-2 border-purple-200 rounded-lg p-6">
+                <div class="flex items-center mb-4">
+                    <span class="flex items-center justify-center w-8 h-8 bg-purple-600 text-white rounded-full font-bold mr-3">1</span>
+                    <h2 class="text-xl font-semibold text-gray-800">扫描二维码</h2>
+                </div>
+                <p class="text-gray-600 mb-4">使用您的身份验证器应用（如 Google Authenticator、Microsoft Authenticator）扫描下方二维码：</p>
+                
+                <div id="qrCodeContainer" class="flex flex-col items-center justify-center bg-white p-6 rounded-lg border-2 border-gray-200">
+                    <button 
+                        id="generateBtn"
+                        class="bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-purple-700 transition duration-300"
+                    >
+                        生成二维码
+                    </button>
+                </div>
+
+                <div id="manualEntry" class="hidden mt-4 bg-gray-50 p-4 rounded-lg">
+                    <p class="text-sm text-gray-600 mb-2">无法扫描？手动输入密钥：</p>
+                    <code id="secretKey" class="block bg-white px-4 py-2 rounded border border-gray-300 text-center font-mono text-lg"></code>
+                </div>
+            </div>
+
+            <!-- Step 2: Verify OTP -->
+            <div id="step2" class="border-2 border-gray-200 rounded-lg p-6 opacity-50">
+                <div class="flex items-center mb-4">
+                    <span class="flex items-center justify-center w-8 h-8 bg-gray-400 text-white rounded-full font-bold mr-3">2</span>
+                    <h2 class="text-xl font-semibold text-gray-800">验证验证码</h2>
+                </div>
+                <p class="text-gray-600 mb-4">在您的身份验证器应用中输入6位验证码：</p>
+                
+                <form id="verifyForm" class="space-y-4">
+                    <div>
+                        <input 
+                            type="text" 
+                            id="otpCode" 
+                            maxlength="6"
+                            pattern="[0-9]{6}"
+                            disabled
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg text-center text-2xl font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            placeholder="000000"
+                        >
+                    </div>
+                    <button 
+                        type="submit"
+                        id="verifyBtn"
+                        disabled
+                        class="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        验证并启用
+                    </button>
+                </form>
+            </div>
+
+            <!-- Step 3: Backup Codes -->
+            <div id="step3" class="hidden border-2 border-green-200 rounded-lg p-6 bg-green-50">
+                <div class="flex items-center mb-4">
+                    <span class="flex items-center justify-center w-8 h-8 bg-green-600 text-white rounded-full font-bold mr-3">✓</span>
+                    <h2 class="text-xl font-semibold text-gray-800">保存备份码</h2>
+                </div>
+                <p class="text-gray-600 mb-4">请妥善保存以下备份码。当您无法使用身份验证器时，可以使用这些备份码登录：</p>
+                
+                <div class="bg-white p-6 rounded-lg border-2 border-green-300 mb-4">
+                    <div id="backupCodesContainer" class="grid grid-cols-2 gap-3 text-center">
+                        <!-- Backup codes will be inserted here -->
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button 
+                        id="copyCodesBtn"
+                        class="flex-1 bg-gray-600 text-white py-3 rounded-lg font-semibold hover:bg-gray-700 transition duration-300"
+                    >
+                        📋 复制备份码
+                    </button>
+                    <button 
+                        id="downloadCodesBtn"
+                        class="flex-1 bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition duration-300"
+                    >
+                        💾 下载备份码
+                    </button>
+                </div>
+
+                <div class="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p class="text-sm text-yellow-800">
+                        ⚠️ <strong>重要提示：</strong>每个备份码只能使用一次。请将这些备份码保存在安全的地方。
+                    </p>
+                </div>
+
+                <button 
+                    id="finishBtn"
+                    class="w-full mt-4 bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition duration-300"
+                >
+                    完成设置
+                </button>
+            </div>
+        </div>
+
+        <!-- Back Link -->
+        <div class="mt-6 text-center">
+            <a href="/" class="text-sm text-gray-500 hover:text-gray-700">← 返回首页</a>
+        </div>
+    </div>
+
+    <script>
+        const alertBox = document.getElementById('alertBox');
+        const alertMessage = document.getElementById('alertMessage');
+        const generateBtn = document.getElementById('generateBtn');
+        const qrCodeContainer = document.getElementById('qrCodeContainer');
+        const manualEntry = document.getElementById('manualEntry');
+        const secretKey = document.getElementById('secretKey');
+        const step2 = document.getElementById('step2');
+        const otpCode = document.getElementById('otpCode');
+        const verifyBtn = document.getElementById('verifyBtn');
+        const verifyForm = document.getElementById('verifyForm');
+        const step3 = document.getElementById('step3');
+        const backupCodesContainer = document.getElementById('backupCodesContainer');
+        const copyCodesBtn = document.getElementById('copyCodesBtn');
+        const downloadCodesBtn = document.getElementById('downloadCodesBtn');
+        const finishBtn = document.getElementById('finishBtn');
+
+        let backupCodes = [];
+
+        function showAlert(message, type = 'error') {
+            alertBox.className = `mb-6 p-4 rounded-lg ${type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`;
+            alertMessage.textContent = message;
+            alertBox.classList.remove('hidden');
+            setTimeout(() => alertBox.classList.add('hidden'), 5000);
+        }
+
+        // Generate QR Code
+        generateBtn.addEventListener('click', async () => {
+            generateBtn.disabled = true;
+            generateBtn.textContent = '生成中...';
+
+            try {
+                const response = await fetch('/api/auth/mfa/setup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Display QR code
+                    qrCodeContainer.innerHTML = `<img src="${data.qr_code}" alt="QR Code" class="w-64 h-64">`;
+                    
+                    // Show manual entry
+                    secretKey.textContent = data.secret;
+                    manualEntry.classList.remove('hidden');
+
+                    // Enable step 2
+                    step2.classList.remove('opacity-50');
+                    const step2Indicator = step2.querySelector('.bg-gray-400');
+                    if (step2Indicator) {
+                        step2Indicator.classList.remove('bg-gray-400');
+                        step2Indicator.classList.add('bg-purple-600');
+                    }
+                    otpCode.disabled = false;
+                    verifyBtn.disabled = false;
+
+                    showAlert('二维码生成成功！请扫描并输入验证码', 'success');
+                } else {
+                    showAlert(data.error || 'QR码生成失败');
+                    generateBtn.disabled = false;
+                    generateBtn.textContent = '生成二维码';
+                }
+            } catch (error) {
+                console.error('QR generation error:', error);
+                showAlert('网络错误，请稍后重试');
+                generateBtn.disabled = false;
+                generateBtn.textContent = '生成二维码';
+            }
+        });
+
+        // Verify OTP
+        verifyForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const code = otpCode.value.trim();
+            if (!/^\d{6}$/.test(code)) {
+                showAlert('请输入6位数字验证码');
+                return;
+            }
+
+            verifyBtn.disabled = true;
+            verifyBtn.textContent = '验证中...';
+
+            try {
+                const response = await fetch('/api/auth/mfa/setup/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Store backup codes
+                    backupCodes = data.backup_codes;
+
+                    // Show backup codes
+                    backupCodesContainer.innerHTML = backupCodes.map(code => 
+                        `<div class="backup-code bg-gray-100 px-4 py-3 rounded-lg border border-gray-300">${code}</div>`
+                    ).join('');
+
+                    // Show step 3
+                    step3.classList.remove('hidden');
+                    step2.classList.add('opacity-50');
+
+                    showAlert('MFA设置成功！请保存备份码', 'success');
+                } else {
+                    showAlert(data.error || '验证码错误，请重试');
+                }
+            } catch (error) {
+                console.error('Verification error:', error);
+                showAlert('网络错误，请稍后重试');
+            } finally {
+                verifyBtn.disabled = false;
+                verifyBtn.textContent = '验证并启用';
+                otpCode.value = '';
+            }
+        });
+
+        // Copy backup codes
+        copyCodesBtn.addEventListener('click', () => {
+            const text = backupCodes.join('\n');
+            navigator.clipboard.writeText(text).then(() => {
+                showAlert('备份码已复制到剪贴板', 'success');
+            }).catch(() => {
+                showAlert('复制失败，请手动复制');
+            });
+        });
+
+        // Download backup codes
+        downloadCodesBtn.addEventListener('click', () => {
+            const text = `AICouncil 备份码\n生成时间: ${new Date().toLocaleString()}\n\n${backupCodes.join('\n')}\n\n请妥善保存这些备份码，每个只能使用一次。`;
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `aicouncil_backup_codes_${Date.now()}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showAlert('备份码已下载', 'success');
+        });
+
+        // Finish setup
+        finishBtn.addEventListener('click', () => {
+            window.location.href = '/';
+        });
+    </script>
+</body>
+</html>
