@@ -5,100 +5,148 @@ All notable changes to AICouncil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.0] - 2026-01-13
+
 ### Added
 
-- 👹 **质疑官（Devil's Advocate）闭环质疑机制**
-  - 在议题拆解阶段和每轮总结后，`质疑官` 对议长的输出进行严格审查，识别盲点与逻辑假设。
-  - 引入严重度分类（Critical / Warning / Minor），并要求议长在下一轮中明确回应质疑（`da_feedback_response` 字段）。
-  - 最终轮为强制修订：若存在关键问题，议长必须在最终汇总前完成修订。
+#### 🔐 企业级认证系统
+- **用户注册与登录**：
+  - 支持公开注册（可配置禁用）、密码强度策略（8位+大小写+数字）
+  - 账户锁定机制（5次失败=5分钟锁定）
+  - bcrypt 密码哈希（PBKDF2-HMAC-SHA256）
+- **多因素认证 (MFA)**：
+  - 基于 TOTP (RFC 6238) 的双因素认证
+  - 支持 Google Authenticator / Microsoft Authenticator
+  - QR码扫描快速配置
+  - 每个用户 10 个一次性备份码（bcrypt 加密存储）
+- **会话管理**：
+  - "记住我"功能（30天持久化会话）
+  - 会话版本控制（登出所有设备）
+  - HttpOnly Cookies + SameSite=Lax 安全配置
+- **审计日志**：
+  - 完整登录历史记录（成功/失败/IP/User-Agent）
+  - 支持安全审计与异常检测
+- **用户管理**：
+  - 用户设置界面（修改密码、管理 MFA、查看会话）
+  - MFA 启用/禁用（需密码确认）
+  - 密码修改后强制其他设备重新登录
+- **数据库支持**：
+  - SQLAlchemy ORM + Flask-Migrate 迁移系统
+  - 支持 SQLite（开发）/ PostgreSQL（生产）
+  - 用户表、登录历史表分离设计
+- **完整文档**：
+  - 认证系统文档（[docs/authentication.md](docs/authentication.md)）
+  - 生产部署指南（[docs/production_deployment.md](docs/production_deployment.md)）
+  - 42 个测试用例覆盖（41 passed, 1 skipped）
 
-- 🔄 **用户参与式报告修订与版本管理**
-  - 报告底部新增“💬 修订反馈”浮动面板，支持用户直接在浏览器提交修改要求。
-  - 报告保存为多版本（`report_v0.html` 为原始版本，`report_v1.html`、`v2`... 为修订版），并在报告标题栏提供版本选择下拉框。
-  - 提供 `Report Auditor` 智能体以自动处理用户反馈并生成修订建议，支持一键应用与预览。
+#### 🤖 议事编排官智能框架
+- **自动需求分析**：根据问题类型推荐最优讨论策略
+- **三大框架支持**：
+  - 罗伯特议事规则（结构化决策与表决）
+  - 图尔敏论证模型（深度论证与逻辑推理）
+  - 批判性思维框架（风险识别与漏洞分析）
+- **动态角色配置**：根据选定框架自动配置角色和流程
+- **阶段化执行**：分阶段推进议事流程，确保深度讨论
+
+#### 👹 质疑官（Devil's Advocate）闭环质疑机制
+- 在议题拆解阶段和每轮总结后对议长输出进行严格审查，识别盲点与逻辑假设
+- 三级严重度分类（Critical / Warning / Minor），按风险等级展示
+- 强制修正流程：议长必须在下一轮中包含 `da_feedback_response` 字段回应质疑
+- 结构化输出：使用 Pydantic 模型确保输出质量
+- 专业化 UI：Tailwind CSS 卡片式渲染，颜色编码区分严重程度
+- Reporter 集成：最终报告新增"质疑与修正"专栏
+- 并行执行优化：与监察官同步运行，不影响整体性能
+
+#### 🔄 用户参与式报告修订与版本管理
+- 报告底部新增"💬 修订反馈"浮动面板，支持浏览器内提交修改要求
+- 多版本保存（`report_v0.html` 原始版本，`v1/v2...` 为修订版）
+- 报告标题栏提供版本选择下拉框
+- `Report Auditor` 智能体自动处理用户反馈并生成修订建议
+
+#### ✏️ 交互式报告编辑器 (MVP)
+- 所见即所得编辑：直接在浏览器编辑报告内容
+- 版本控制：自动创建快照，支持历史版本预览和恢复
+- 自动保存：编辑模式下每 60 秒自动保存草稿
+- 友好 UI：固定工具栏、状态指示器、通知消息、模态框
+- 数据持久化：基于文件系统的版本管理，元数据存储在 `report_edits.json`
+- REST API：完整的后端 API 支持
+- 轻量实现：使用原生 ContentEditable API，无需 React/Vue
+- 响应式设计：支持桌面和移动端编辑
+- 安全防护：离开页面前自动提示未保存修改
+
+#### 🔍 Google Custom Search API 集成
+- 集成 Google Custom Search API，提供高质量搜索结果
+- 国内可直接访问，无需代理或浏览器
+- 响应速度 ~1 秒，显著优于浏览器自动化方案
+- 免费配额：100 次/天；付费：$5/1000 次查询
+- Web 配置页面支持直接设置 API Key 和 Search Engine ID
+
+#### 📊 Mermaid 流程图支持
+- 集成 Mermaid.js 10.9.5 实现丰富的图表渲染
+- 支持 8 种图表类型：flowchart、sequenceDiagram、gantt、classDiagram、stateDiagram、erDiagram、journey、pie
+- Reporter 智能体可根据内容自动生成合适的流程图
+- 本地渲染，支持离线使用和 PDF 导出
+- 修复常见语法问题（使用 `flowchart TD` 替代过时的 `graph TD`）
+
+#### 📝 Markdown 格式导出
+- 使用 BeautifulSoup4 智能解析 HTML 结构
+- 自动转换标题、段落、列表、表格、链接、代码块
+- 保留 Mermaid 流程图代码块（可在 Typora、VS Code、GitHub 中渲染）
+- ECharts 图表转换为文字描述占位符
+- 支持 CommonMark 标准，兼容主流 Markdown 编辑器
+- 文件大小仅为 HTML 的 5-10%
+
+#### 🔗 增强型信源引用与跳转链接解析
+- 交互式引用预览：悬停显示标题、摘要和来源域名
+- 跳转链接解析：自动解析搜索引擎跳转链接为实际目标 URL
+- 并行解析引擎：使用多线程并行解析链接
+- 百度验证码自动绕过：自动提取 backurl 中的原始地址
+- 结构化搜索结果：搜索结果表格新增"来源"列
+- 交互式 UI：使用原生 JS 和 CSS 实现轻量级 Tooltip
 
 ### Changed
 
-- 📝 **Reporter 输出优化**：最终报告不再直接暴露内部角色讨论细节（如“质疑官提出…”），而是将反馈自然整合为更专业的建议文本。
+- 📝 **Reporter 输出优化**：最终报告不再暴露内部角色讨论细节，将反馈自然整合为专业建议文本
+- 🔧 **简化 Google 搜索实现**：
+  - 移除 Playwright 浏览器自动化方案
+  - 统一使用官方 API，代码更简洁、维护成本更低
+  - 删除 `GOOGLE_SEARCH_PROXY` 配置项
+  - 前端配置界面标注 Google 搜索为 "API" 方式
+- ⚙️ **配置系统重构**：
+  - 从 `src/config.py` 迁移到 `.env` 文件（更安全、更易管理）
+  - 配置优先级：环境变量 > .env 文件 > config.py（向后兼容）> 默认值
+  - 提供 `.env.example` 模板和 `scripts/validate_env.py` 验证工具
+  - Web UI 支持直接配置并保存到 .env
 
 ### Fixed
 
-- 🐛 修复报告修订时覆盖原始报告的问题（新增原始备份 `report_v0.html`）。
-- 🐛 修复历史工作区加载时版本选择下拉框不显示的问题。
-
-### Added
-
-- 🎯 **质疑官 (Devil's Advocate) 角色**
-  - **闭环质疑机制**：在议题拆解阶段和每轮总结后，质疑官对议长的输出进行严格审查
-  - **强制修正流程**：议长必须在下一轮总结中包含 `da_feedback_response` 字段，明确回应质疑官的批评
-  - **三级严重度分类**：Critical (严重)、Warning (警告)、Minor (提示)，按风险等级展示
-  - **结构化输出**：使用 Pydantic 模型 (`DecompositionChallenge`, `SummaryChallenge`) 确保输出质量
-  - **专业化 UI**：基于 Tailwind CSS 的卡片式渲染，使用颜色编码（红色/橙色/蓝色）区分严重程度
-  - **Reporter 集成**：最终报告新增"质疑与修正"专栏，完整记录批判性思考过程
-  - **盲点检测提示词**：质疑官使用专门的 prompt 模板，专注于逻辑一致性、数据可信度、方法论缺陷等维度
-  - **并行执行优化**：质疑官与监察官同步运行，不影响整体性能
-
-- ✏️ **交互式报告编辑器 (MVP)**
-  - **所见即所得编辑**：直接在浏览器中编辑报告内容，支持标题、段落、列表等文本元素
-  - **版本控制**：自动创建版本快照，支持查看历史版本、预览和恢复
-  - **自动保存**：编辑模式下每 60 秒自动保存草稿，防止内容丢失
-  - **友好 UI**：固定工具栏、状态指示器、通知消息、模态框等现代化交互界面
-  - **数据持久化**：基于文件系统的版本管理，元数据存储在 `report_edits.json`
-  - **REST API**：完整的后端 API 支持（保存、加载、版本列表、恢复等）
-  - **轻量实现**：无需 React/Vue 等框架，使用原生 ContentEditable API
-  - **响应式设计**：支持桌面和移动端编辑（移动端工具栏自适应）
-  - **安全防护**：离开页面前自动提示未保存修改
-  - **文档完善**：提供详细的使用指南 (`docs/editor_guide.md`)
-
-- 🔍 **Google Custom Search API 集成**
-  - 集成 Google Custom Search API，提供高质量搜索结果
-  - 国内可直接访问，无需代理或浏览器
-  - 响应速度 ~1 秒，显著优于浏览器自动化方案
-  - 免费配额：100 次/天；付费：$5/1000 次查询
-  - 支持在 Web 配置页面直接设置 API Key 和 Search Engine ID
-  - 完整的测试套件和集成测试
-
-- 📊 **Mermaid 流程图支持**
-  - 集成 Mermaid.js 10.9.5 实现丰富的图表渲染
-  - 支持 8 种图表类型：flowchart（流程图）、sequenceDiagram（时序图）、gantt（甘特图）、classDiagram（类图）、stateDiagram（状态图）、erDiagram（ER图）、journey（用户旅程图）、pie（饼图）
-  - Reporter 智能体可根据内容自动生成合适的流程图
-  - 本地渲染，支持离线使用和 PDF 导出
-  - 提供完整的测试页面和语法示例（test_mermaid.html、test_llm_search.html）
-  - 修复常见语法问题：使用 `flowchart TD` 替代过时的 `graph TD`、正确处理复杂连接、支持中文标签
-
-- 📝 **Markdown 格式导出**
-  - 新增 Markdown 格式报告导出功能
-  - 使用 BeautifulSoup4 智能解析 HTML 结构
-  - 自动转换标题、段落、列表、表格、链接、代码块
-  - 保留 Mermaid 流程图代码块（可在 Typora、VS Code、GitHub 中渲染）
-  - ECharts 图表转换为文字描述占位符
-  - 完整保留报告层级结构和格式化
-  - 支持 CommonMark 标准，兼容主流 Markdown 编辑器
-  - 一键导出，文件大小仅为 HTML 的 5-10%
-
-- 🔗 **增强型信源引用与跳转链接解析**
-  - **交互式引用预览**：报告中的引用支持悬停预览，显示标题、摘要和来源域名，提升阅读体验。
-  - **跳转链接解析**：自动解析搜索引擎（百度、Bing 等）的跳转链接为实际目标 URL，提高链接准确性。
-  - **并行解析引擎**：使用多线程并行解析链接，确保在不增加显著延迟的情况下完成解析。
-  - **百度验证码自动绕过**：针对被重定向到验证码页面的链接，自动提取 backurl 中的原始地址。
-  - **结构化搜索结果**：搜索结果表格新增“来源”列，方便 Agent 识别权威信源。
-  - **交互式 UI**：使用原生 JS 和 CSS 实现轻量级 Tooltip，无需外部依赖。
-  - **引用准确性提升**：通过提示词约束，确保智能体生成的引用链接与末尾参考资料严格对应。
-
-### Changed
-
-- 🔧 **简化 Google 搜索实现**
-  - 移除 Playwright 浏览器自动化方案（复杂且不稳定）
-  - 统一使用官方 API，代码更简洁、维护成本更低
-  - 删除 `GOOGLE_SEARCH_PROXY` 配置项
-  - 更新前端配置界面，Google 搜索标注为 "API" 方式
+- 🐛 修复报告修订时覆盖原始报告的问题（新增原始备份 `report_v0.html`）
+- 🐛 修复历史工作区加载时版本选择下拉框不显示的问题
+- 🐛 修复 MFA 设置页面 JavaScript DOM 错误（querySelector 重复调用）
+- 🐛 修复 MFA 禁用时密码验证失败（改用 bcrypt.checkpw）
+- 🐛 修复登录重定向 BuildError（login_manager.login_view 错误配置）
+- 🐛 修复认证 API 404 错误（补充缺失的 /api/auth/mfa/setup/verify 端点）
 
 ### Removed
 
 - ❌ 移除 `google_search_playwright()` 函数及相关 Playwright 依赖
 - ❌ 移除 `tests/test_google_search.py` Playwright 测试文件
 - ❌ 移除 Google 代理配置选项（不再需要）
+
+### Security
+
+- 🔒 **认证系统安全增强**：
+  - bcrypt 密码哈希（PBKDF2-HMAC-SHA256）
+  - TOTP 双因素认证（RFC 6238）
+  - 会话版本控制防止会话固定攻击
+  - HttpOnly Cookies + SameSite=Lax 防止 CSRF
+  - 账户锁定机制防止暴力破解
+- 🔒 **.env 配置文件保护**：
+  - `.gitignore` 排除 `.env` 文件（防止密钥泄露）
+  - 提供 `.env.example` 安全模板
+  - 支持环境变量覆盖（生产环境推荐）
+
+---
 
 ## [1.0.0] - 2025-12-31
 
@@ -168,12 +216,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### 文档与测试
 - 📚 完善的项目文档
-  - [README.md](README.md) - 项目概览与快速开始
-  - [docs/user_manual_exe.md](docs/user_manual_exe.md) - EXE 用户手册
-  - [docs/build_guide.md](docs/build_guide.md) - 构建指南
-  - [docs/pdf_export_guide.md](docs/pdf_export_guide.md) - PDF 导出说明
-  - [docs/architecture.md](docs/architecture.md) - 架构设计文档
-  - [docs/workflow.md](docs/workflow.md) - 工作流程图
+  - README.md - 项目概览与快速开始
+  - docs/user_manual_exe.md - EXE 用户手册
+  - docs/build_guide.md - 构建指南
+  - docs/pdf_export_guide.md - PDF 导出说明
+  - docs/architecture.md - 架构设计文档
+  - docs/workflow.md - 工作流程图
 - 🧪 Baseline 测试框架
   - REST API 级别的功能测试
   - 完整议事流程验证（tests/test_baseline_api.py）
@@ -237,15 +285,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
-
-### Planned Features
-- 🚀 macOS/Linux 打包支持
-- 🌐 国际化（i18n）支持
-- 📱 移动端适配
-- 🎨 主题切换功能
-- 🔌 插件系统架构
-
----
-
+[2.0.0]: https://github.com/mzniu/AICouncil/releases/tag/v2.0.0
 [1.0.0]: https://github.com/mzniu/AICouncil/releases/tag/v1.0.0

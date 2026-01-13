@@ -12,6 +12,9 @@ import pathlib
 import shutil
 from datetime import datetime
 
+# 版本号
+__version__ = "2.0.0"
+
 # 确保项目根目录在 sys.path 中，以便能够导入 src 模块
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
@@ -145,21 +148,22 @@ signal.signal(signal.SIGTERM, signal_handler)
 @app.route('/')
 @login_required
 def index():
-    return render_template('index.html')
+    return render_template('index.html', version=__version__)
 
 @app.route('/login')
 def login_page():
     """登录页面"""
-    return render_template('login.html')
+    return render_template('login.html', version=__version__)
 
 @app.route('/register')
 def register_page():
     """注册页面"""
-    return render_template('register.html')
+    return render_template('register.html', version=__version__)
 
 @app.route('/mfa-setup')
 def mfa_setup_page():
     """MFA设置页面"""
+    return render_template('mfa_setup.html', version=__version__)
     return render_template('mfa_setup.html')
 
 @app.route('/mfa-verify')

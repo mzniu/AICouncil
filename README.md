@@ -3,6 +3,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![Flask](https://img.shields.io/badge/framework-Flask-lightgrey.svg)](https://flask.palletsprojects.com/)
+[![Version](https://img.shields.io/badge/version-2.0.0-brightgreen.svg)](https://github.com/mzniu/AICouncil/releases/tag/v2.0.0)
+[![Release Date](https://img.shields.io/badge/release-2026--01--13-blue.svg)](https://github.com/mzniu/AICouncil/releases/tag/v2.0.0)
 
 中文 | [English](README_EN.md)
 
