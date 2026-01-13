@@ -145,9 +145,9 @@ def register():
         return jsonify({"error": "用户名、密码和邮箱不能为空"}), 400
     
     # 验证密码强度
-    valid, message = validate_password_strength(password)
+    valid, result = validate_password_strength(password)
     if not valid:
-        return jsonify({"error": message}), 400
+        return jsonify({"error": "密码不符合要求", "details": result}), 400
     
     # 检查用户名是否已存在
     if User.query.filter_by(username=username).first():
@@ -542,9 +542,9 @@ def change_password():
         return jsonify({"error": "当前密码错误"}), 400
     
     # 验证新密码强度
-    errors = validate_password_strength(new_password)
-    if errors:
-        return jsonify({"error": "新密码不符合要求", "details": errors}), 400
+    is_valid, result = validate_password_strength(new_password)
+    if not is_valid:
+        return jsonify({"error": "新密码不符合要求", "details": result}), 400
     
     # 不允许新密码与旧密码相同
     if bcrypt_lib.checkpw(new_password.encode('utf-8'), user.password_hash.encode('utf-8')):
