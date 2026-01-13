@@ -131,8 +131,11 @@ def register():
     注册新用户
     需要：username, password, email
     """
-    # 检查是否允许公开注册
-    if not ALLOW_PUBLIC_REGISTRATION:
+    # 检查用户表是否为空（首次启动场景）
+    is_first_user = User.query.count() == 0
+    
+    # 智能注册控制：如果是首个用户，自动允许注册（无论ALLOW_PUBLIC_REGISTRATION设置）
+    if not is_first_user and not ALLOW_PUBLIC_REGISTRATION:
         return jsonify({"error": "registration_disabled", "message": "公开注册已禁用，请联系管理员"}), 403
     
     data = request.get_json()
@@ -171,10 +174,15 @@ def register():
         
         log_login_action(user.id, 'register', True)
         
+        # 如果是首个用户，记录日志提示其拥有管理员权限
+        if is_first_user:
+            logger.info(f"🎉 首个用户注册成功：{username}（拥有完整系统访问权限）")
+        
         return jsonify({
-            "message": "注册成功",
+            "message": "注册成功" + ("（您是系统首个用户，拥有完整访问权限）" if is_first_user else ""),
             "user_id": user.id,
-            "username": username
+            "username": username,
+            "is_first_user": is_first_user
         }), 201
         
     except Exception as e:

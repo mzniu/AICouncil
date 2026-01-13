@@ -56,6 +56,19 @@
             </div>
 
             <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">邮箱</label>
+                <input 
+                    type="email" 
+                    id="email" 
+                    name="email"
+                    required
+                    class="input-field w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2"
+                    placeholder="请输入邮箱地址"
+                    autocomplete="email"
+                >
+            </div>
+
+            <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">密码</label>
                 <input 
                     type="password" 
@@ -207,12 +220,25 @@
             e.preventDefault();
             
             const username = document.getElementById('username').value.trim();
+            const email = document.getElementById('email').value.trim();
             const pwd = password.value;
             const confirmPwd = confirmPassword.value;
 
             // Validation
             if (!username || username.length < 3) {
                 showAlert('用户名至少3个字符');
+                return;
+            }
+
+            if (!email) {
+                showAlert('请输入邮箱地址');
+                return;
+            }
+
+            // Email validation
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                showAlert('邮箱格式不正确');
                 return;
             }
 
@@ -233,16 +259,20 @@
                 const response = await fetch('/api/auth/register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password: pwd })
+                    body: JSON.stringify({ username, email, password: pwd })
                 });
 
                 const data = await response.json();
 
                 if (response.ok) {
-                    showAlert('注册成功！正在跳转到登录页...', 'success');
+                    // 检查是否是首个用户
+                    const message = data.is_first_user 
+                        ? '🎉 注册成功！您是系统首个用户，拥有完整访问权限。正在跳转到登录页...'
+                        : '注册成功！正在跳转到登录页...';
+                    showAlert(message, 'success');
                     setTimeout(() => {
                         window.location.href = '/login';
-                    }, 1500);
+                    }, 2000);
                 } else {
                     if (response.status === 403 && data.error === 'registration_disabled') {
                         showAlert('公开注册已关闭，请联系管理员创建账户');

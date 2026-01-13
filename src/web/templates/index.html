@@ -471,6 +471,11 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
                 </button>
+                <button onclick="logout()" class="p-2 bg-red-600 hover:bg-red-700 rounded-lg border border-red-500 transition group" title="登出" data-i18n-title="btn_logout">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                    </svg>
+                </button>
             </div>
         </div>
     </nav>
@@ -690,6 +695,34 @@
                     <div class="flex">
                         <button onclick="closeAlertModal()" class="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-lg shadow-blue-200" data-i18n="btn_ok">
                             确定
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 密码输入模态框 -->
+        <div id="password-input-modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[200] flex items-center justify-center">
+            <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all">
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                        </svg>
+                    </div>
+                    <h3 id="password-input-title" class="text-xl font-bold text-slate-800 mb-2">安全验证</h3>
+                    <p id="password-input-message" class="text-slate-600 mb-4 text-sm">为了安全，请输入您的当前密码：</p>
+                    <div class="mb-6">
+                        <input type="password" id="password-input-field" 
+                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                               placeholder="请输入密码">
+                    </div>
+                    <div class="flex space-x-4">
+                        <button id="password-input-cancel-btn" class="flex-1 px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition">
+                            取消
+                        </button>
+                        <button id="password-input-ok-btn" class="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition shadow-lg shadow-red-200">
+                            确认
                         </button>
                     </div>
                 </div>
@@ -1878,6 +1911,58 @@
                     cancelBtn.addEventListener('click', handleCancel);
                     
                     modal.classList.remove('hidden');
+                });
+            }
+
+            // 密码输入框
+            function showPasswordInput(message, title = '安全验证') {
+                return new Promise((resolve) => {
+                    const modal = document.getElementById('password-input-modal');
+                    const titleEl = document.getElementById('password-input-title');
+                    const messageEl = document.getElementById('password-input-message');
+                    const inputField = document.getElementById('password-input-field');
+                    const okBtn = document.getElementById('password-input-ok-btn');
+                    const cancelBtn = document.getElementById('password-input-cancel-btn');
+                    
+                    titleEl.innerText = title;
+                    messageEl.innerText = message;
+                    inputField.value = '';
+                    
+                    const handleOk = () => {
+                        const password = inputField.value;
+                        if (!password) {
+                            inputField.focus();
+                            return;
+                        }
+                        modal.classList.add('hidden');
+                        cleanup();
+                        resolve(password);
+                    };
+                    
+                    const handleCancel = () => {
+                        modal.classList.add('hidden');
+                        cleanup();
+                        resolve(null);
+                    };
+                    
+                    const handleEnter = (e) => {
+                        if (e.key === 'Enter') {
+                            handleOk();
+                        }
+                    };
+                    
+                    const cleanup = () => {
+                        okBtn.removeEventListener('click', handleOk);
+                        cancelBtn.removeEventListener('click', handleCancel);
+                        inputField.removeEventListener('keypress', handleEnter);
+                    };
+                    
+                    okBtn.addEventListener('click', handleOk);
+                    cancelBtn.addEventListener('click', handleCancel);
+                    inputField.addEventListener('keypress', handleEnter);
+                    
+                    modal.classList.remove('hidden');
+                    setTimeout(() => inputField.focus(), 100);
                 });
             }
 
@@ -4309,6 +4394,29 @@ function confirmSatisfied() {
                 }
             }
 
+            async function logout() {
+                const confirmed = await showConfirm('确认退出登录？', '退出登录');
+                if (!confirmed) {
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/auth/logout', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    
+                    if (response.ok) {
+                        window.location.href = '/login';
+                    } else {
+                        await showAlert('登出失败，请重试', '错误');
+                    }
+                } catch (error) {
+                    console.error('Logout error:', error);
+                    await showAlert('网络错误，请重试', '错误');
+                }
+            }
+
             async function toggleHistoryModal() {
                 const modal = document.getElementById('history-modal');
                 const list = document.getElementById('history-list');
@@ -5174,7 +5282,7 @@ function confirmSatisfied() {
 
             // 禁用MFA
             async function disableMfa() {
-                const password = prompt('为了安全，请输入您的当前密码以禁用双因素认证：');
+                const password = await showPasswordInput('为了安全，请输入您的当前密码以禁用双因素认证：', '禁用双因素认证');
                 
                 if (!password) {
                     return; // 用户取消
