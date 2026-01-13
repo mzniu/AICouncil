@@ -109,7 +109,7 @@ workspace_dir = response.json()["workspace_dir"]
 - `model`：模型名称
 - `agent_configs`（可选）：为特定角色指定不同模型
 
-#### 方式 3: Web 界面（即将推出）
+#### 方式 3: Web 界面
 
 在设置页面启用 **议事编排官模式**，系统将自动进行智能编排。
 
@@ -201,7 +201,7 @@ workspace_dir = response.json()["workspace_dir"]
    - 建议路径：`C:\AICouncil\` 或 `D:\Tools\AICouncil\`
 
 4. **数据存储位置**
-   - 配置文件：与 EXE 同级目录 `src/config.py`
+   - 配置文件：与 EXE 同级目录 `.env`
    - 工作空间：`workspaces/` 子目录（包含所有讨论记录）
    - 日志文件：`aicouncil.log`
 
