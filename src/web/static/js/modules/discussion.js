@@ -13,9 +13,9 @@
  * - handleFinalReport: 处理最终报告
  */
 
-import { showAlert, showConfirm } from './core/utils.js';
-import * as API from './core/api.js';
-import * as State from './core/state.js';
+import { showAlert, showConfirm } from '../core/utils.js';
+import * as API from '../core/api.js';
+import * as State from '../core/state.js';
 
 // ==================== DOM元素引用 ====================
 let flowContainer = null;
