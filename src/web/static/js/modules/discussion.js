@@ -109,9 +109,6 @@ export async function startDiscussion() {
     State.setCurrentProgress(0);
     document.getElementById('progress-bar').style.width = '0%';
     document.getElementById('progress-percentage').innerText = '0%';
-    
-    // 切换到讨论模式布局
-    setLayoutMode('discussion');
 
     try {
         const data = await API.startDiscussion({
@@ -419,7 +416,8 @@ export async function pollStatus() {
         console.log('Poll status response:', {
             is_running: data.is_running,
             events_count: data.events?.length,
-            logs_count: data.logs?.length
+            logs_count: data.logs?.length,
+            has_final_report: !!data.final_report
         });
         
         updateStatusUI(data);
@@ -446,6 +444,16 @@ export async function pollStatus() {
             }
             logs.forEach(log => appendLog(log));
             State.setLastLogCount(data.logs.length);
+        }
+        
+        // 处理最终报告（后端直接返回的final_report字段）
+        if (data.final_report && data.final_report.length > 100) {
+            const reportIframe = document.getElementById('report-iframe');
+            // 只有当iframe为空或显示占位符时才加载报告
+            if (reportIframe && (!reportIframe.srcdoc || reportIframe.srcdoc.length < 200 || reportIframe.srcdoc.includes('italic'))) {
+                console.log('Loading final report from status API');
+                handleFinalReport({ report_html: data.final_report });
+            }
         }
     } catch (error) {
         console.error('Poll status error:', error);
@@ -1298,8 +1306,9 @@ export function setLayoutMode(mode) {
     }
     
     if (mode === 'discussion') {
-        // 讨论模式：隐藏报告区
-        reportSection.classList.add('hidden', 'lg:hidden');
+        // 讨论模式：小屏幕隐藏，大屏幕保持显示
+        reportSection.classList.add('hidden');
+        reportSection.classList.remove('lg:hidden');
     } else {
         // 报告模式：显示报告区
         reportSection.classList.remove('hidden', 'lg:hidden');

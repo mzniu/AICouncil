@@ -71,14 +71,23 @@ export function toggleModal(modalId) {
 /**
  * 切换角色管理模态框
  */
-export function toggleRolesModal() {
-    toggleModal('roles-modal');
+export async function toggleRolesModal() {
+    const modal = document.getElementById('roles-modal');
+    if (!modal) return;
+    
+    if (modal.classList.contains('hidden')) {
+        modal.classList.remove('hidden');
+        // 打开时加载角色列表
+        await loadRolesList();
+    } else {
+        modal.classList.add('hidden');
+    }
 }
 
 /**
  * 切换高级配置Modal
  */
-export function toggleAdvancedConfigModal() {
+export async function toggleAdvancedConfigModal() {
     const modal = document.getElementById('advanced-config-modal');
     if (modal.classList.contains('hidden')) {
         // 打开modal - 从隐藏字段加载值到modal字段
@@ -93,6 +102,8 @@ export function toggleAdvancedConfigModal() {
         updateModalReasoningVisibility();
         // 更新席位配置列表
         updateModalAgentConfigsUI();
+        // 加载编制列表
+        await loadModalPresetsList();
         
         modal.classList.remove('hidden');
     } else {

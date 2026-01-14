@@ -26,6 +26,9 @@ window.stopDiscussion = Discussion.stopDiscussion;
 window.submitIntervention = Discussion.submitIntervention;
 window.submitRevisionFeedback = Discussion.submitRevisionFeedback;
 
+// 认证相关
+window.logout = API.logout;
+
 // 历史管理
 window.toggleHistoryModal = History.toggleHistoryModal;
 window.loadWorkspace = History.loadWorkspace;
