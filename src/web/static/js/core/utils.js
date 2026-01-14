@@ -198,3 +198,23 @@ export function formatDate(date, format = 'YYYY-MM-DD HH:mm:ss') {
         .replace('mm', minutes)
         .replace('ss', seconds);
 }
+
+/**
+ * 关闭提示模态框
+ */
+export function closeAlertModal() {
+    const modal = document.getElementById('alert-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
+/**
+ * 关闭确认模态框
+ */
+export function closeConfirmModal() {
+    const modal = document.getElementById('confirm-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
