@@ -2357,3 +2357,403 @@ export async function deletePreset(name) {
         showAlert(error.message, '错误', 'error');
     }
 }
+
+// ==================== 高级配置函数 ====================
+
+/**
+ * 更新Modal推理强度显示
+ */
+export function updateModalReasoningVisibility() {
+    const backendSelect = document.getElementById('modal-backend-select');
+    const reasoningContainer = document.getElementById('modal-global-reasoning-container');
+    
+    if (backendSelect && reasoningContainer) {
+        const backend = backendSelect.value;
+        const supportsReasoning = ['deepseek', 'openai', 'azure', 'openrouter'].includes(backend);
+        
+        if (supportsReasoning) {
+            reasoningContainer.classList.remove('hidden');
+        } else {
+            reasoningContainer.classList.add('hidden');
+        }
+    }
+}
+
+/**
+ * 更新Modal中的Agent配置UI
+ */
+export function updateModalAgentConfigsUI() {
+    const container = document.getElementById('modal-agent-configs-container');
+    if (!container) return;
+    
+    const plannersInput = document.getElementById('modal-planners-input');
+    const auditorsInput = document.getElementById('modal-auditors-input');
+    
+    const plannersCount = parseInt(plannersInput?.value || 0);
+    const auditorsCount = parseInt(auditorsInput?.value || 0);
+    
+    // 处理策论家
+    for (let i = 0; i < 5; i++) {
+        const id = `planner_${i}`;
+        let el = container.querySelector(`[data-agent-wrapper="${id}"]`);
+        
+        if (i < plannersCount) {
+            if (!el) {
+                const div = window.createAgentConfigItem(`策论家 ${i+1}`, id, 'bg-blue-50', 'bg-blue-500');
+                container.appendChild(div);
+            } else {
+                const label = el.querySelector('h4');
+                if (label) {
+                    label.innerHTML = `<span class="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>策论家 ${i+1}`;
+                }
+            }
+        } else if (el) {
+            container.removeChild(el);
+        }
+    }
+
+    // 处理监察官
+    for (let i = 0; i < 5; i++) {
+        const id = `auditor_${i}`;
+        let el = container.querySelector(`[data-agent-wrapper="${id}"]`);
+        
+        if (i < auditorsCount) {
+            if (!el) {
+                const div = window.createAgentConfigItem(`监察官 ${i+1}`, id, 'bg-amber-50', 'bg-amber-500');
+                container.appendChild(div);
+            } else {
+                const label = el.querySelector('h4');
+                if (label) {
+                    label.innerHTML = `<span class="w-2 h-2 bg-amber-500 rounded-full mr-2"></span>监察官 ${i+1}`;
+                }
+            }
+        } else if (el) {
+            container.removeChild(el);
+        }
+    }
+}
+
+/**
+ * 保存Modal编制
+ */
+export async function saveModalPreset() {
+    const nameInput = document.getElementById('modal-new-preset-name');
+    if (!nameInput) return;
+    
+    let name = nameInput.value.trim();
+    
+    if (!name) {
+        showAlert('请输入编制名称', '提示', 'warning');
+        return;
+    }
+
+    // 从modal字段收集配置
+    const config = {
+        backend: document.getElementById('modal-backend-select')?.value || 'deepseek',
+        global_model: document.getElementById('modal-global-model-input')?.value || '',
+        global_reasoning: document.getElementById('modal-global-reasoning-input')?.value || '',
+        rounds: parseInt(document.getElementById('modal-rounds-input')?.value || 3),
+        planners: parseInt(document.getElementById('modal-planners-input')?.value || 2),
+        auditors: parseInt(document.getElementById('modal-auditors-input')?.value || 2),
+        agents: {}
+    };
+
+    // 收集Agent配置
+    document.querySelectorAll('.agent-backend').forEach(select => {
+        const agentId = select.dataset.agent;
+        const modelInput = document.querySelector(`.agent-model[data-agent="${agentId}"]`);
+        const reasoningSelect = document.querySelector(`.agent-reasoning[data-agent="${agentId}"]`);
+        
+        if (modelInput && reasoningSelect) {
+            config.agents[agentId] = {
+                backend: select.value,
+                model: modelInput.value,
+                reasoning: reasoningSelect.value
+            };
+        }
+    });
+
+    try {
+        const response = await fetch('/api/presets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, config })
+        });
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            showAlert('编制已保存', '成功');
+            nameInput.value = ''; 
+            loadModalPresetsList();
+            if (typeof loadPresets === 'function') {
+                loadPresets();
+            }
+        } else {
+            showAlert(data.message, '错误', 'error');
+        }
+    } catch (error) {
+        showAlert(error.message, '错误', 'error');
+    }
+}
+
+/**
+ * 加载Modal编制列表
+ */
+export async function loadModalPresetsList() {
+    const container = document.getElementById('modal-presets-list');
+    if (!container) return;
+    
+    try {
+        const response = await fetch('/api/presets');
+        const data = await response.json();
+        
+        const presetArray = Object.entries(data.presets || {});
+        
+        if (presetArray.length > 0) {
+            container.innerHTML = presetArray.map(([name, config]) => `
+                <div class="bg-white p-3 rounded-lg border border-slate-200 hover:border-blue-300 transition flex items-center justify-between">
+                    <div class="flex-1">
+                        <div class="font-bold text-slate-700 mb-1">${name}</div>
+                        <div class="text-xs text-slate-500">
+                            ${config.backend || 'default'} | 轮次: ${config.rounds || 3} | 
+                            策论家: ${config.planners || 2} | 监察官: ${config.auditors || 2}
+                        </div>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button onclick="window.applyModalPreset('${name}')" class="text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition">
+                            加载
+                        </button>
+                        <button onclick="window.deleteModalPreset('${name}')" class="text-xs bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded transition">
+                            删除
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            container.innerHTML = '<div class="text-center text-gray-400 py-4">暂无存档</div>';
+        }
+    } catch (error) {
+        container.innerHTML = `<div class="text-center text-red-400 py-4">加载失败: ${error.message}</div>`;
+    }
+}
+
+/**
+ * 应用Modal编制
+ */
+export async function applyModalPreset(name) {
+    try {
+        const response = await fetch('/api/presets');
+        const data = await response.json();
+        
+        const config = data.presets[name];
+        if (!config) {
+            showAlert('编制不存在', '错误', 'error');
+            return;
+        }
+        
+        // 应用到modal字段
+        const backendSelect = document.getElementById('modal-backend-select');
+        const modelInput = document.getElementById('modal-global-model-input');
+        const reasoningInput = document.getElementById('modal-global-reasoning-input');
+        const roundsInput = document.getElementById('modal-rounds-input');
+        const plannersInput = document.getElementById('modal-planners-input');
+        const auditorsInput = document.getElementById('modal-auditors-input');
+        
+        if (backendSelect) backendSelect.value = config.backend || 'deepseek';
+        if (modelInput) modelInput.value = config.global_model || '';
+        if (reasoningInput) reasoningInput.value = config.global_reasoning || '';
+        if (roundsInput) roundsInput.value = config.rounds || 3;
+        if (plannersInput) plannersInput.value = config.planners || 2;
+        if (auditorsInput) auditorsInput.value = config.auditors || 2;
+        
+        // 更新推理强度显示
+        updateModalReasoningVisibility();
+        
+        // 应用Agent配置
+        if (config.agents) {
+            Object.keys(config.agents).forEach(agentId => {
+                const agentConfig = config.agents[agentId];
+                const backendSelect = document.querySelector(`.agent-backend[data-agent="${agentId}"]`);
+                const modelInput = document.querySelector(`.agent-model[data-agent="${agentId}"]`);
+                const reasoningSelect = document.querySelector(`.agent-reasoning[data-agent="${agentId}"]`);
+                
+                if (backendSelect) backendSelect.value = agentConfig.backend || 'default';
+                if (modelInput) modelInput.value = agentConfig.model || '';
+                if (reasoningSelect) reasoningSelect.value = agentConfig.reasoning || '';
+            });
+        }
+        
+        // 更新席位配置UI
+        updateModalAgentConfigsUI();
+        
+        showAlert('编制已加载', '成功');
+    } catch (error) {
+        showAlert(error.message, '错误', 'error');
+    }
+}
+
+/**
+ * 删除Modal编制
+ */
+export async function deleteModalPreset(name) {
+    if (!confirm('确定要删除此编制吗？')) return;
+
+    try {
+        const response = await fetch(`/api/presets/${encodeURIComponent(name)}`, {
+            method: 'DELETE'
+        });
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            showAlert('编制已删除', '成功');
+            loadModalPresetsList();
+            if (typeof loadPresets === 'function') {
+                loadPresets();
+            }
+        } else {
+            showAlert(data.message, '错误', 'error');
+        }
+    } catch (error) {
+        showAlert(error.message, '错误', 'error');
+    }
+}
+
+/**
+ * 获取OpenRouter模型列表
+ */
+export async function fetchOpenRouterModels() {
+    try {
+        const response = await fetch('/api/openrouter/models');
+        const models = await response.json();
+        const datalist = document.getElementById('openrouter-models-list');
+        
+        if (datalist) {
+            datalist.innerHTML = '';
+            models.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model.id;
+                option.textContent = model.name || model.id;
+                datalist.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error fetching OpenRouter models:', error);
+    }
+}
+
+/**
+ * 获取DeepSeek模型列表
+ */
+export async function fetchDeepSeekModels() {
+    try {
+        const response = await fetch('/api/deepseek/models');
+        const models = await response.json();
+        const datalist = document.getElementById('deepseek-models-list');
+        
+        if (datalist) {
+            datalist.innerHTML = '';
+            models.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model.id;
+                option.textContent = model.id;
+                datalist.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error fetching DeepSeek models:', error);
+    }
+}
+
+/**
+ * 加载系统设置
+ */
+export async function loadSystemSettings() {
+    try {
+        const response = await fetch('/api/config');
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            const cfg = data.config;
+            
+            const setVal = (id, val) => {
+                const el = document.getElementById(id);
+                if (el) el.value = val || '';
+            };
+            
+            setVal('settings-key-deepseek', cfg.DEEPSEEK_API_KEY);
+            setVal('settings-key-openai', cfg.OPENAI_API_KEY);
+            setVal('settings-key-azure', cfg.AZURE_OPENAI_API_KEY);
+            setVal('settings-azure-endpoint', cfg.AZURE_OPENAI_ENDPOINT);
+            setVal('settings-azure-deployment', cfg.AZURE_OPENAI_DEPLOYMENT_NAME);
+            setVal('settings-key-anthropic', cfg.ANTHROPIC_API_KEY);
+            setVal('settings-key-gemini', cfg.GEMINI_API_KEY);
+            setVal('settings-key-openrouter', cfg.OPENROUTER_API_KEY);
+            setVal('settings-key-aliyun', cfg.ALIYUN_API_KEY);
+            setVal('settings-key-tavily', cfg.TAVILY_API_KEY);
+            setVal('settings-key-google', cfg.GOOGLE_API_KEY);
+            setVal('settings-google-cx', cfg.GOOGLE_SEARCH_ENGINE_ID);
+            setVal('settings-browser-path', cfg.BROWSER_PATH);
+            
+            // 处理多选搜索供应商
+            if (cfg.SEARCH_PROVIDER) {
+                const providers = cfg.SEARCH_PROVIDER.split(',').map(p => p.trim());
+                document.querySelectorAll('.search-provider-checkbox').forEach(cb => {
+                    cb.checked = providers.includes(cb.value);
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Failed to load config:', error);
+    }
+}
+
+/**
+ * 保存系统设置
+ */
+export async function saveSettings() {
+    const getVal = (id) => {
+        const el = document.getElementById(id);
+        return el ? el.value.trim() : '';
+    };
+    
+    const selectedProviders = Array.from(document.querySelectorAll('.search-provider-checkbox:checked'))
+        .map(cb => cb.value)
+        .join(',');
+
+    const keys = {
+        DEEPSEEK_API_KEY: getVal('settings-key-deepseek'),
+        OPENAI_API_KEY: getVal('settings-key-openai'),
+        AZURE_OPENAI_API_KEY: getVal('settings-key-azure'),
+        AZURE_OPENAI_ENDPOINT: getVal('settings-azure-endpoint'),
+        AZURE_OPENAI_DEPLOYMENT_NAME: getVal('settings-azure-deployment'),
+        ANTHROPIC_API_KEY: getVal('settings-key-anthropic'),
+        GEMINI_API_KEY: getVal('settings-key-gemini'),
+        OPENROUTER_API_KEY: getVal('settings-key-openrouter'),
+        ALIYUN_API_KEY: getVal('settings-key-aliyun'),
+        TAVILY_API_KEY: getVal('settings-key-tavily'),
+        GOOGLE_API_KEY: getVal('settings-key-google'),
+        GOOGLE_SEARCH_ENGINE_ID: getVal('settings-google-cx'),
+        BROWSER_PATH: getVal('settings-browser-path'),
+        SEARCH_PROVIDER: selectedProviders
+    };
+
+    try {
+        const response = await fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(keys)
+        });
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            showAlert('设置已保存', '成功');
+            return true;
+        } else {
+            showAlert('保存失败: ' + data.message, '错误', 'error');
+            return false;
+        }
+    } catch (error) {
+        showAlert('保存失败: ' + error.message, '错误', 'error');
+        return false;
+    }
+}

@@ -97,6 +97,18 @@ window.renderPresetsList = UI.renderPresetsList;
 window.saveCurrentAsPreset = UI.saveCurrentAsPreset;
 window.applyPreset = UI.applyPreset;
 window.deletePreset = UI.deletePreset;
+
+// 高级配置
+window.updateModalReasoningVisibility = UI.updateModalReasoningVisibility;
+window.updateModalAgentConfigsUI = UI.updateModalAgentConfigsUI;
+window.saveModalPreset = UI.saveModalPreset;
+window.loadModalPresetsList = UI.loadModalPresetsList;
+window.applyModalPreset = UI.applyModalPreset;
+window.deleteModalPreset = UI.deleteModalPreset;
+window.fetchOpenRouterModels = UI.fetchOpenRouterModels;
+window.fetchDeepSeekModels = UI.fetchDeepSeekModels;
+window.loadSystemSettings = UI.loadSystemSettings;
+window.saveSettings = UI.saveSettings;
 window.saveRoleConfig = UI.saveRoleConfig;
 window.openRoleDesigner = UI.openRoleDesigner;
 window.closeRoleDesigner = UI.closeRoleDesigner;
