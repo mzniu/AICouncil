@@ -973,6 +973,5 @@ export {
     appendLog,
     updateProgress,
     setLayoutMode,
-    toggleReportLoading,
     getIcon
 };
