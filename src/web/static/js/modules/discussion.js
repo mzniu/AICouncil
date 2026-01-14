@@ -797,7 +797,13 @@ export function formatContent(content, roleType) {
             let rawJson = remainingText.replace(/^```(json)?\s*/, '').replace(/```\s*$/, '');
             html += `<pre class="whitespace-pre-wrap font-mono text-sm bg-slate-50 p-3 rounded-lg border border-slate-200 text-slate-600">${escapeHtml(rawJson)}</pre>`;
         } else if (!text.includes('SEARCH PROGRESS')) {
-            html += marked.parse(remainingText);
+            // 使用marked解析Markdown，如果marked未定义则降级为纯文本
+            if (typeof marked !== 'undefined' && marked.parse) {
+                html += marked.parse(remainingText);
+            } else {
+                // 降级：简单的文本处理（换行转<br>）
+                html += `<div class="whitespace-pre-wrap">${escapeHtml(remainingText)}</div>`;
+            }
         }
     }
 

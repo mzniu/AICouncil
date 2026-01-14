@@ -312,6 +312,16 @@ function initButtonListeners() {
     if (historyBtn) {
         historyBtn.addEventListener('click', History.toggleHistoryModal);
     }
+    
+    // 历史modal关闭按钮
+    const historyCloseTopBtn = document.getElementById('history-close-btn-top');
+    const historyCloseBottomBtn = document.getElementById('history-close-btn-bottom');
+    if (historyCloseTopBtn) {
+        historyCloseTopBtn.addEventListener('click', History.toggleHistoryModal);
+    }
+    if (historyCloseBottomBtn) {
+        historyCloseBottomBtn.addEventListener('click', History.toggleHistoryModal);
+    }
 
     // 管理员按钮
     const adminBtn = document.getElementById('admin-btn');

@@ -20,6 +20,11 @@ export async function toggleHistoryModal() {
     const modal = document.getElementById('history-modal');
     const list = document.getElementById('history-list');
     
+    if (!modal || !list) {
+        console.error('History modal elements not found');
+        return;
+    }
+    
     if (modal.classList.contains('hidden')) {
         modal.classList.remove('hidden');
         list.innerHTML = `<div class="text-center py-8 text-slate-400 italic">${t('history_loading')}</div>`;
