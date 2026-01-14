@@ -54,7 +54,7 @@ export function initDOMReferences() {
  * - 重置UI并发起API请求
  */
 export async function startDiscussion() {
-    if (State.getIsRunning()) return;
+    if (State.isRunning) return;
     
     const issue = document.getElementById('issue-input').value.trim();
     const backend = document.getElementById('backend-select').value;
@@ -123,7 +123,7 @@ export async function startDiscussion() {
             planners,
             auditors,
             agentConfigs,
-            State.getIsOrchestratorMode()
+            State.isOrchestratorMode
         );
         
         if (data.status === 'ok') {
@@ -147,7 +147,7 @@ export async function startDiscussion() {
  * - 调用停止API
  */
 export async function stopDiscussion() {
-    if (!State.getIsRunning()) return;
+    if (!State.isRunning) return;
     
     const confirmed = await showConfirm(t('msg_stop_confirm'), t('msg_stop_title'));
     if (!confirmed) return;
@@ -170,7 +170,7 @@ export async function stopDiscussion() {
  * - 调用reReport API
  */
 export async function reReport() {
-    if (State.getIsRunning()) return;
+    if (State.isRunning) return;
     
     const backend = document.getElementById('backend-select').value;
     const model = document.getElementById('global-model-input').value;
@@ -282,7 +282,7 @@ export function updateStatusUI(statusData) {
     if (running) {
         // 检查是否正在生成报告
         const currentText = loaderText ? loaderText.innerText.toLowerCase() : '';
-        const isReporting = State.getIsReportingPhase() || (
+        const isReporting = State.isReportingPhase || (
             currentText.includes('报告') || 
             currentText.includes('撰写') || 
             currentText.includes('report') || 
@@ -307,7 +307,7 @@ export function updateStatusUI(statusData) {
         interventionArea.classList.remove('hidden');
 
         // 如果是刷新页面且还没有加载出事件，显示恢复状态
-        if (State.getLastEventCount() === 0 && flowContainer.innerHTML.trim() === '') {
+        if (State.lastEventCount === 0 && flowContainer.innerHTML.trim() === '') {
             flowContainer.innerHTML = `<div class="flex justify-center my-4 animate-pulse"><span class="bg-blue-100 text-blue-600 px-4 py-1 rounded-full text-sm font-medium">${t('msg_restoring_progress')}</span></div>`;
         }
 
@@ -351,8 +351,8 @@ export function updateStatusUI(statusData) {
 export function updateRoundUI() {
     const roundInfo = document.getElementById('round-info');
     const maxRounds = parseInt(document.getElementById('rounds-input').value) || 3;
-    if (State.getIsRunning()) {
-        roundInfo.innerText = `Round ${State.getCurrentRound()} / ${maxRounds}`;
+    if (State.isRunning) {
+        roundInfo.innerText = `Round ${State.currentRound} / ${maxRounds}`;
         roundInfo.classList.remove('hidden');
     } else {
         roundInfo.classList.add('hidden');
@@ -368,14 +368,14 @@ export function updateProgress(event) {
     const progressText = document.getElementById('progress-percentage');
     const maxRounds = parseInt(document.getElementById('rounds-input').value) || 3;
     
-    let targetProgress = State.getCurrentProgress();
+    let targetProgress = State.currentProgress;
 
     if (event.type === 'system_start') {
         targetProgress = 0;
         State.setCurrentRound(1);
     } else if (event.type === 'round_start') {
         State.setCurrentRound(event.round);
-        targetProgress = ((State.getCurrentRound() - 1) / maxRounds) * 100;
+        targetProgress = ((State.currentRound - 1) / maxRounds) * 100;
     } else if (event.type === 'agent_action') {
         if (event.role_type === 'Reporter') {
             targetProgress = 95;
@@ -392,10 +392,10 @@ export function updateProgress(event) {
     // 确保进度不会超过 100% 或出现异常值
     targetProgress = Math.min(100, Math.max(0, targetProgress));
 
-    if (targetProgress > State.getCurrentProgress() || event.type === 'system_start') {
+    if (targetProgress > State.currentProgress || event.type === 'system_start') {
         State.setCurrentProgress(targetProgress);
-        progressBar.style.width = `${State.getCurrentProgress()}%`;
-        progressText.innerText = `${Math.round(State.getCurrentProgress())}%`;
+        progressBar.style.width = `${State.currentProgress}%`;
+        progressText.innerText = `${Math.round(State.currentProgress)}%`;
     }
     updateRoundUI();
 }
@@ -411,7 +411,7 @@ export async function pollStatus() {
         updateStatusUI(data);
         
         if (data.events) {
-            const events = data.events.slice(State.getLastEventCount());
+            const events = data.events.slice(State.lastEventCount);
             events.forEach(event => {
                 appendEvent(event);
                 updateProgress(event);
@@ -423,7 +423,7 @@ export async function pollStatus() {
         }
         
         if (data.logs) {
-            const logs = data.logs.slice(State.getLastLogCount());
+            const logs = data.logs.slice(State.lastLogCount);
             logs.forEach(log => appendLog(log));
             State.setLastLogCount(data.logs.length);
         }
@@ -468,7 +468,7 @@ function escapeHtml(text) {
  */
 function appendEvent(event) {
     // 如果是第一个事件，且容器内只有初始化消息，则清空
-    if (State.getLastEventCount() === 0 && flowContainer.querySelector('.animate-pulse')) {
+    if (State.lastEventCount === 0 && flowContainer.querySelector('.animate-pulse')) {
         flowContainer.innerHTML = '';
     }
 
@@ -936,7 +936,7 @@ export function toggleReportLoading(show, text = '', subtext = '') {
  * 获取报告版本列表
  */
 async function fetchReportVersions() {
-    const sessionId = State.getCurrentSessionId();
+    const sessionId = State.currentSessionId;
     if (!sessionId) return;
     
     try {
