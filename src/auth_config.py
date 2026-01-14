@@ -50,10 +50,9 @@ def init_auth(app: Flask):
     data_dir = Path(app.root_path).parent / 'data'
     data_dir.mkdir(exist_ok=True)
     
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv(
-        'DATABASE_URL', 
-        f"sqlite:///{data_dir / 'users.db'}"
-    )
+    # 读取DATABASE_URL，如果为空字符串则使用默认相对路径
+    database_url = os.getenv('DATABASE_URL') or f"sqlite:///{data_dir / 'users.db'}"
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
     # === Session配置（服务端存储） ===
