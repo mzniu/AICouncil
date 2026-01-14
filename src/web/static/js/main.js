@@ -89,6 +89,7 @@ window.designerNextStep = UI.designerNextStep;
 window.designerGoBack = UI.designerGoBack;
 window.renderRolePreview = UI.renderRolePreview;
 window.saveNewRole = UI.saveNewRole;
+window.handleRoleDesignerEvent = UI.handleRoleDesignerEvent;
 
 // 编制管理
 window.togglePresetsDropdown = UI.togglePresetsDropdown;
