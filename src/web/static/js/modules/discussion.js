@@ -114,17 +114,17 @@ export async function startDiscussion() {
     setLayoutMode('discussion');
 
     try {
-        const data = await API.startDiscussion(
+        const data = await API.startDiscussion({
             issue,
             backend,
             model,
-            reasoningEffort,
+            reasoning: reasoningEffort ? { effort: reasoningEffort } : undefined,
             rounds,
             planners,
             auditors,
-            agentConfigs,
-            State.isOrchestratorMode
-        );
+            agent_configs: agentConfigs,
+            use_meta_orchestrator: State.isOrchestratorMode
+        });
         
         if (data.status === 'ok') {
             console.log('讨论已启动');
