@@ -13,14 +13,10 @@ import {
     getConfig,
     saveConfig,
     getRoles,
-    getRoleDetail,
-    getRoleConfig,
-    deleteRole as apiDeleteRole,
-    reloadRole as apiReloadRole,
-    validateRoleConfig as apiValidateRoleConfig,
-    updateRoleConfig,
-    generateRole,
-    createRole
+    validateRole,
+    designRole,
+    saveRole,
+    deleteRole as apiDeleteRole
 } from '../core/api.js';
 import * as State from '../core/state.js';
 import { t } from '../core/i18n.js';
@@ -950,7 +946,10 @@ export async function deleteRole(roleName) {
  * @param {string} roleName - 角色名称
  */
 export async function reloadRole(roleName) {
-    try {
+    // TODO: API endpoint not implemented yet
+    showAlert('角色重载功能暂未实现', t('title_info'));
+    return;
+    /* try {
         const data = await apiReloadRole(roleName);
         if (data.status === 'success') {
             showAlert(t('role_reload_success'), t('title_success'));
@@ -973,7 +972,10 @@ let currentEditingRole = null;
  * @param {string} roleName - 角色名称
  */
 export async function openRoleEditor(roleName) {
-    try {
+    // TODO: API endpoint not implemented yet
+    showAlert('角色编辑功能暂未实现', t('title_info'));
+    return;
+    /* try {
         const data = await getRoleConfig(roleName);
         
         if (data.status !== 'success') {
@@ -1019,7 +1021,10 @@ export function closeRoleEditor() {
  * 验证角色配置
  */
 export async function validateRoleConfig() {
-    const yamlContent = document.getElementById('role-yaml-editor').value;
+    // TODO: API endpoint not implemented yet
+    showAlert('配置验证功能暂未实现', t('title_info'));
+    return;
+    /* const yamlContent = document.getElementById('role-yaml-editor').value;
     
     try {
         const data = await apiValidateRoleConfig(yamlContent);
@@ -1030,8 +1035,7 @@ export async function validateRoleConfig() {
         }
     } catch (error) {
         showAlert('验证失败: ' + error.message, t('title_error'), 'error');
-    }
-}
+    } */
 
 /**
  * 保存角色配置
