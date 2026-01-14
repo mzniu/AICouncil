@@ -5,6 +5,21 @@ All notable changes to AICouncil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-01-15
+
+### Fixed
+- **报告加载优化**：移除 `handleFinalReport` 内部的早期校验逻辑，避免延迟加载时丢失 JS/配置
+  - 在 WebSocket 事件流和 pollStatus 两个入口前置数据校验（`report_html.length > 100`）
+  - 确保处理函数专注于转换逻辑，无防御性代码干扰
+- **议事编排官议题传递**：修复从 `orchestration_result.json` 加载报告时使用错误字段的问题
+  - 从 `problem_type`（"决策类"等分类标签）改为 `user_requirement`（实际议题内容）
+  - 确保参考资料整理官收到正确的议题进行相关性过滤
+  - 修复报告标题/内容显示分类标签而非实际议题的问题
+- **用户数据库跟踪**：将 `data/users.db` 从 Git 跟踪中移除，避免敏感数据泄露
+
+### Changed
+- 优化控制台日志输出，区分 `console.error` 和 `console.warn` 的使用场景
+
 ## [2.0.0] - 2026-01-13
 
 ### Added

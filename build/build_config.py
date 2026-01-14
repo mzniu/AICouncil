@@ -18,7 +18,7 @@ DIST_DIR = PROJECT_ROOT / "dist"
 # 应用信息
 # ═══════════════════════════════════════════════════════════
 APP_NAME = "AICouncil"
-APP_VERSION = "1.0.0"
+APP_VERSION = "2.0.1"
 APP_AUTHOR = "AICouncil Team"
 APP_DESCRIPTION = "多智能体协商式决策系统"
 APP_COPYRIGHT = "Copyright © 2025 AICouncil Team"

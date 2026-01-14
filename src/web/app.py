@@ -13,7 +13,7 @@ import shutil
 from datetime import datetime
 
 # 版本号
-__version__ = "2.0.0"
+__version__ = "2.0.1"
 
 # 确保项目根目录在 sys.path 中，以便能够导入 src 模块
 ROOT = pathlib.Path(__file__).resolve().parents[2]
