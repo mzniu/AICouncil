@@ -666,7 +666,7 @@ function getIcon(role) {
  * @param {string} roleType - 角色类型（可选）
  * @returns {string} - HTML字符串
  */
-function formatContent(content, roleType) {
+export function formatContent(content, roleType) {
     if (!content) return '';
     
     let text = content.trim();
@@ -775,7 +775,7 @@ function formatContent(content, roleType) {
  * @param {Object} data - JSON数据
  * @returns {string} - HTML字符串
  */
-function renderStructuredData(data) {
+export function renderStructuredData(data) {
     // 这里简化处理，实际实现需要根据具体的JSON结构渲染
     // 可以复用index.html中的renderStructuredData逻辑
     return `<pre class="whitespace-pre-wrap font-mono text-sm bg-slate-50 p-3 rounded-lg border border-slate-200 text-slate-600">${escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
@@ -968,10 +968,236 @@ async function fetchReportVersions() {
     }
 }
 
-// ==================== 导出 ====================
-export {
-    escapeHtml,
-    appendEvent,
-    appendLog,
-    getIcon
-};
+// ==================== UI Toggle Functions ====================
+
+// 用于跟踪修订面板状态
+let panelCollapsed = true;
+
+/**
+ * 切换修订面板显示/隐藏
+ */
+export function toggleRevisionPanel() {
+    const content = document.getElementById('revision-content');
+    const toggle = document.getElementById('revision-toggle');
+    
+    if (panelCollapsed) {
+        content.style.display = 'block';
+        toggle.innerHTML = '✕ 关闭';
+        panelCollapsed = false;
+    } else {
+        content.style.display = 'none';
+        toggle.innerHTML = '💬 修订反馈';
+        panelCollapsed = true;
+    }
+}
+
+/**
+ * 提交修订反馈
+ */
+export async function submitRevisionFeedback() {
+    const feedback = document.getElementById('revision-feedback')?.value.trim();
+    if (!feedback) {
+        showAlert('请输入修改要求', '提示');
+        return;
+    }
+    
+    const statusDiv = document.getElementById('revision-status');
+    const statusText = document.getElementById('revision-status-text');
+    const resultDiv = document.getElementById('revision-result');
+    const submitBtn = document.getElementById('btn-submit-revision');
+    
+    // 显示加载状态
+    if (statusDiv) statusDiv.style.display = 'block';
+    if (statusText) statusText.innerHTML = '⏳ 报告审核官正在处理您的修订要求...';
+    if (resultDiv) resultDiv.style.display = 'none';
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '⏳ 处理中...';
+    }
+    
+    try {
+        // 获取workspace ID
+        const workspaceId = State.sessionId || '';
+        
+        // 获取当前报告HTML
+        const reportIframe = document.getElementById('report-iframe');
+        let reportContent = '';
+        if (reportIframe && reportIframe.contentDocument) {
+            reportContent = reportIframe.contentDocument.documentElement.outerHTML;
+        }
+        
+        const response = await API.reviseReport(workspaceId, feedback, reportContent);
+        
+        if (response.status === 'success') {
+            // 显示修订结果
+            if (statusDiv) statusDiv.style.display = 'none';
+            if (resultDiv) {
+                resultDiv.style.display = 'block';
+                
+                let changesHtml = `<h4 style="margin:0 0 10px 0;color:#667eea;">✅ 修订完成（版本 ${response.version}）</h4>`;
+                changesHtml += `<p style="margin:0 0 10px 0;"><strong>概要：</strong>${response.revision_summary}</p>`;
+                
+                if (response.changes_made && response.changes_made.length > 0) {
+                    changesHtml += '<p style="margin:0 0 5px 0;"><strong>修改内容：</strong></p><ul style="margin:0;padding-left:20px;">';
+                    response.changes_made.forEach(c => {
+                        changesHtml += `<li>${c}</li>`;
+                    });
+                    changesHtml += '</ul>';
+                }
+                
+                if (response.warnings && response.warnings.length > 0) {
+                    changesHtml += '<p style="margin:10px 0 5px 0;color:#f59e0b;"><strong>⚠️ 注意：</strong></p><ul style="margin:0;padding-left:20px;color:#f59e0b;">';
+                    response.warnings.forEach(w => {
+                        changesHtml += `<li>${w}</li>`;
+                    });
+                    changesHtml += '</ul>';
+                }
+                
+                changesHtml += '<p style="margin:15px 0 0 0;"><button onclick="window.applyRevision()" style="background:#667eea;color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;">🔄 应用修订</button></p>';
+                
+                resultDiv.innerHTML = changesHtml;
+                
+                // 保存修订后的HTML
+                window._revisedHtml = response.revised_html;
+            }
+            
+        } else {
+            if (statusText) statusText.innerHTML = `❌ 修订失败：${response.message || '未知错误'}`;
+        }
+        
+    } catch (error) {
+        if (statusText) statusText.innerHTML = `❌ 请求失败：${error.message}`;
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '📤 提交修订';
+        }
+    }
+}
+
+/**
+ * 应用修订后的报告
+ */
+export function applyRevision() {
+    if (window._revisedHtml) {
+        const reportIframe = document.getElementById('report-iframe');
+        if (reportIframe) {
+            reportIframe.srcdoc = window._revisedHtml;
+        }
+        showAlert('报告已更新', '成功');
+    }
+}
+
+/**
+ * 确认满意当前报告
+ */
+export function confirmSatisfied() {
+    showConfirm('确认对当前报告满意？', '确认', () => {
+        const panel = document.getElementById('revision-panel');
+        if (panel) panel.style.display = 'none';
+    });
+}
+
+/**
+ * 最大化/还原功能
+ */
+export function toggleMaximize(sectionId) {
+    const section = document.getElementById(sectionId);
+    if (!section) return;
+    
+    const btn = section.querySelector('button[onclick^="toggleMaximize"]');
+    const icon = document.getElementById(sectionId === 'discussion-section' ? 'discussion-maximize-icon' : 'report-maximize-icon');
+    const isMaximized = section.classList.toggle('maximized');
+    
+    if (isMaximized) {
+        // 切换为还原图标
+        if (icon) icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 14h6v6M20 10h-6V4M3 21l7-7M21 3l-7 7"></path>';
+        if (btn) {
+            btn.setAttribute('data-i18n-title', 'btn_restore');
+            btn.title = '还原';
+        }
+        document.body.style.overflow = 'hidden';
+    } else {
+        // 切换为最大化图标
+        if (icon) icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path>';
+        if (btn) {
+            btn.setAttribute('data-i18n-title', 'btn_maximize');
+            btn.title = '最大化';
+        }
+        document.body.style.overflow = '';
+    }
+}
+
+/**
+ * 切换智能卡片显示/隐藏
+ */
+export function toggleSmartCard(nodeId) {
+    const card = document.querySelector(`[data-node-id="${nodeId}"]`);
+    if (!card) return;
+    
+    const content = card.querySelector('.smart-card-content');
+    const icon = card.querySelector('.toggle-icon');
+    if (!content || !icon) return;
+    
+    if (content.classList.contains('collapsed')) {
+        content.classList.remove('collapsed');
+        icon.textContent = '▼';
+    } else {
+        content.classList.add('collapsed');
+        icon.textContent = '▶';
+    }
+}
+
+/**
+ * 切换推理内容显示/隐藏
+ */
+export function toggleReasoning(header) {
+    const wrapper = header.closest('.reasoning-wrapper');
+    const content = wrapper?.querySelector('.event-reasoning');
+    const icon = header.querySelector('.toggle-icon');
+    if (!content || !icon) return;
+    
+    if (content.classList.contains('collapsed')) {
+        content.classList.remove('collapsed');
+        icon.textContent = '▼';
+    } else {
+        content.classList.add('collapsed');
+        icon.textContent = '▶';
+    }
+}
+
+/**
+ * 切换搜索卡片显示/隐藏
+ */
+export function toggleSearchCard(header) {
+    const card = header.closest('.search-progress-card');
+    const content = card?.querySelector('.search-content');
+    const icon = header.querySelector('.toggle-icon');
+    if (!content || !icon) return;
+    
+    if (content.classList.contains('collapsed')) {
+        content.classList.remove('collapsed');
+        icon.textContent = '▼';
+    } else {
+        content.classList.add('collapsed');
+        icon.textContent = '▶';
+    }
+}
+
+/**
+ * 切换讨论阶段显示/隐藏
+ */
+export function toggleStage(stageId) {
+    const stage = document.getElementById(stageId);
+    if (!stage) return;
+    const content = stage.querySelector(`#${stageId}-content`);
+    const icon = document.getElementById(`${stageId}-icon`);
+    if (!content || !icon) return;
+    if (content.classList.contains('hidden')) {
+        content.classList.remove('hidden');
+        icon.style.transform = 'rotate(0deg)';
+    } else {
+        content.classList.add('hidden');
+        icon.style.transform = 'rotate(-90deg)';
+    }
+}

@@ -218,3 +218,29 @@ export function closeConfirmModal() {
         modal.classList.add('hidden');
     }
 }
+
+/**
+ * 显示临时Toast提示
+ * @param {string} message - 提示消息
+ */
+export function showToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'fixed top-20 right-4 bg-slate-800 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
+    toast.innerText = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, 2000);
+}
+
+/**
+ * 清空日志内容
+ */
+export function clearLogs() {
+    const logContainer = document.getElementById('log-container');
+    if (logContainer) {
+        logContainer.innerHTML = '';
+    }
+}

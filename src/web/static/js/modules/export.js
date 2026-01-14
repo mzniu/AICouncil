@@ -377,9 +377,25 @@ export default {
     exportAsPDF,
     exportAsScreenshot,
     downloadFile,
+    openReportInNewTab,
     // 兼容旧版
     downloadReport,
     downloadMarkdown,
     downloadPDF,
     downloadImage
 };
+
+/**
+ * 在新标签页打开报告（支持编辑）
+ */
+export function openReportInNewTab() {
+    const sessionId = window.State?.currentSessionId;
+    if (!sessionId) {
+        showAlert('报告尚未生成，无法打开编辑器', '提示');
+        return;
+    }
+    
+    const reportUrl = `/report/${sessionId}`;
+    window.open(reportUrl, '_blank');
+    showAlert('已在新标签页中打开报告（支持编辑功能）', '成功');
+}

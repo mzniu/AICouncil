@@ -30,8 +30,7 @@ window.submitRevisionFeedback = Discussion.submitRevisionFeedback;
 window.toggleHistoryModal = History.toggleHistoryModal;
 window.loadWorkspace = History.loadWorkspace;
 window.deleteWorkspace = History.deleteWorkspace;
-window.logout = logout;
-window.toggleLogs = toggleLogs;
+window.toggleLogs = UI.toggleLogs;
 
 // 导出功能
 window.toggleDownloadDropdown = Export.toggleDownloadDropdown;
@@ -40,6 +39,7 @@ window.downloadMarkdown = Export.downloadMarkdown;
 window.downloadPDF = Export.downloadPDF;
 window.downloadImage = Export.downloadImage;
 window.copyReport = Export.copyReport;
+window.openReportInNewTab = Export.openReportInNewTab;
 
 // UI交互
 window.toggleOrchestratorMode = UI.toggleOrchestratorMode;
@@ -59,7 +59,9 @@ window.openPresetsTab = UI.openPresetsTab;
 window.applyModalPreset = UI.applyModalPreset;
 window.deleteModalPreset = UI.deleteModalPreset;
 window.saveModalPreset = UI.saveModalPreset;
-window.loadSystemSettings = UI.loadSystemSettings;
+window.loadSystemSettings = UI.loadSys
+window.updateAgentConfigsUI = UI.updateAgentConfigsUI;
+window.createAgentConfigItem = UI.createAgentConfigItem;temSettings;
 window.saveSettings = UI.saveSettings;
 
 // 角色管理
@@ -83,9 +85,13 @@ window.showAlert = Utils.showAlert;
 window.showConfirm = Utils.showConfirm;
 window.closeAlertModal = Utils.closeAlertModal;
 window.closeConfirmModal = Utils.closeConfirmModal;
+window.showToast = Utils.showToast;
+window.clearLogs = Utils.clearLogs;
 
 // 讨论UI函数
 window.toggleRevisionPanel = Discussion.toggleRevisionPanel;
+window.applyRevision = Discussion.applyRevision;
+window.confirmSatisfied = Discussion.confirmSatisfied;
 window.toggleMaximize = Discussion.toggleMaximize;
 window.toggleReasoning = Discussion.toggleReasoning;
 window.toggleSearchCard = Discussion.toggleSearchCard;
@@ -110,32 +116,6 @@ async function checkAdminStatus() {
     } catch (error) {
         console.error('Failed to check admin status:', error);
     }
-}
-
-/**
- * 退出登录
- */
-async function logout() {
-    const confirmed = await Utils.showConfirm('确认退出登录？', '退出登录');
-    if (!confirmed) {
-        return;
-    }
-    
-    try {
-        await API.logout();
-        window.location.href = '/login';
-    } catch (error) {
-        console.error('Logout error:', error);
-        await Utils.showAlert('网络错误，请重试', '错误');
-    }
-}
-
-/**
- * 切换日志显示
- */
-function toggleLogs() {
-    const logSection = document.getElementById('log-section');
-    logSection.classList.toggle('hidden');
 }
 
 /**

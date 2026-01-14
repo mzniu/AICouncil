@@ -1204,3 +1204,53 @@ export function handleRoleDesignerEvent(eventData) {
         }
     }
 }
+
+/**
+ * 切换日志区域的显示/隐藏
+ */
+export function toggleLogs() {
+    const logSection = document.getElementById('log-section');
+    if (logSection) {
+        logSection.classList.toggle('hidden');
+    }
+}
+
+/**
+ * 更新主界面Agent配置UI（兼容函数）
+ */
+export function updateAgentConfigsUI() {
+    // 调用modal版本
+    updateModalAgentConfigsUI();
+}
+
+/**
+ * 创建Agent配置项
+ */
+export function createAgentConfigItem(label, id, bgColor, dotColor) {
+    const div = document.createElement('div');
+    div.className = `p-3 ${bgColor} rounded-lg border border-slate-200`;
+    div.setAttribute('data-agent-wrapper', id);
+    div.innerHTML = `
+        <h4 class="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center">
+            <span class="w-2 h-2 ${dotColor} rounded-full mr-2"></span>${label}
+        </h4>
+        <div class="flex gap-2">
+            <select class="agent-backend flex-1 text-xs p-1 border rounded" data-agent="${id}">
+                <option value="default">使用默认</option>
+                <option value="deepseek">DeepSeek</option>
+                <option value="openai">OpenAI</option>
+                <option value="openrouter">OpenRouter</option>
+                <option value="aliyun">Aliyun</option>
+                <option value="ollama">Ollama</option>
+            </select>
+            <input type="text" class="agent-model flex-1 text-xs p-1 border rounded" placeholder="模型名称" data-agent="${id}">
+        </div>
+        <select class="agent-reasoning hidden text-[10px] p-1 border rounded mt-1 w-full" data-agent="${id}">
+            <option value="">关闭推理</option>
+            <option value="low">推理: Low</option>
+            <option value="medium">推理: Medium</option>
+            <option value="high">推理: High</option>
+        </select>
+    `;
+    return div;
+}
