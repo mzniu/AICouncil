@@ -2157,3 +2157,203 @@ export async function saveNewRole() {
         showAlert('创建失败: ' + error.message, '错误', 'error');
     }
 }
+
+// ==================== 编制管理函数 ====================
+
+/**
+ * 切换编制下拉菜单
+ */
+export function togglePresetsDropdown() {
+    const dropdown = document.getElementById('presets-dropdown');
+    if (dropdown) {
+        dropdown.classList.toggle('show');
+        if (dropdown.classList.contains('show')) {
+            loadPresets();
+        }
+    }
+}
+
+/**
+ * 加载编制列表
+ */
+export async function loadPresets() {
+    try {
+        const response = await fetch('/api/presets');
+        const data = await response.json();
+        
+        if (data.presets) {
+            renderPresetsList(data.presets);
+        }
+    } catch (error) {
+        console.error('Failed to load presets:', error);
+    }
+}
+
+/**
+ * 渲染编制列表
+ */
+export function renderPresetsList(presets) {
+    const dropdownContainer = document.getElementById('presets-list-container');
+    
+    if (!dropdownContainer) return;
+
+    dropdownContainer.innerHTML = '';
+
+    // API返回的是对象格式 {name: config, ...}，需要转换为数组
+    const presetArray = Object.entries(presets || {});
+    
+    if (presetArray.length === 0) {
+        const emptyHtml = `<div class="text-center text-gray-400 py-4 text-xs">暂无存档</div>`;
+        dropdownContainer.innerHTML = emptyHtml;
+        return;
+    }
+
+    for (const [name, config] of presetArray) {
+        const dropdownItem = document.createElement('button');
+        dropdownItem.onclick = () => { 
+            window.applyPreset(name); 
+            window.togglePresetsDropdown(); 
+        };
+        dropdownItem.className = 'w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition group border-b border-slate-100 last:border-0';
+        dropdownItem.innerHTML = `
+            <div class="font-bold text-slate-700 mb-1 truncate">${name}</div>
+            <div class="text-xs text-slate-500 group-hover:text-slate-600 flex items-center space-x-2">
+                <span class="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded text-[10px] border border-blue-100 font-medium">${config.backend || 'default'}</span>
+                <span class="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] border border-slate-200">R${config.rounds || 3}</span>
+                <span class="flex items-center space-x-1">
+                    <span title="策论家">🧠 ${config.planners || 2}</span>
+                    <span class="text-slate-300">|</span>
+                    <span title="监察官">👁️ ${config.auditors || 2}</span>
+                </span>
+            </div>
+        `;
+        dropdownContainer.appendChild(dropdownItem);
+    }
+}
+
+/**
+ * 保存当前配置为编制
+ */
+export async function saveCurrentAsPreset() {
+    let name = prompt('请输入编制名称：');
+    if (!name || !name.trim()) return;
+    
+    name = name.trim();
+
+    // 收集当前配置
+    const config = {
+        backend: document.getElementById('backend-select')?.value || 'deepseek',
+        global_model: document.getElementById('global-model-input')?.value || '',
+        global_reasoning: document.getElementById('global-reasoning-input')?.value || '',
+        rounds: parseInt(document.getElementById('rounds-input')?.value || 3),
+        planners: parseInt(document.getElementById('planners-input')?.value || 2),
+        auditors: parseInt(document.getElementById('auditors-input')?.value || 2),
+        agents: {}
+    };
+
+    // 收集Agent配置
+    document.querySelectorAll('.agent-backend').forEach(select => {
+        const agentId = select.dataset.agent;
+        const modelInput = document.querySelector(`.agent-model[data-agent="${agentId}"]`);
+        const reasoningSelect = document.querySelector(`.agent-reasoning[data-agent="${agentId}"]`);
+        
+        config.agents[agentId] = {
+            backend: select.value,
+            model: modelInput ? modelInput.value : '',
+            reasoning: reasoningSelect ? reasoningSelect.value : ''
+        };
+    });
+
+    try {
+        const response = await fetch('/api/presets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, config })
+        });
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            showAlert('编制已保存', '成功');
+            loadPresets();
+        } else {
+            showAlert(data.message, '错误', 'error');
+        }
+    } catch (error) {
+        showAlert(error.message, '错误', 'error');
+    }
+}
+
+/**
+ * 应用编制
+ */
+export function applyPreset(name) {
+    fetch('/api/presets')
+        .then(res => res.json())
+        .then(data => {
+            const config = data.presets[name];
+            if (config) {
+                const backendSelect = document.getElementById('backend-select');
+                const globalModelInput = document.getElementById('global-model-input');
+                const globalReasoningInput = document.getElementById('global-reasoning-input');
+                const roundsInput = document.getElementById('rounds-input');
+                const plannersInput = document.getElementById('planners-input');
+                const auditorsInput = document.getElementById('auditors-input');
+                
+                if (backendSelect) {
+                    backendSelect.value = config.backend || 'deepseek';
+                    backendSelect.dispatchEvent(new Event('change'));
+                }
+                if (globalModelInput) globalModelInput.value = config.global_model || '';
+                if (globalReasoningInput) globalReasoningInput.value = config.global_reasoning || '';
+                if (roundsInput) roundsInput.value = config.rounds || 3;
+                if (plannersInput) plannersInput.value = config.planners || 2;
+                if (auditorsInput) auditorsInput.value = config.auditors || 2;
+
+                // 应用Agent配置
+                if (config.agents) {
+                    for (const [agentId, agentConfig] of Object.entries(config.agents)) {
+                        const backendSelect = document.querySelector(`.agent-backend[data-agent="${agentId}"]`);
+                        const modelInput = document.querySelector(`.agent-model[data-agent="${agentId}"]`);
+                        const reasoningSelect = document.querySelector(`.agent-reasoning[data-agent="${agentId}"]`);
+                        
+                        if (backendSelect) {
+                            backendSelect.value = agentConfig.backend;
+                            backendSelect.dispatchEvent(new Event('change'));
+                        }
+                        if (modelInput) modelInput.value = agentConfig.model || '';
+                        if (reasoningSelect) reasoningSelect.value = agentConfig.reasoning || '';
+                    }
+                }
+
+                showAlert('编制已加载', '成功');
+            } else {
+                showAlert('编制不存在', '错误', 'error');
+            }
+        })
+        .catch(error => {
+            showAlert(error.message, '错误', 'error');
+        });
+}
+
+/**
+ * 删除编制
+ */
+export async function deletePreset(name) {
+    if (!confirm('确定要删除此编制吗？')) return;
+
+    try {
+        const response = await fetch(`/api/presets/${encodeURIComponent(name)}`, {
+            method: 'DELETE'
+        });
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            showAlert('编制已删除', '成功');
+            loadPresets();
+        } else {
+            showAlert(data.message, '错误', 'error');
+        }
+    } catch (error) {
+        showAlert(error.message, '错误', 'error');
+    }
+}

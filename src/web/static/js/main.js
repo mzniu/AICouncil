@@ -89,6 +89,14 @@ window.designerNextStep = UI.designerNextStep;
 window.designerGoBack = UI.designerGoBack;
 window.renderRolePreview = UI.renderRolePreview;
 window.saveNewRole = UI.saveNewRole;
+
+// 编制管理
+window.togglePresetsDropdown = UI.togglePresetsDropdown;
+window.loadPresets = UI.loadPresets;
+window.renderPresetsList = UI.renderPresetsList;
+window.saveCurrentAsPreset = UI.saveCurrentAsPreset;
+window.applyPreset = UI.applyPreset;
+window.deletePreset = UI.deletePreset;
 window.saveRoleConfig = UI.saveRoleConfig;
 window.openRoleDesigner = UI.openRoleDesigner;
 window.closeRoleDesigner = UI.closeRoleDesigner;
