@@ -1462,3 +1462,698 @@ export async function handleLogout() {
         showAlert('网络错误，请稍后重试', '错误', 'error');
     }
 }
+
+// ==================== 角色管理函数 ====================
+
+/**
+ * 加载角色列表
+ */
+export async function loadRolesList(tagFilter = null) {
+    try {
+        let url = '/api/roles';
+        if (tagFilter) {
+            url += `?tag=${tagFilter}`;
+        }
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        console.log('Roles API response:', data);
+        
+        if (data.status === 'success') {
+            if (!data.roles) {
+                console.error('API returned success but no roles array:', data);
+                showAlert('角色数据格式错误：缺少roles字段', '错误', 'error');
+                return;
+            }
+            renderRolesList(data.roles);
+        } else {
+            showAlert('加载失败: ' + (data.message || 'Unknown error'), '错误', 'error');
+        }
+    } catch (error) {
+        console.error('Failed to load roles:', error);
+        showAlert('加载失败: ' + error.message, '错误', 'error');
+    }
+}
+
+/**
+ * 渲染角色列表
+ */
+export function renderRolesList(roles) {
+    const listContainer = document.getElementById('roles-list');
+    if (!listContainer) return;
+
+    listContainer.innerHTML = '';
+
+    if (!roles || !Array.isArray(roles)) {
+        console.error('renderRolesList: roles is not an array:', roles);
+        listContainer.innerHTML = `<div class="col-span-2 text-center text-red-400 py-8">数据格式错误</div>`;
+        return;
+    }
+
+    if (roles.length === 0) {
+        listContainer.innerHTML = `<div class="col-span-2 text-center text-gray-400 py-8">暂无角色</div>`;
+        return;
+    }
+
+    roles.forEach(role => {
+        const card = document.createElement('div');
+        card.className = 'bg-gradient-to-br from-slate-50 to-slate-100 p-4 rounded-xl border border-slate-200 hover:shadow-lg transition group';
+        
+        const colorMap = {
+            'blue': 'bg-blue-500',
+            'green': 'bg-green-500',
+            'purple': 'bg-purple-500',
+            'orange': 'bg-orange-500',
+            'red': 'bg-red-500',
+            'pink': 'bg-pink-500',
+            'indigo': 'bg-indigo-500'
+        };
+        
+        const bgColor = colorMap[role.ui.color] || 'bg-slate-500';
+        const tags = role.tags.map(tag => {
+            const tagColor = tag === 'core' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600';
+            const tagText = tag === 'core' ? '核心' : (tag === 'advanced' ? '高级' : tag);
+            return `<span class="px-2 py-0.5 ${tagColor} rounded-full text-xs">${tagText}</span>`;
+        }).join(' ');
+        
+        card.innerHTML = `
+            <div class="flex items-start justify-between mb-3">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 ${bgColor} rounded-lg flex items-center justify-center text-white text-xl">
+                        ${role.ui.icon}
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-slate-800">${role.display_name}</h4>
+                        <p class="text-xs text-slate-500">版本: ${role.version}</p>
+                    </div>
+                </div>
+            </div>
+            <p class="text-sm text-slate-600 mb-3 line-clamp-2">${role.ui.description_short}</p>
+            <div class="flex flex-wrap gap-1 mb-3">
+                ${tags}
+            </div>
+            <div class="flex justify-between items-center pt-2 border-t border-slate-200">
+                <div class="text-xs text-slate-500">
+                    阶段: ${role.stages.length}
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="window.showRoleDetail('${role.name}')" 
+                            class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg transition">
+                        详情
+                    </button>
+                    <button onclick="window.reloadRole('${role.name}')" 
+                            class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded-lg transition">
+                        重载
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        listContainer.appendChild(card);
+    });
+}
+
+/**
+ * 显示角色详情
+ */
+export async function showRoleDetail(roleName) {
+    try {
+        const response = await fetch(`/api/roles/${roleName}`);
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            const role = data.role;
+            
+            let contentHtml = '';
+            
+            // 阶段信息
+            if (role.stages && role.stages.length > 0) {
+                contentHtml += `
+                    <section class="space-y-2">
+                        <h4 class="text-sm font-bold text-slate-700">阶段</h4>
+                        ${role.stages.map(stage => `
+                            <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                <div class="font-bold text-slate-800 mb-1">${stage.name}</div>
+                                <div class="text-xs text-slate-600">${stage.description || '无描述'}</div>
+                                ${stage.input_vars && stage.input_vars.length > 0 ? `
+                                    <div class="text-xs text-slate-500 mt-2">
+                                        输入变量: ${stage.input_vars.join(', ')}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `).join('')}
+                    </section>
+                `;
+            }
+            
+            // 参数信息
+            if (role.parameters) {
+                contentHtml += `
+                    <section class="space-y-2">
+                        <h4 class="text-sm font-bold text-slate-700">参数</h4>
+                        <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                            <div class="grid grid-cols-2 gap-2 text-xs">
+                                <div><span class="text-slate-500">Temperature:</span> <span class="font-mono">${role.parameters.temperature}</span></div>
+                                <div><span class="text-slate-500">Max Retries:</span> <span class="font-mono">${role.parameters.max_retries}</span></div>
+                            </div>
+                        </div>
+                    </section>
+                `;
+            }
+            
+            // 提示词预览
+            if (role.prompt_preview || role.prompts) {
+                let promptContent = '';
+                if (role.prompts) {
+                    promptContent = Object.entries(role.prompts).map(([stage, prompt]) => 
+                        `<div class="mb-3 pb-3 border-b border-slate-200 last:border-0 last:pb-0">
+                            <h5 class="text-xs font-bold text-blue-700 mb-2">阶段: ${stage}</h5>
+                            <pre class="text-xs text-slate-600 whitespace-pre-wrap font-mono">${prompt}</pre>
+                        </div>`
+                    ).join('');
+                } else {
+                    promptContent = `<pre class="text-xs text-slate-600 whitespace-pre-wrap font-mono">${role.prompt_preview}</pre>`;
+                }
+                
+                contentHtml += `
+                    <section class="space-y-2">
+                        <h4 class="text-sm font-bold text-slate-700">提示词预览</h4>
+                        <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 max-h-96 overflow-y-auto">
+                            ${promptContent}
+                        </div>
+                    </section>
+                `;
+            }
+            
+            // 显示Modal
+            const nameEl = document.getElementById('detail-role-name');
+            const descEl = document.getElementById('detail-role-desc');
+            const contentEl = document.getElementById('detail-role-content');
+            
+            if (nameEl) nameEl.textContent = role.display_name;
+            if (descEl) descEl.textContent = role.description;
+            if (contentEl) contentEl.innerHTML = contentHtml;
+            
+            // 添加编辑和删除按钮
+            const modal = document.getElementById('role-detail-modal');
+            if (modal) {
+                const detailHeader = modal.querySelector('.flex.justify-between');
+                if (detailHeader) {
+                    const existingBtns = detailHeader.querySelector('.role-action-btns');
+                    if (existingBtns) {
+                        existingBtns.remove();
+                    }
+                    
+                    const btnContainer = document.createElement('div');
+                    btnContainer.className = 'role-action-btns flex space-x-2 mr-2';
+                    
+                    const editBtn = document.createElement('button');
+                    editBtn.className = 'px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition text-sm';
+                    editBtn.innerHTML = '✏️ 编辑';
+                    editBtn.onclick = () => window.openRoleEditor(roleName);
+                    
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition text-sm';
+                    deleteBtn.innerHTML = '🗑️ 删除';
+                    deleteBtn.onclick = () => window.deleteRole(roleName);
+                    
+                    btnContainer.appendChild(editBtn);
+                    btnContainer.appendChild(deleteBtn);
+                    
+                    const closeBtn = detailHeader.querySelector('button');
+                    if (closeBtn) {
+                        closeBtn.parentElement.insertBefore(btnContainer, closeBtn);
+                    }
+                }
+                
+                modal.classList.remove('hidden');
+            }
+        } else {
+            showAlert('加载失败: ' + data.message, '错误', 'error');
+        }
+    } catch (error) {
+        console.error('Failed to load role detail:', error);
+        showAlert('加载失败: ' + error.message, '错误', 'error');
+    }
+}
+
+/**
+ * 关闭角色详情
+ */
+export function closeRoleDetail() {
+    const modal = document.getElementById('role-detail-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
+/**
+ * 删除角色
+ */
+export async function deleteRole(roleName) {
+    const confirmed = confirm(`确定要删除角色 "${roleName}" 吗？\n\n此操作将删除角色配置文件和所有相关Prompt文件，且不可恢复！`);
+    if (!confirmed) return;
+    
+    try {
+        const response = await fetch(`/api/roles/${roleName}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            showAlert('角色已成功删除', '删除成功');
+            closeRoleDetail();
+            await loadRolesList();
+        } else {
+            showAlert('删除失败: ' + data.message, '错误', 'error');
+        }
+    } catch (error) {
+        console.error('Failed to delete role:', error);
+        showAlert('删除失败: ' + error.message, '错误', 'error');
+    }
+}
+
+/**
+ * 重载角色
+ */
+export async function reloadRole(roleName) {
+    try {
+        const response = await fetch(`/api/roles/${roleName}/reload`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            showAlert('角色重载成功', '成功');
+            await loadRolesList();
+            closeRoleDetail();
+        } else {
+            showAlert('重载失败: ' + data.message, '错误', 'error');
+        }
+    } catch (error) {
+        console.error('Failed to reload role:', error);
+        showAlert('重载失败: ' + error.message, '错误', 'error');
+    }
+}
+
+// 编辑器状态
+let currentEditingRole = null;
+
+/**
+ * 打开角色编辑器
+ */
+export async function openRoleEditor(roleName) {
+    try {
+        const response = await fetch(`/api/roles/${roleName}/config`);
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            currentEditingRole = roleName;
+            
+            const modal = document.getElementById('role-edit-modal');
+            const nameEl = document.getElementById('edit-role-name');
+            const editorEl = document.getElementById('role-yaml-editor');
+            
+            if (modal) modal.classList.remove('hidden');
+            if (nameEl) nameEl.textContent = roleName;
+            if (editorEl) editorEl.value = data.data.yaml_content;
+            
+            // 加载prompts
+            const promptsContainer = document.getElementById('prompt-editors');
+            if (promptsContainer) {
+                promptsContainer.innerHTML = '';
+                
+                for (const [stageName, promptContent] of Object.entries(data.data.prompts)) {
+                    const editorHtml = `
+                        <div class="border border-slate-300 rounded-lg p-4">
+                            <label class="block text-xs font-bold text-slate-600 uppercase mb-2">${stageName} Prompt</label>
+                            <textarea data-stage="${stageName}" 
+                                      class="prompt-editor w-full h-48 px-3 py-2 border border-slate-300 rounded-lg font-mono text-sm outline-none focus:border-blue-500 transition"
+                                      placeholder="Prompt内容...">${promptContent}</textarea>
+                        </div>
+                    `;
+                    promptsContainer.insertAdjacentHTML('beforeend', editorHtml);
+                }
+            }
+        } else {
+            showAlert('加载配置失败: ' + data.message, '错误', 'error');
+        }
+    } catch (error) {
+        console.error('Failed to load role config:', error);
+        showAlert('加载配置失败: ' + error.message, '错误', 'error');
+    }
+}
+
+/**
+ * 关闭角色编辑器
+ */
+export function closeRoleEditor() {
+    const modal = document.getElementById('role-edit-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+    currentEditingRole = null;
+}
+
+/**
+ * 验证角色配置
+ */
+export async function validateRoleConfig() {
+    const editorEl = document.getElementById('role-yaml-editor');
+    if (!editorEl) return;
+    
+    const yamlContent = editorEl.value;
+    
+    try {
+        const response = await fetch('/api/roles/validate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ yaml_content: yamlContent })
+        });
+        const data = await response.json();
+        
+        if (data.status === 'success' && data.valid) {
+            showAlert('✅ 配置验证通过', '成功');
+        } else {
+            showAlert('❌ 配置验证失败:\n' + data.error, '错误', 'error');
+        }
+    } catch (error) {
+        showAlert('验证失败: ' + error.message, '错误', 'error');
+    }
+}
+
+/**
+ * 保存角色配置
+ */
+export async function saveRoleConfig() {
+    if (!currentEditingRole) return;
+    
+    const editorEl = document.getElementById('role-yaml-editor');
+    if (!editorEl) return;
+    
+    const yamlContent = editorEl.value;
+    
+    // 收集所有prompt
+    const prompts = {};
+    document.querySelectorAll('.prompt-editor').forEach(textarea => {
+        const stageName = textarea.getAttribute('data-stage');
+        prompts[stageName] = textarea.value;
+    });
+    
+    try {
+        const response = await fetch(`/api/roles/${currentEditingRole}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                yaml_content: yamlContent,
+                prompts: prompts
+            })
+        });
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            showAlert('✅ 角色配置已保存并重载', '成功');
+            closeRoleEditor();
+            await loadRolesList();
+            closeRoleDetail();
+        } else {
+            showAlert('❌ 保存失败:\n' + data.message, '错误', 'error');
+        }
+    } catch (error) {
+        console.error('Failed to save role config:', error);
+        showAlert('保存失败: ' + error.message, '错误', 'error');
+    }
+}
+
+// 设计器状态
+let currentDesignerStep = 1;
+let generatedRoleDesign = null;
+
+/**
+ * 打开角色设计师
+ */
+export function openRoleDesigner() {
+    currentDesignerStep = 1;
+    generatedRoleDesign = null;
+    
+    const inputEl = document.getElementById('role-requirement-input');
+    if (inputEl) inputEl.value = '';
+    
+    const modal = document.getElementById('role-designer-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+    }
+    
+    updateDesignerStep(1);
+}
+
+/**
+ * 关闭角色设计师
+ */
+export function closeRoleDesigner() {
+    const modal = document.getElementById('role-designer-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+    currentDesignerStep = 1;
+    generatedRoleDesign = null;
+}
+
+/**
+ * 更新设计器步骤
+ */
+export function updateDesignerStep(step) {
+    currentDesignerStep = step;
+    
+    // 隐藏所有步骤
+    for (let i = 1; i <= 3; i++) {
+        const stepEl = document.getElementById(`designer-step-${i}`);
+        if (stepEl) {
+            stepEl.classList.add('hidden');
+        }
+    }
+    
+    // 显示当前步骤
+    const currentStepEl = document.getElementById(`designer-step-${step}`);
+    if (currentStepEl) {
+        currentStepEl.classList.remove('hidden');
+    }
+    
+    // 更新步骤指示器
+    for (let i = 1; i <= 3; i++) {
+        const indicator = document.getElementById(`step-indicator-${i}`);
+        const label = document.getElementById(`step-label-${i}`);
+        
+        if (!indicator || !label) continue;
+        
+        if (i < step) {
+            indicator.className = 'w-10 h-10 rounded-full bg-green-500 text-white flex items-center justify-center font-bold';
+            indicator.innerHTML = '✓';
+            label.className = 'ml-2 text-green-600 font-bold';
+        } else if (i === step) {
+            indicator.className = 'w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold';
+            indicator.textContent = i;
+            label.className = 'ml-2 font-bold text-blue-600';
+        } else {
+            indicator.className = 'w-10 h-10 rounded-full bg-slate-200 text-slate-400 flex items-center justify-center font-bold';
+            indicator.textContent = i;
+            label.className = 'ml-2 text-slate-400';
+        }
+    }
+    
+    // 更新进度条
+    for (let i = 1; i <= 2; i++) {
+        const progress = document.getElementById(`step-progress-${i}`);
+        if (progress) {
+            progress.style.width = i < step ? '100%' : '0%';
+        }
+    }
+    
+    // 更新按钮
+    const backBtn = document.getElementById('designer-back-btn');
+    const nextBtn = document.getElementById('designer-next-btn');
+    
+    if (backBtn && nextBtn) {
+        if (step === 1) {
+            backBtn.classList.add('hidden');
+            nextBtn.textContent = '开始生成 →';
+            nextBtn.onclick = () => window.designerNextStep();
+        } else if (step === 2) {
+            backBtn.classList.add('hidden');
+            nextBtn.classList.add('hidden');
+        } else if (step === 3) {
+            backBtn.classList.remove('hidden');
+            nextBtn.classList.remove('hidden');
+            nextBtn.textContent = '保存角色';
+            nextBtn.onclick = () => window.saveNewRole();
+        }
+    }
+}
+
+/**
+ * 设计器下一步
+ */
+export async function designerNextStep() {
+    if (currentDesignerStep === 1) {
+        const inputEl = document.getElementById('role-requirement-input');
+        if (!inputEl) return;
+        
+        const requirement = inputEl.value.trim();
+        if (!requirement) {
+            showAlert('请输入角色需求描述', '提示', 'warning');
+            return;
+        }
+        
+        updateDesignerStep(2);
+        
+        // 清空显示区
+        const reasoningEl = document.getElementById('reasoning-display');
+        const contentEl = document.getElementById('content-display');
+        if (reasoningEl) reasoningEl.textContent = '';
+        if (contentEl) contentEl.textContent = '';
+        
+        try {
+            const response = await fetch('/api/roles/design', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ requirement })
+            });
+            
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                generatedRoleDesign = data.design;
+                
+                setTimeout(() => {
+                    updateDesignerStep(3);
+                    renderRolePreview(generatedRoleDesign);
+                }, 1000);
+            } else {
+                showAlert('生成失败: ' + (data.message || '未知错误'), '错误', 'error');
+                setTimeout(() => updateDesignerStep(1), 2000);
+            }
+        } catch (error) {
+            console.error('Failed to generate role:', error);
+            showAlert('生成失败: ' + error.message, '错误', 'error');
+            updateDesignerStep(1);
+        }
+    }
+}
+
+/**
+ * 设计器返回
+ */
+export function designerGoBack() {
+    if (currentDesignerStep === 3) {
+        updateDesignerStep(1);
+    }
+}
+
+/**
+ * 渲染角色预览
+ */
+export function renderRolePreview(design) {
+    // 渲染基本信息
+    const nameEl = document.getElementById('preview-role-name');
+    const displayNameEl = document.getElementById('preview-display-name');
+    const descEl = document.getElementById('preview-description');
+    
+    if (nameEl) nameEl.value = design.role_name;
+    if (displayNameEl) displayNameEl.value = design.display_name;
+    if (descEl) descEl.value = design.role_description;
+    
+    // 渲染阶段
+    const stagesContainer = document.getElementById('preview-stages-container');
+    if (stagesContainer) {
+        stagesContainer.innerHTML = '';
+        
+        design.stages.forEach((stage) => {
+            const stageCard = document.createElement('div');
+            stageCard.className = 'bg-white border border-slate-300 rounded-lg p-3';
+            stageCard.innerHTML = `
+                <div class="flex items-center justify-between mb-2">
+                    <h5 class="font-bold text-slate-700">${stage.stage_name}</h5>
+                    <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">${stage.output_schema}</span>
+                </div>
+                <p class="text-sm text-slate-600 mb-2"><strong>思维方式:</strong> ${stage.thinking_style}</p>
+                <div class="text-sm text-slate-600">
+                    <strong>职责:</strong>
+                    <ul class="list-disc list-inside mt-1 space-y-1">
+                        ${stage.responsibilities.map(r => `<li>${r}</li>`).join('')}
+                    </ul>
+                </div>
+                <p class="text-xs text-slate-500 mt-2"><strong>输出格式:</strong> ${stage.output_format}</p>
+            `;
+            stagesContainer.appendChild(stageCard);
+        });
+    }
+    
+    // 渲染推荐人物
+    const personasContainer = document.getElementById('preview-personas-container');
+    if (personasContainer) {
+        personasContainer.innerHTML = '';
+        
+        if (design.recommended_personas && design.recommended_personas.length > 0) {
+            design.recommended_personas.forEach(persona => {
+                const personaCard = document.createElement('div');
+                personaCard.className = 'bg-white border border-slate-300 rounded-lg p-3 flex items-start';
+                personaCard.innerHTML = `
+                    <div class="text-2xl mr-3">👤</div>
+                    <div class="flex-1">
+                        <h5 class="font-bold text-slate-700 mb-1">${persona.name}</h5>
+                        <p class="text-sm text-slate-600 mb-2">${persona.reason}</p>
+                        <div class="flex flex-wrap gap-1">
+                            ${persona.traits.map(t => `<span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">${t}</span>`).join('')}
+                        </div>
+                    </div>
+                `;
+                personasContainer.appendChild(personaCard);
+            });
+        } else {
+            personasContainer.innerHTML = '<p class="text-sm text-slate-400">无推荐人物</p>';
+        }
+    }
+}
+
+/**
+ * 保存新角色
+ */
+export async function saveNewRole() {
+    try {
+        const displayNameEl = document.getElementById('preview-display-name');
+        const descEl = document.getElementById('preview-description');
+        
+        const updatedDesign = {
+            ...generatedRoleDesign,
+            display_name: displayNameEl ? displayNameEl.value : generatedRoleDesign.display_name,
+            role_description: descEl ? descEl.value : generatedRoleDesign.role_description
+        };
+        
+        const response = await fetch('/api/roles', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(updatedDesign)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showAlert(`✅ 成功创建角色: ${data.display_name}`, '成功', 'success');
+            closeRoleDesigner();
+            
+            // 刷新角色列表
+            if (typeof window.loadRoles === 'function') {
+                window.loadRoles();
+            } else if (typeof loadRolesList === 'function') {
+                loadRolesList();
+            }
+        } else {
+            showAlert('创建失败: ' + (data.message || '未知错误'), '错误', 'error');
+        }
+    } catch (error) {
+        console.error('Failed to create role:', error);
+        showAlert('创建失败: ' + error.message, '错误', 'error');
+    }
+}

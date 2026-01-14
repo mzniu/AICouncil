@@ -73,6 +73,7 @@ window.handleLogout = UI.handleLogout;
 
 // 角色管理
 window.loadRolesList = UI.loadRolesList;
+window.renderRolesList = UI.renderRolesList;
 window.showRoleDetail = UI.showRoleDetail;
 window.closeRoleDetail = UI.closeRoleDetail;
 window.deleteRole = UI.deleteRole;
@@ -80,6 +81,14 @@ window.reloadRole = UI.reloadRole;
 window.openRoleEditor = UI.openRoleEditor;
 window.closeRoleEditor = UI.closeRoleEditor;
 window.validateRoleConfig = UI.validateRoleConfig;
+window.saveRoleConfig = UI.saveRoleConfig;
+window.openRoleDesigner = UI.openRoleDesigner;
+window.closeRoleDesigner = UI.closeRoleDesigner;
+window.updateDesignerStep = UI.updateDesignerStep;
+window.designerNextStep = UI.designerNextStep;
+window.designerGoBack = UI.designerGoBack;
+window.renderRolePreview = UI.renderRolePreview;
+window.saveNewRole = UI.saveNewRole;
 window.saveRoleConfig = UI.saveRoleConfig;
 window.openRoleDesigner = UI.openRoleDesigner;
 window.closeRoleDesigner = UI.closeRoleDesigner;
