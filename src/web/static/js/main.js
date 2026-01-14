@@ -13,6 +13,13 @@ import * as Export from './modules/export.js';
 import * as UI from './modules/ui.js';
 
 // ========================
+// 调试日志：检查导入的模块
+// ========================
+console.log('[Main] History module:', History);
+console.log('[Main] History.deleteHistory:', History.deleteHistory);
+console.log('[Main] History module keys:', Object.keys(History));
+
+// ========================
 // 全局函数挂载（供HTML内联事件使用）
 // ========================
 
@@ -27,13 +34,17 @@ window.submitIntervention = Discussion.submitIntervention;
 window.submitRevisionFeedback = Discussion.submitRevisionFeedback;
 
 // 认证相关
-window.logout = API.logout;
+window.logout = UI.handleLogout;
 
 // 历史管理
 window.toggleHistoryModal = History.toggleHistoryModal;
 window.loadWorkspace = History.loadWorkspace;
-window.deleteWorkspace = History.deleteWorkspace;
+window.deleteWorkspace = History.deleteHistory;
 window.toggleLogs = UI.toggleLogs;
+
+// 调试日志：验证函数挂载
+console.log('[Main] window.deleteWorkspace:', window.deleteWorkspace);
+console.log('[Main] typeof window.deleteWorkspace:', typeof window.deleteWorkspace);
 
 // 导出功能
 window.toggleDownloadDropdown = Export.toggleDownloadDropdown;

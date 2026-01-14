@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- 三角形屋顶 -->
+  <path d="M16 3 L29 11 L3 11 Z" fill="#94A3B8" stroke="#64748B" stroke-width="0.5"/>
+  
+  <!-- 顶部横梁 -->
+  <rect x="2" y="11" width="28" height="2.5" fill="#64748B" stroke="#475569" stroke-width="0.3"/>
+  
+  <!-- 5根柱子 -->
+  <rect x="4" y="13.5" width="2.5" height="13" fill="#64748B" stroke="#475569" stroke-width="0.3"/>
+  <rect x="9" y="13.5" width="2.5" height="13" fill="#64748B" stroke="#475569" stroke-width="0.3"/>
+  <rect x="14.75" y="13.5" width="2.5" height="13" fill="#64748B" stroke="#475569" stroke-width="0.3"/>
+  <rect x="20.5" y="13.5" width="2.5" height="13" fill="#64748B" stroke="#475569" stroke-width="0.3"/>
+  <rect x="25.5" y="13.5" width="2.5" height="13" fill="#64748B" stroke="#475569" stroke-width="0.3"/>
+  
+  <!-- 底座 -->
+  <rect x="1.5" y="26.5" width="29" height="4" fill="#64748B" stroke="#475569" stroke-width="0.5"/>
+  
+  <!-- 装饰细节 - 柱头 -->
+  <circle cx="5.25" cy="13.5" r="1.5" fill="#CBD5E1" opacity="0.8"/>
+  <circle cx="10.25" cy="13.5" r="1.5" fill="#CBD5E1" opacity="0.8"/>
+  <circle cx="16" cy="13.5" r="1.5" fill="#CBD5E1" opacity="0.8"/>
+  <circle cx="21.75" cy="13.5" r="1.5" fill="#CBD5E1" opacity="0.8"/>
+  <circle cx="26.75" cy="13.5" r="1.5" fill="#CBD5E1" opacity="0.8"/>
+</svg>

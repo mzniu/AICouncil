@@ -423,3 +423,22 @@ export async function enableMfa(mfaData) {
 export async function getMfaSetup() {
     return apiFetch(`${API_BASE}/auth/mfa/setup`);
 }
+
+/**
+ * 获取报告版本列表
+ * @param {string} sessionId - 会话ID
+ * @returns {Promise<Object>} 报告版本列表
+ */
+export async function getReportVersions(sessionId) {
+    return apiFetch(`${API_BASE}/report_versions?workspace_id=${sessionId}`);
+}
+
+/**
+ * 获取报告内容
+ * @param {string} sessionId - 会话ID
+ * @param {string} filename - 报告文件名
+ * @returns {Promise<string>} 报告HTML内容
+ */
+export async function getReportContent(sessionId, filename) {
+    return apiFetch(`${API_BASE}/report_content?workspace_id=${sessionId}&filename=${encodeURIComponent(filename)}`);
+}

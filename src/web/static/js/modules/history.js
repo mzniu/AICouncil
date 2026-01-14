@@ -7,9 +7,10 @@
 import { showAlert, showConfirm, formatDate } from '../core/utils.js';
 import { getWorkspaces, deleteWorkspace as apiDeleteWorkspace, loadWorkspace as apiLoadWorkspace } from '../core/api.js';
 import * as State from '../core/state.js';
+import { pollStatus } from './discussion.js';
 
-// 使用全局t()函数（定义在index.html中）
-const t = window.t || ((key) => key);
+// 动态获取全局t()函数
+const t = (key) => (window.t && typeof window.t === 'function') ? window.t(key) : key;
 
 /**
  * 切换历史记录模态框的显示/隐藏状态
@@ -69,7 +70,7 @@ export function renderHistoryList(workspaces) {
                 </div>
                 <div class="flex flex-col items-end space-y-2">
                     <span class="text-xs font-mono text-slate-400 bg-slate-50 px-2 py-1 rounded">${ws.timestamp}</span>
-                    <button onclick="window.aiCouncil.history.deleteHistory(event, '${ws.id}')" 
+                    <button onclick="deleteWorkspace(event, '${ws.id}')" 
                             class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition opacity-0 group-hover:opacity-100"
                             title="${t('btn_delete_record')}">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -90,11 +91,14 @@ export function renderHistoryList(workspaces) {
  * @returns {Promise<void>}
  */
 export async function loadWorkspace(sessionId) {
+    console.log('[History] loadWorkspace called with sessionId:', sessionId);
     const confirmed = await showConfirm(t('msg_confirm_load'), t('title_confirm_load'));
+    console.log('[History] User confirmed load:', confirmed);
     if (!confirmed) return;
     
     try {
         const data = await apiLoadWorkspace(sessionId);
+        console.log('[History] Load workspace response:', data);
         
         if (data.status === 'success') {
             // 重置UI
@@ -126,14 +130,15 @@ export async function loadWorkspace(sessionId) {
             State.setLastEventCount(0);
             State.setLastLogCount(0);
             
-            // 触发一次更新以拉取所有历史事件
-            if (window.aiCouncil?.core?.fetchUpdates) {
-                window.aiCouncil.core.fetchUpdates();
-            }
+            console.log('[History] Triggering pollStatus to load historical events...');
+            // 触发一次轮询以拉取所有历史事件
+            pollStatus();
         } else {
+            console.error('[History] Load failed:', data.message);
             showAlert(t('msg_load_failed') + ': ' + (data.message || 'unknown'), t('title_error'), 'error');
         }
     } catch (error) {
+        console.error('[History] Load error:', error);
         showAlert(t('msg_load_failed') + ': ' + error.message, t('title_error'), 'error');
     }
 }
@@ -146,9 +151,11 @@ export async function loadWorkspace(sessionId) {
  * @returns {Promise<void>}
  */
 export async function deleteHistory(event, sessionId) {
+    console.log('[History] deleteHistory called with:', { event, sessionId });
     event.stopPropagation(); // 阻止触发 loadWorkspace
     
     const confirmed = await showConfirm(t('msg_confirm_delete'), t('title_confirm_delete'));
+    console.log('[History] User confirmed:', confirmed);
     if (!confirmed) return;
     
     try {
