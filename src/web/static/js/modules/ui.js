@@ -1036,6 +1036,7 @@ export async function validateRoleConfig() {
     } catch (error) {
         showAlert('验证失败: ' + error.message, t('title_error'), 'error');
     } */
+}
 
 /**
  * 保存角色配置
