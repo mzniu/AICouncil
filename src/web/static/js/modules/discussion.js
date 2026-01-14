@@ -776,9 +776,378 @@ export function formatContent(content, roleType) {
  * @returns {string} - HTML字符串
  */
 export function renderStructuredData(data) {
-    // 这里简化处理，实际实现需要根据具体的JSON结构渲染
-    // 可以复用index.html中的renderStructuredData逻辑
-    return `<pre class="whitespace-pre-wrap font-mono text-sm bg-slate-50 p-3 rounded-lg border border-slate-200 text-slate-600">${escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
+    // 使用智能渲染
+    try {
+        return renderGenericJsonTree(data);
+    } catch (e) {
+        // 降级到简单渲染
+        return `<pre class="whitespace-pre-wrap font-mono text-sm bg-slate-50 p-3 rounded-lg border border-slate-200 text-slate-600">${escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
+    }
+}
+
+// ==================== 智能数据渲染工具 ====================
+
+// 智能高亮关键字映射
+const SMART_HIGHLIGHT_KEYWORDS = {
+    error: ['issues', 'problems', 'errors', 'error', 'bugs', 'failures', 'failed', 'critical', 'warnings', 'risks', 'concerns', 'weaknesses', 'limitations', 'gaps', 'missing', '问题', '错误', '风险', '缺陷', '不足', '隐患', '漏洞', '质疑', '挑战'],
+    success: ['suggestions', 'recommendations', 'solutions', 'improvements', 'advantages', 'benefits', 'strengths', 'success', 'achieved', '建议', '优势', '方案', '改进', '解决', '优点', '成功', '选择', '推荐'],
+    rating: ['rating', 'score', 'level', 'grade', 'priority', 'status', 'evaluation', 'assessment', '评分', '等级', '评级', '优先级', '状态', '类型', 'type']
+};
+
+// 评级值到Badge颜色映射
+const SMART_BADGE_COLORS = {
+    '优秀': 'green', '良好': 'blue', '合格': 'blue', '一般': 'yellow', '较差': 'red', '不合格': 'red', '不可行': 'red', '需重构': 'yellow',
+    '高': 'red', '中': 'yellow', '低': 'green',
+    '紧急': 'red', '重要': 'yellow', '普通': 'blue',
+    '成功': 'green', '失败': 'red', '进行中': 'blue', '待处理': 'yellow',
+    '决策类': 'purple', '分析类': 'blue', '创意类': 'green', '规划类': 'yellow',
+    'excellent': 'green', 'good': 'blue', 'pass': 'blue', 'fair': 'yellow', 'poor': 'red', 'fail': 'red', 'infeasible': 'red',
+    'high': 'red', 'medium': 'yellow', 'low': 'green',
+    'critical': 'red', 'important': 'yellow', 'normal': 'blue',
+    'success': 'green', 'failed': 'red', 'pending': 'yellow', 'in_progress': 'blue',
+    'decision': 'purple', 'analysis': 'blue', 'creative': 'green', 'planning': 'yellow'
+};
+
+// 字段名称美化映射
+const FIELD_DISPLAY_NAMES = {
+    'analysis': '📊 需求分析', 'role_planning': '👥 角色规划', 'framework_selection': '🏗️ 框架选择',
+    'execution_config': '⚙️ 执行配置', 'summary': '📋 规划摘要',
+    'problem_type': '问题类型', 'core_requirement': '核心需求', 'complexity': '复杂度',
+    'key_points': '关键要点', 'constraints': '约束条件',
+    'recommended_roles': '推荐角色', 'custom_roles_needed': '需要自定义角色',
+    'custom_role_descriptions': '自定义角色描述',
+    'selected_framework': '选定框架', 'framework_reason': '选择原因', 'stage_customization': '阶段定制',
+    'total_rounds': '总轮数', 'agents_per_role': '每角色Agent数',
+    'key_decisions': '关键决策', 'expected_outcomes': '预期成果', 'risk_factors': '风险因素',
+    'name': '名称', 'description': '描述', 'type': '类型', 'source': '来源',
+    'stages': '阶段', 'roles': '角色', 'rounds': '轮数',
+    'core_idea': '核心思路', 'steps': '执行步骤', 'feasibility': '可行性分析',
+    'advantages': '优势', 'requirements': '资源需求',
+    'reviews': '审查意见', 'issues': '发现问题', 'suggestions': '改进建议',
+    'rating': '评级', 'plan_id': '方案ID',
+    'decomposition': '问题拆解', 'core_goal': '核心目标', 'key_questions': '关键问题',
+    'boundaries': '边界条件', 'report_design': '报告设计', 'instructions': '执行指令'
+};
+
+function getSmartHighlightType(key) {
+    if (!key) return null;
+    const lowerKey = key.toLowerCase();
+    for (const [type, keywords] of Object.entries(SMART_HIGHLIGHT_KEYWORDS)) {
+        if (keywords.some(kw => lowerKey.includes(kw))) {
+            return type;
+        }
+    }
+    return null;
+}
+
+function getSmartBadgeColor(value) {
+    if (typeof value !== 'string') return null;
+    const lowerValue = value.toLowerCase();
+    for (const [val, color] of Object.entries(SMART_BADGE_COLORS)) {
+        if (lowerValue === val.toLowerCase() || lowerValue.includes(val.toLowerCase())) {
+            return color;
+        }
+    }
+    return 'gray';
+}
+
+function getFieldDisplayName(key) {
+    return FIELD_DISPLAY_NAMES[key] || key;
+}
+
+function getFieldIcon(key) {
+    const icons = {
+        'analysis': '📊', 'role_planning': '👥', 'framework_selection': '🏗️',
+        'execution_config': '⚙️', 'summary': '📋', 'stages': '📑', 'roles': '👤',
+        'key_points': '🎯', 'constraints': '🔒', 'risk_factors': '⚠️',
+        'advantages': '✅', 'issues': '❌', 'suggestions': '💡',
+        'steps': '📝', 'core_idea': '💡', 'decomposition': '🔍'
+    };
+    return icons[key] || '📄';
+}
+
+function isHomogeneousObjectArray(arr) {
+    if (!Array.isArray(arr) || arr.length === 0) return false;
+    if (arr.length === 1) return typeof arr[0] === 'object' && arr[0] !== null && !Array.isArray(arr[0]);
+    
+    const firstKeys = typeof arr[0] === 'object' && arr[0] !== null ? Object.keys(arr[0]).sort().join(',') : null;
+    if (!firstKeys) return false;
+    
+    return arr.every(item => {
+        if (typeof item !== 'object' || item === null || Array.isArray(item)) return false;
+        return Object.keys(item).sort().join(',') === firstKeys;
+    });
+}
+
+function isSimpleArray(arr) {
+    if (!Array.isArray(arr)) return false;
+    return arr.every(item => typeof item !== 'object' || item === null);
+}
+
+function isFlatObject(obj) {
+    if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) return false;
+    return Object.values(obj).every(v => typeof v !== 'object' || v === null);
+}
+
+function renderGenericJsonTree(data, title = null) {
+    return `
+        <div class="smart-render-container">
+            ${title ? `
+                <div class="smart-render-header">
+                    <span class="smart-render-header-icon">📋</span>
+                    <span class="smart-render-header-title">${escapeHtml(title)}</span>
+                </div>
+            ` : ''}
+            ${renderSmartValue(data, null, 0)}
+        </div>
+    `;
+}
+
+function renderSmartValue(data, key, depth) {
+    if (data === null || data === undefined) {
+        return `<span class="text-slate-400 italic">${data === null ? '空' : '未定义'}</span>`;
+    }
+    
+    if (typeof data !== 'object') {
+        return renderPrimitiveValue(data, key);
+    }
+    
+    if (Array.isArray(data)) {
+        if (data.length === 0) {
+            return `<span class="text-slate-400 italic">（空列表）</span>`;
+        }
+        
+        if (isHomogeneousObjectArray(data)) {
+            return renderTable(data);
+        }
+        
+        if (isSimpleArray(data)) {
+            return renderSimpleList(data, key);
+        }
+        
+        return renderComplexArray(data, key, depth);
+    }
+    
+    const keys = Object.keys(data);
+    if (keys.length === 0) {
+        return `<span class="text-slate-400 italic">（空对象）</span>`;
+    }
+    
+    if (depth === 0) {
+        return renderTopLevelObject(data);
+    }
+    
+    if (isFlatObject(data)) {
+        return renderKeyValueGrid(data);
+    }
+    
+    return renderNestedObject(data, key, depth);
+}
+
+function renderPrimitiveValue(value, key) {
+    if (typeof value === 'string') {
+        const badgeColor = key && getSmartHighlightType(key) === 'rating' ? getSmartBadgeColor(value) : null;
+        if (badgeColor) {
+            return `<span class="smart-badge smart-badge-${badgeColor}">${escapeHtml(value)}</span>`;
+        }
+        
+        if (value.length > 80) {
+            return `<div class="smart-kv-value-long">${escapeHtml(value)}</div>`;
+        }
+        
+        return `<span class="text-slate-700">${escapeHtml(value)}</span>`;
+    }
+    
+    if (typeof value === 'number') {
+        return `<span class="text-blue-600 font-medium">${value}</span>`;
+    }
+    
+    if (typeof value === 'boolean') {
+        return value 
+            ? `<span class="smart-badge smart-badge-green">是</span>`
+            : `<span class="smart-badge smart-badge-gray">否</span>`;
+    }
+    
+    return `<span class="text-slate-500">${String(value)}</span>`;
+}
+
+function renderTable(arr) {
+    if (arr.length === 0) return '';
+    
+    const headers = Object.keys(arr[0]);
+    
+    return `
+        <table class="smart-table">
+            <thead>
+                <tr>
+                    ${headers.map(h => `<th>${escapeHtml(getFieldDisplayName(h))}</th>`).join('')}
+                </tr>
+            </thead>
+            <tbody>
+                ${arr.map(row => `
+                    <tr>
+                        ${headers.map(h => `<td>${renderPrimitiveValue(row[h], h)}</td>`).join('')}
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+function renderSimpleList(arr, key) {
+    const useNumbers = key && (key.includes('step') || key.includes('point') || key.includes('question') || 
+                              key.includes('步骤') || key.includes('要点') || key.includes('问题'));
+    
+    return `
+        <ul class="smart-list">
+            ${arr.map((item, i) => `
+                <li class="smart-list-item">
+                    ${useNumbers 
+                        ? `<span class="smart-list-number">${i + 1}</span>`
+                        : `<span class="smart-list-bullet"></span>`
+                    }
+                    <span>${renderPrimitiveValue(item, null)}</span>
+                </li>
+            `).join('')}
+        </ul>
+    `;
+}
+
+function renderComplexArray(arr, key, depth) {
+    return arr.map((item, i) => {
+        const nodeId = `arr-${Math.random().toString(36).substr(2, 9)}`;
+        const itemTitle = item.name || item.title || item.id || `项目 ${i + 1}`;
+        
+        return `
+            <div class="smart-card">
+                <div class="smart-card-header" onclick="window.toggleSmartCard('${nodeId}')">
+                    <span class="smart-card-title">
+                        <span class="smart-card-title-icon">📌</span>
+                        ${escapeHtml(String(itemTitle))}
+                    </span>
+                    <span class="smart-card-toggle" id="${nodeId}-icon">▼</span>
+                </div>
+                <div class="smart-card-content" id="${nodeId}">
+                    ${renderSmartValue(item, null, depth + 1)}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderKeyValueGrid(obj) {
+    const entries = Object.entries(obj);
+    
+    return `
+        <div class="smart-kv-grid">
+            ${entries.map(([k, v]) => `
+                <span class="smart-kv-key">${escapeHtml(getFieldDisplayName(k))}</span>
+                <span class="smart-kv-value">${renderPrimitiveValue(v, k)}</span>
+            `).join('')}
+        </div>
+    `;
+}
+
+function renderTopLevelObject(obj) {
+    const entries = Object.entries(obj);
+    const simpleFields = {};
+    const complexFields = [];
+    
+    entries.forEach(([k, v]) => {
+        if (typeof v !== 'object' || v === null) {
+            simpleFields[k] = v;
+        } else {
+            complexFields.push([k, v]);
+        }
+    });
+    
+    let html = '';
+    
+    if (Object.keys(simpleFields).length > 0) {
+        html += `
+            <div class="smart-card">
+                <div class="smart-card-header" onclick="window.toggleSmartCard('overview-card')">
+                    <span class="smart-card-title">
+                        <span class="smart-card-title-icon">📋</span>
+                        概览
+                    </span>
+                    <span class="smart-card-toggle" id="overview-card-icon">▼</span>
+                </div>
+                <div class="smart-card-content" id="overview-card">
+                    ${renderKeyValueGrid(simpleFields)}
+                </div>
+            </div>
+        `;
+    }
+    
+    complexFields.forEach(([k, v]) => {
+        const nodeId = `card-${Math.random().toString(36).substr(2, 9)}`;
+        const highlightType = getSmartHighlightType(k);
+        const highlightClass = highlightType ? `smart-highlight-${highlightType}` : '';
+        const displayName = getFieldDisplayName(k);
+        const icon = getFieldIcon(k);
+        const isArray = Array.isArray(v);
+        const badge = isArray ? `${v.length} 项` : `${Object.keys(v).length} 字段`;
+        
+        html += `
+            <div class="smart-card ${highlightClass}">
+                <div class="smart-card-header" onclick="window.toggleSmartCard('${nodeId}')">
+                    <span class="smart-card-title">
+                        <span class="smart-card-title-icon">${icon}</span>
+                        ${escapeHtml(displayName)}
+                        <span class="smart-card-badge">${badge}</span>
+                    </span>
+                    <span class="smart-card-toggle" id="${nodeId}-icon">▼</span>
+                </div>
+                <div class="smart-card-content" id="${nodeId}">
+                    ${renderSmartValue(v, k, 1)}
+                </div>
+            </div>
+        `;
+    });
+    
+    return html;
+}
+
+function renderNestedObject(obj, key, depth) {
+    if (isFlatObject(obj)) {
+        return renderKeyValueGrid(obj);
+    }
+    
+    const entries = Object.entries(obj);
+    let html = '<div class="space-y-2">';
+    
+    entries.forEach(([k, v]) => {
+        const displayName = getFieldDisplayName(k);
+        
+        if (typeof v !== 'object' || v === null) {
+            html += `
+                <div class="flex items-start gap-2">
+                    <span class="smart-kv-key min-w-[100px]">${escapeHtml(displayName)}</span>
+                    <span class="smart-kv-value">${renderPrimitiveValue(v, k)}</span>
+                </div>
+            `;
+        } else {
+            const nodeId = `nested-${Math.random().toString(36).substr(2, 9)}`;
+            const collapsed = depth >= 2 ? 'collapsed' : '';
+            const icon = collapsed ? '▶' : '▼';
+            
+            html += `
+                <div class="border-l-2 border-slate-200 pl-3 mt-2">
+                    <div class="flex items-center gap-2 cursor-pointer text-slate-600 hover:text-slate-800 mb-1" onclick="window.toggleSmartCard('${nodeId}')">
+                        <span class="text-xs" id="${nodeId}-icon">${icon}</span>
+                        <span class="font-medium text-sm">${escapeHtml(displayName)}</span>
+                    </div>
+                    <div class="${collapsed}" id="${nodeId}">
+                        ${renderSmartValue(v, k, depth + 1)}
+                    </div>
+                </div>
+            `;
+        }
+    });
+    
+    html += '</div>';
+    return html;
 }
 
 /**
