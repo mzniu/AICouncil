@@ -6,7 +6,7 @@
 
 import { showAlert, showConfirm, formatDate } from '../core/utils.js';
 import { getWorkspaces, deleteWorkspace as apiDeleteWorkspace, loadWorkspace as apiLoadWorkspace } from '../core/api.js';
-import { state } from '../core/state.js';
+import * as State from '../core/state.js';
 
 // 使用全局t()函数（定义在index.html中）
 const t = window.t || ((key) => key);
@@ -100,8 +100,8 @@ export async function loadWorkspace(sessionId) {
             reportIframe.srcdoc = "<div style='color:#94a3b8; font-style:italic; text-align:center; margin-top:100px; font-family:sans-serif;'></div>";
             
             // 重置进度条
-            state.currentProgress = 0;
-            state.isReportingPhase = false;
+            State.setCurrentProgress(0);
+            State.setIsReportingPhase(false);
             document.getElementById('progress-bar').style.width = '0%';
             document.getElementById('progress-percentage').innerText = '0%';
             
@@ -118,8 +118,8 @@ export async function loadWorkspace(sessionId) {
             showAlert(t('msg_load_success'), t('title_success'));
             
             // 重置计数器以强制全量拉取
-            state.lastEventCount = 0;
-            state.lastLogCount = 0;
+            State.setLastEventCount(0);
+            State.setLastLogCount(0);
             
             // 触发一次更新以拉取所有历史事件
             if (window.aiCouncil?.core?.fetchUpdates) {
