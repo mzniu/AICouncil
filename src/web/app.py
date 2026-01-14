@@ -201,7 +201,16 @@ def start_discussion():
     backend_logs = []
     final_report = ""
     
-    data = request.json
+    # 获取并验证请求数据
+    try:
+        data = request.get_json()
+        if not data:
+            logger.error("Request data is empty or not JSON")
+            return jsonify({"status": "error", "message": "请求数据格式错误"}), 400
+    except Exception as e:
+        logger.error(f"Failed to parse request JSON: {e}")
+        return jsonify({"status": "error", "message": "请求数据解析失败"}), 400
+    
     issue = data.get('issue')
     backend = data.get('backend', 'deepseek')
     model = data.get('model') # 获取全局模型覆盖
