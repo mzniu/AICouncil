@@ -972,6 +972,5 @@ export {
     appendEvent,
     appendLog,
     updateProgress,
-    setLayoutMode,
     getIcon
 };
