@@ -47,7 +47,8 @@ def init_auth(app: Flask):
     """
     
     # === 数据库配置 ===
-    data_dir = Path(app.root_path).parent / 'data'
+    # 确保data目录在项目根目录（向上两级：src/web -> src -> 项目根）
+    data_dir = Path(app.root_path).parent.parent / 'data'
     data_dir.mkdir(exist_ok=True)
     
     # 读取DATABASE_URL，如果为空字符串则使用默认相对路径
