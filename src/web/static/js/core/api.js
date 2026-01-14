@@ -150,12 +150,21 @@ export async function getWorkspaces() {
 }
 
 /**
+ * 加载历史工作区
+ * @param {string} sessionId - 会话ID
+ * @returns {Promise<Object>} 工作区数据
+ */
+export async function loadWorkspace(sessionId) {
+    return apiFetch(`${API_BASE}/load_workspace/${sessionId}`);
+}
+
+/**
  * 删除工作区
  * @param {string} workspaceId - 工作区ID
  * @returns {Promise<Object>} 删除结果
  */
 export async function deleteWorkspace(workspaceId) {
-    return apiFetch(`${API_BASE}/workspaces/${workspaceId}`, {
+    return apiFetch(`${API_BASE}/delete_workspace/${workspaceId}`, {
         method: 'DELETE'
     });
 }
