@@ -48,11 +48,26 @@ def init_auth(app: Flask):
     
     # === 数据库配置 ===
     # 确保data目录在项目根目录（向上两级：src/web -> src -> 项目根）
+    logger.info(f"📁 Flask app.root_path: {app.root_path}")
     data_dir = Path(app.root_path).parent.parent / 'data'
-    data_dir.mkdir(exist_ok=True)
+    logger.info(f"📁 计算的data目录: {data_dir.absolute()}")
+    
+    # 创建data目录并验证权限
+    try:
+        data_dir.mkdir(parents=True, exist_ok=True)
+        logger.info(f"✅ data目录已准备: {data_dir.absolute()}")
+    except Exception as e:
+        logger.error(f"❌ 创建data目录失败: {e}")
+        raise RuntimeError(f"无法创建数据库目录 {data_dir}: {e}")
+    
+    # 检查目录写权限
+    if not os.access(data_dir, os.W_OK):
+        logger.error(f"❌ data目录无写权限: {data_dir.absolute()}")
+        raise PermissionError(f"无法写入数据库目录: {data_dir.absolute()}")
     
     # 读取DATABASE_URL，如果为空字符串则使用默认相对路径
-    database_url = os.getenv('DATABASE_URL') or f"sqlite:///{data_dir / 'users.db'}"
+    database_url = os.getenv('DATABASE_URL') or f"sqlite:///{data_dir.absolute() / 'users.db'}"
+    logger.info(f"🗄️  数据库URI: {database_url}")
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
