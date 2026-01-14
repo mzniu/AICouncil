@@ -961,7 +961,7 @@ export async function reloadRole(roleName) {
     } catch (error) {
         console.error('Failed to reload role:', error);
         showAlert(t('role_reload_failed') + ': ' + error.message, t('title_error'), 'error');
-    }
+    } */
 }
 
 // 角色编辑器相关状态
@@ -1006,7 +1006,7 @@ export async function openRoleEditor(roleName) {
     } catch (error) {
         console.error('Failed to load role config:', error);
         showAlert('加载配置失败: ' + error.message, t('title_error'), 'error');
-    }
+    } */
 }
 
 /**
