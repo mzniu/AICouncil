@@ -1254,3 +1254,211 @@ export function createAgentConfigItem(label, id, bgColor, dotColor) {
     `;
     return div;
 }
+
+// ==================== 用户管理函数 ====================
+
+/**
+ * 加载用户信息
+ */
+export async function loadUserInfo() {
+    try {
+        const response = await fetch('/api/auth/user/info');
+        if (response.ok) {
+            const data = await response.json();
+            const usernameEl = document.getElementById('user-display-username');
+            const emailEl = document.getElementById('user-display-email');
+            const mfaEl = document.getElementById('user-display-mfa');
+            
+            if (usernameEl) usernameEl.textContent = data.username;
+            if (emailEl) emailEl.textContent = data.email;
+            
+            if (mfaEl) {
+                const mfaStatus = data.mfa_enabled 
+                    ? '<span class="text-green-600">✅ 已启用</span>' 
+                    : '<span class="text-gray-500">❌ 未启用</span>';
+                mfaEl.innerHTML = mfaStatus;
+            }
+            
+            // 加载MFA管理界面
+            loadMfaManagement(data.mfa_enabled);
+        } else {
+            showAlert('加载用户信息失败', '错误', 'error');
+        }
+    } catch (error) {
+        console.error('Load user info error:', error);
+        showAlert('网络错误，无法加载用户信息', '错误', 'error');
+    }
+}
+
+/**
+ * 加载MFA管理界面
+ */
+export function loadMfaManagement(mfaEnabled) {
+    const container = document.getElementById('mfa-status-container');
+    if (!container) return;
+    
+    if (mfaEnabled) {
+        // MFA已启用
+        container.innerHTML = `
+            <div class="bg-green-50 border border-green-200 p-3 rounded-lg">
+                <div class="flex items-center mb-2">
+                    <svg class="w-5 h-5 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                    </svg>
+                    <span class="text-sm font-bold text-green-800">双因素认证已启用</span>
+                </div>
+                <p class="text-xs text-green-700 mb-3">您的账户已受到额外保护。如需更换设备或重新配置，请先禁用再重新设置。</p>
+                <button onclick="window.disableMfa()" class="w-full bg-yellow-600 hover:bg-yellow-700 text-white py-2 px-4 rounded-lg font-bold transition">
+                    禁用双因素认证
+                </button>
+            </div>
+            <div class="bg-white border border-blue-200 p-3 rounded-lg">
+                <p class="text-xs text-slate-600 mb-2">
+                    <span class="font-bold">💡 提示：</span>禁用后可以重新配置MFA
+                </p>
+                <a href="/mfa-setup" target="_blank" class="text-blue-600 hover:text-blue-800 text-xs font-bold underline">
+                    需要帮助？查看设置指南 ↗
+                </a>
+            </div>
+        `;
+    } else {
+        // MFA未启用
+        container.innerHTML = `
+            <div class="bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
+                <div class="flex items-center mb-2">
+                    <svg class="w-5 h-5 text-yellow-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                    </svg>
+                    <span class="text-sm font-bold text-yellow-800">建议启用双因素认证</span>
+                </div>
+                <p class="text-xs text-yellow-700 mb-3">启用双因素认证可以大幅提升账户安全性，防止密码泄露导致的账户被盗。</p>
+                <a href="/mfa-setup" class="block w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg font-bold transition text-center">
+                    立即启用
+                </a>
+            </div>
+            <div class="bg-white border border-blue-200 p-3 rounded-lg">
+                <p class="text-xs text-slate-600 mb-1">
+                    <span class="font-bold">🔐 什么是双因素认证？</span>
+                </p>
+                <p class="text-xs text-slate-500">
+                    除了密码外，还需要手机验证器应用生成的6位动态验证码，即使密码泄露也能保护账户安全。
+                </p>
+            </div>
+        `;
+    }
+}
+
+/**
+ * 禁用MFA
+ */
+export async function disableMfa() {
+    const password = prompt('为了安全，请输入您的当前密码以禁用双因素认证：');
+    
+    if (!password) {
+        return; // 用户取消
+    }
+
+    try {
+        const response = await fetch('/api/auth/mfa/disable', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showAlert('双因素认证已禁用。您可以随时重新启用。', '成功', 'success');
+            // 重新加载用户信息
+            loadUserInfo();
+        } else {
+            showAlert(data.error || '禁用失败', '错误', 'error');
+        }
+    } catch (error) {
+        console.error('Disable MFA error:', error);
+        showAlert('网络错误，请稍后重试', '错误', 'error');
+    }
+}
+
+/**
+ * 修改密码
+ */
+export async function changePassword() {
+    const currentPassword = document.getElementById('user-current-password')?.value.trim();
+    const newPassword = document.getElementById('user-new-password')?.value.trim();
+    const confirmPassword = document.getElementById('user-confirm-password')?.value.trim();
+
+    // 前端验证
+    if (!currentPassword || !newPassword || !confirmPassword) {
+        showAlert('请填写所有密码字段', '错误', 'error');
+        return;
+    }
+
+    if (newPassword !== confirmPassword) {
+        showAlert('两次输入的新密码不一致', '错误', 'error');
+        return;
+    }
+
+    if (newPassword.length < 8) {
+        showAlert('新密码长度至少8位', '错误', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/auth/user/change-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                current_password: currentPassword,
+                new_password: newPassword
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showAlert(data.message || '密码修改成功！', '成功', 'success');
+            // 清空输入框
+            const currentPwdEl = document.getElementById('user-current-password');
+            const newPwdEl = document.getElementById('user-new-password');
+            const confirmPwdEl = document.getElementById('user-confirm-password');
+            if (currentPwdEl) currentPwdEl.value = '';
+            if (newPwdEl) newPwdEl.value = '';
+            if (confirmPwdEl) confirmPwdEl.value = '';
+        } else {
+            if (data.details) {
+                const errors = Object.values(data.details).join('、');
+                showAlert(`${data.error}：${errors}`, '错误', 'error');
+            } else {
+                showAlert(data.error || '密码修改失败', '错误', 'error');
+            }
+        }
+    } catch (error) {
+        console.error('Change password error:', error);
+        showAlert('网络错误，请稍后重试', '错误', 'error');
+    }
+}
+
+/**
+ * 退出登录
+ */
+export async function handleLogout() {
+    if (!confirm('确定要退出登录吗？')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/auth/logout', {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            window.location.href = '/login';
+        } else {
+            showAlert('登出失败，请稍后重试', '错误', 'error');
+        }
+    } catch (error) {
+        console.error('Logout error:', error);
+        showAlert('网络错误，请稍后重试', '错误', 'error');
+    }
+}

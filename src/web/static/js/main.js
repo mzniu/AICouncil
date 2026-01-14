@@ -59,10 +59,17 @@ window.openPresetsTab = UI.openPresetsTab;
 window.applyModalPreset = UI.applyModalPreset;
 window.deleteModalPreset = UI.deleteModalPreset;
 window.saveModalPreset = UI.saveModalPreset;
-window.loadSystemSettings = UI.loadSys
-window.updateAgentConfigsUI = UI.updateAgentConfigsUI;
-window.createAgentConfigItem = UI.createAgentConfigItem;temSettings;
+window.loadSystemSettings = UI.loadSystemSettings;
 window.saveSettings = UI.saveSettings;
+window.updateAgentConfigsUI = UI.updateAgentConfigsUI;
+window.createAgentConfigItem = UI.createAgentConfigItem;
+
+// 用户管理
+window.loadUserInfo = UI.loadUserInfo;
+window.loadMfaManagement = UI.loadMfaManagement;
+window.disableMfa = UI.disableMfa;
+window.changePassword = UI.changePassword;
+window.handleLogout = UI.handleLogout;
 
 // 角色管理
 window.loadRolesList = UI.loadRolesList;
