@@ -127,7 +127,9 @@ export async function startDiscussion() {
         });
         
         if (data.status === 'ok') {
-            console.log('讨论已启动');
+            console.log('讨论已启动，开始轮询状态更新');
+            // 启动轮询以获取实时更新
+            startPolling();
         } else {
             State.setIsRunning(false);
             updateStatusUI({ is_running: false });
@@ -157,6 +159,9 @@ export async function stopDiscussion() {
         if (data.status === 'ok') {
             State.setIsRunning(false);
             updateStatusUI({ is_running: false });
+            // 停止轮询
+            stopPolling();
+            console.log('讨论已停止，轮询已终止');
         }
     } catch (error) {
         console.error('Stop error:', error);
@@ -336,6 +341,9 @@ export function updateStatusUI(statusData) {
         statusText.innerText = t('status_ready');
         interventionArea.classList.add('hidden');
         toggleReportLoading(false);
+        
+        // 讨论结束时停止轮询
+        stopPolling();
 
         // 如果不运行，且已经有报告内容，则切换到报告模式
         if (reportIframe && reportIframe.srcdoc && reportIframe.srcdoc.length > 200 && !reportIframe.srcdoc.includes('italic')) {
