@@ -895,17 +895,19 @@ export function injectRevisionPanel(html) {
  * @param {'discussion'|'report'} mode - 布局模式
  */
 export function setLayoutMode(mode) {
-    const discussionCol = document.getElementById('discussion-column');
-    const reportCol = document.getElementById('report-column');
+    const reportSection = document.getElementById('report-section');
+    
+    if (!reportSection) {
+        console.warn('report-section element not found');
+        return;
+    }
     
     if (mode === 'discussion') {
-        discussionCol.classList.remove('md:w-1/2');
-        discussionCol.classList.add('md:w-full');
-        reportCol.classList.add('hidden');
+        // 讨论模式：隐藏报告区
+        reportSection.classList.add('hidden', 'lg:hidden');
     } else {
-        discussionCol.classList.remove('md:w-full');
-        discussionCol.classList.add('md:w-1/2');
-        reportCol.classList.remove('hidden');
+        // 报告模式：显示报告区
+        reportSection.classList.remove('hidden', 'lg:hidden');
     }
 }
 
