@@ -3,6 +3,7 @@
 包括注册、登录、登出、MFA设置和验证、密码重置、管理员功能
 """
 import os
+import sys
 import json
 import re
 import secrets
@@ -992,15 +993,28 @@ def update_smtp_config():
     data = request.get_json()
     
     try:
-        # 读取当前.env文件（src/auth_routes.py -> src -> 项目根目录）
-        env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
-        # 备用：直接从项目根查找
+        # 智能查找.env文件（兼容开发模式和PyInstaller打包模式）
+        env_path = None
+        
+        # 方案1: PyInstaller打包模式 - 在exe所在目录查找
+        if getattr(sys, 'frozen', False):
+            # 打包后：sys.executable 是 exe 路径
+            exe_dir = os.path.dirname(sys.executable)
+            env_path = os.path.join(exe_dir, '.env')
+            logger.info(f"检测到PyInstaller环境，在exe目录查找.env: {env_path}")
+        
+        # 方案2: 开发模式 - 从源代码路径查找
+        if not env_path or not os.path.exists(env_path):
+            env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
+            logger.info(f"开发模式，从项目根目录查找.env: {env_path}")
+        
+        # 方案3: 备用 - 当前工作目录
         if not os.path.exists(env_path):
-            # 尝试从当前工作目录查找
             env_path = os.path.abspath('.env')
+            logger.info(f"备用方案，从工作目录查找.env: {env_path}")
         
         if not os.path.exists(env_path):
-            logger.error(f"尝试访问的.env路径: {env_path}")
+            logger.error(f"所有路径尝试失败，.env文件不存在: {env_path}")
             return jsonify({"error": f".env文件不存在: {env_path}"}), 500
         
         with open(env_path, 'r', encoding='utf-8') as f:
