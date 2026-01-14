@@ -553,14 +553,24 @@ def stop_discussion():
 
 @app.route('/api/status', methods=['GET'])
 def get_status():
+    """
+    获取当前讨论状态、配置和事件数据
+    前端轮询此接口以获取实时更新
+    """
     return jsonify({
         "is_running": is_running,
         "config": current_config,
-        "browser_found": bool(config.BROWSER_PATH and os.path.exists(config.BROWSER_PATH))
+        "browser_found": bool(config.BROWSER_PATH and os.path.exists(config.BROWSER_PATH)),
+        "events": discussion_events,
+        "logs": backend_logs,
+        "final_report": final_report
     })
 
 @app.route('/api/events', methods=['GET'])
 def get_events():
+    """
+    获取事件数据（保留兼容性）
+    """
     return jsonify({
         "events": discussion_events,
         "logs": backend_logs,
