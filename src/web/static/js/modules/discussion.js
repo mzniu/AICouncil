@@ -971,6 +971,5 @@ export {
     escapeHtml,
     appendEvent,
     appendLog,
-    updateProgress,
     getIcon
 };
