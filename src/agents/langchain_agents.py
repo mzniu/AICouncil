@@ -1431,7 +1431,7 @@ def generate_report_from_workspace(workspace_path: str, model_config: Dict[str, 
             
             # 从 orchestration_result.json 构造 final_data
             final_data = {
-                "issue": orchestration_data.get("plan", {}).get("analysis", {}).get("problem_type", ""),
+                "issue": orchestration_data.get("user_requirement", ""),  # 修复：使用 user_requirement 而非 problem_type
                 "decomposition": {},  # 议事编排官没有分解步骤
                 "decomposition_challenge": "",
                 "history": orchestration_data.get("execution", {}),  # FrameworkEngine 的执行结果

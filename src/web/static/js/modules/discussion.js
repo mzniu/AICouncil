@@ -430,7 +430,8 @@ export async function pollStatus() {
             events.forEach(event => {
                 appendEvent(event);
                 updateProgress(event);
-                if (event.type === 'final_report') {
+                if (event.type === 'final_report' && event.report_html && event.report_html.length > 100) {
+                    console.log('[Discussion] Processing final_report event from WebSocket (length:', event.report_html.length, ')');
                     handleFinalReport(event);
                 }
             });
@@ -451,7 +452,7 @@ export async function pollStatus() {
             const reportIframe = document.getElementById('report-iframe');
             // 只有当iframe为空或显示占位符时才加载报告
             if (reportIframe && (!reportIframe.srcdoc || reportIframe.srcdoc.length < 200 || reportIframe.srcdoc.includes('italic'))) {
-                console.log('Loading final report from status API');
+                console.log('[Discussion] Loading final report from status API (length:', data.final_report.length, ')');
                 handleFinalReport({ report_html: data.final_report });
             }
         }
@@ -1210,10 +1211,10 @@ function appendLog(logText) {
  * @param {Object} event - final_report事件对象
  */
 export async function handleFinalReport(event) {
-    if (!event.report_html) {
-        console.error('报告内容为空');
-        return;
-    }
+    console.log('[Discussion] handleFinalReport called, report_html length:', event?.report_html?.length);
+    
+    // 移除校验：由 pollStatus 在调用前确保数据有效性
+    // 此处直接处理可避免延迟加载时丢失配置
     
     let html = event.report_html;
     
@@ -1305,6 +1306,7 @@ export function injectRevisionPanel(html) {
  */
 export function setLayoutMode(mode) {
     const reportSection = document.getElementById('report-section');
+    const discussionSection = document.getElementById('discussion-section');
     
     if (!reportSection) {
         console.warn('report-section element not found');
@@ -1312,12 +1314,20 @@ export function setLayoutMode(mode) {
     }
     
     if (mode === 'discussion') {
-        // 讨论模式：小屏幕隐藏，大屏幕保持显示
+        // 讨论模式：隐藏报告区，讨论区扩展为100%
         reportSection.classList.add('hidden');
         reportSection.classList.remove('lg:hidden');
+        if (discussionSection) {
+            discussionSection.classList.remove('lg:w-1/2');
+            discussionSection.classList.add('lg:w-full');
+        }
     } else {
-        // 报告模式：显示报告区
+        // 报告模式：显示报告区，恢复两栏布局
         reportSection.classList.remove('hidden', 'lg:hidden');
+        if (discussionSection) {
+            discussionSection.classList.remove('lg:w-full');
+            discussionSection.classList.add('lg:w-1/2');
+        }
     }
 }
 
