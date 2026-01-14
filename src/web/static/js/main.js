@@ -44,6 +44,7 @@ window.copyReport = Export.copyReport;
 // UI交互
 window.toggleOrchestratorMode = UI.toggleOrchestratorMode;
 window.toggleAdvancedConfigModal = UI.toggleAdvancedConfigModal;
+window.toggleRolesModal = UI.toggleRolesModal;
 window.switchAdvancedTab = UI.switchAdvancedTab;
 window.applyAdvancedConfig = UI.applyAdvancedConfig;
 window.updateModalReasoningVisibility = UI.updateModalReasoningVisibility;

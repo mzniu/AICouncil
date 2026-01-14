@@ -69,6 +69,13 @@ export function toggleModal(modalId) {
 }
 
 /**
+ * 切换角色管理模态框
+ */
+export function toggleRolesModal() {
+    toggleModal('roles-modal');
+}
+
+/**
  * 切换高级配置Modal
  */
 export function toggleAdvancedConfigModal() {
