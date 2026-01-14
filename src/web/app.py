@@ -160,6 +160,25 @@ def register_page():
     """注册页面"""
     return render_template('register.html', version=__version__)
 
+@app.route('/forgot-password')
+def forgot_password_page():
+    """忘记密码页面"""
+    return render_template('forgot_password.html', version=__version__)
+
+@app.route('/reset-password')
+def reset_password_page():
+    """密码重置页面"""
+    return render_template('reset_password.html', version=__version__)
+
+@app.route('/admin')
+@login_required
+def admin_page():
+    """管理员设置页面（仅管理员可访问）"""
+    if not current_user.is_admin:
+        flash('需要管理员权限', 'error')
+        return redirect('/')
+    return render_template('admin.html', version=__version__)
+
 @app.route('/mfa-setup')
 def mfa_setup_page():
     """MFA设置页面"""

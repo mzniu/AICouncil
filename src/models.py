@@ -27,6 +27,9 @@ class User(UserMixin, db.Model):
     # Session管理
     session_version = db.Column(db.Integer, default=1, nullable=False)  # 用于强制logout
     
+    # 管理员权限
+    is_admin = db.Column(db.Boolean, default=False, nullable=False)
+    
     # 时间戳
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     last_login = db.Column(db.DateTime, nullable=True)
@@ -104,3 +107,35 @@ class LoginHistory(db.Model):
     
     def __repr__(self):
         return f'<LoginHistory user_id={self.user_id} action={self.action} success={self.success}>'
+
+
+class PasswordResetToken(db.Model):
+    """密码重置令牌"""
+    __tablename__ = 'password_reset_tokens'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    token = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    
+    # 时间戳
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used_at = db.Column(db.DateTime, nullable=True)  # 标记token是否已使用
+    
+    # 关联关系
+    user = db.relationship('User', backref=db.backref('reset_tokens', lazy='dynamic'))
+    
+    def is_valid(self):
+        """检查token是否有效"""
+        if self.used_at is not None:
+            return False  # 已使用
+        if datetime.utcnow() > self.expires_at:
+            return False  # 已过期
+        return True
+    
+    def mark_as_used(self):
+        """标记token为已使用"""
+        self.used_at = datetime.utcnow()
+    
+    def __repr__(self):
+        return f'<PasswordResetToken user_id={self.user_id} expires_at={self.expires_at}>'

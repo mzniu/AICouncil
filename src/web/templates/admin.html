@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理员设置 - AICouncil v{{ version }}</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .tab-active {
+            border-bottom: 3px solid #7c3aed;
+            color: #7c3aed;
+            font-weight: 600;
+        }
+        .tab-inactive {
+            color: #6b7280;
+        }
+        .tab-inactive:hover {
+            color: #4b5563;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- 顶部导航栏 -->
+    <nav class="gradient-bg shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <svg class="w-8 h-8 text-white mr-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/>
+                    </svg>
+                    <h1 class="text-white text-2xl font-bold">管理员设置</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-white text-sm" id="current-username"></span>
+                    <a href="/" class="text-white hover:text-gray-200 transition">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主内容区 -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Tab导航 -->
+        <div class="bg-white rounded-lg shadow-md mb-6">
+            <div class="flex border-b">
+                <button onclick="switchTab('users')" id="tab-users" class="flex-1 py-4 px-6 text-center transition tab-active">
+                    <svg class="w-5 h-5 inline-block mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
+                    </svg>
+                    用户管理
+                </button>
+                <button onclick="switchTab('smtp')" id="tab-smtp" class="flex-1 py-4 px-6 text-center transition tab-inactive">
+                    <svg class="w-5 h-5 inline-block mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/>
+                        <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/>
+                    </svg>
+                    SMTP配置
+                </button>
+            </div>
+        </div>
+
+        <!-- 用户管理Tab -->
+        <div id="panel-users" class="tab-panel">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold text-gray-800">用户列表</h2>
+                    <button onclick="refreshUsers()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                        <svg class="w-5 h-5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        刷新
+                    </button>
+                </div>
+                
+                <div id="users-loading" class="text-center py-12">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                    <p class="text-gray-600 mt-4">加载中...</p>
+                </div>
+                
+                <div id="users-table" class="hidden overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">用户名</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">邮箱</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">角色</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">MFA</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">登录次数</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最后登录</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-tbody" class="bg-white divide-y divide-gray-200">
+                            <!-- 用户行将由JS动态生成 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- SMTP配置Tab -->
+        <div id="panel-smtp" class="tab-panel hidden">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-6">SMTP邮件配置</h2>
+                
+                <form id="smtp-form" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">SMTP服务器</label>
+                            <input type="text" id="smtp_server" placeholder="smtp.example.com" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">端口</label>
+                            <input type="number" id="smtp_port" placeholder="587" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">用户名</label>
+                            <input type="text" id="smtp_username" placeholder="your-email@example.com" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">密码</label>
+                            <input type="password" id="smtp_password" placeholder="保持空白以保留现有密码" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">发件人名称</label>
+                            <input type="text" id="smtp_from_name" placeholder="AICouncil" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">发件人邮箱</label>
+                            <input type="email" id="smtp_from_email" placeholder="noreply@example.com" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center">
+                        <input type="checkbox" id="smtp_use_tls" class="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
+                        <label for="smtp_use_tls" class="ml-2 block text-sm text-gray-700">使用TLS加密</label>
+                    </div>
+                    
+                    <div class="flex space-x-4">
+                        <button type="submit" class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                            <svg class="w-5 h-5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            保存配置
+                        </button>
+                        
+                        <button type="button" onclick="testSmtp()" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+                            <svg class="w-5 h-5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            测试连接
+                        </button>
+                        
+                        <button type="button" onclick="restartApp()" class="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition">
+                            <svg class="w-5 h-5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                            重启应用
+                        </button>
+                    </div>
+                    
+                    <div class="mt-3 text-sm text-gray-600">
+                        <svg class="w-4 h-4 inline-block mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                        </svg>
+                        提示：SMTP配置保存后，部分设置需要重启应用才能完全生效
+                    </div>
+                </form>
+                
+                <div id="smtp-status" class="mt-4"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑用户Modal -->
+    <div id="edit-user-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold mb-4">编辑用户</h3>
+            <form id="edit-user-form">
+                <input type="hidden" id="edit-user-id">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">用户名</label>
+                        <input type="text" id="edit-username" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">邮箱</label>
+                        <input type="email" id="edit-email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600">
+                    </div>
+                    <div class="flex items-center">
+                        <input type="checkbox" id="edit-is-admin" class="w-4 h-4 text-purple-600 border-gray-300 rounded">
+                        <label for="edit-is-admin" class="ml-2 text-sm text-gray-700">管理员权限</label>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" onclick="closeEditModal()" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
+                    <button type="submit" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 重置密码Modal -->
+    <div id="reset-password-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold mb-4">重置密码</h3>
+            <form id="reset-password-form">
+                <input type="hidden" id="reset-user-id">
+                <p class="text-gray-600 mb-4">为用户 <span id="reset-username" class="font-semibold"></span> 设置新密码：</p>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">新密码</label>
+                        <input type="password" id="reset-new-password" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">确认密码</label>
+                        <input type="password" id="reset-confirm-password" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600" required>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" onclick="closeResetModal()" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
+                    <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">重置密码</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let allUsers = [];
+        let currentTab = 'users';
+        let currentUserId = null; // 存储当前登录用户ID
+
+        // 页面加载时获取当前用户信息和用户列表
+        window.addEventListener('DOMContentLoaded', async () => {
+            // 获取当前用户信息
+            try {
+                const response = await fetch('/api/auth/user-info');
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('current-username').textContent = data.username;
+                    currentUserId = data.id; // 保存当前用户ID
+                }
+            } catch (error) {
+                console.error('获取用户信息失败:', error);
+            }
+
+            // 加载用户列表
+            await refreshUsers();
+        });
+
+        // 切换Tab
+        function switchTab(tab) {
+            currentTab = tab;
+            
+            // 更新Tab样式
+            document.getElementById('tab-users').className = tab === 'users' ? 'flex-1 py-4 px-6 text-center transition tab-active' : 'flex-1 py-4 px-6 text-center transition tab-inactive';
+            document.getElementById('tab-smtp').className = tab === 'smtp' ? 'flex-1 py-4 px-6 text-center transition tab-active' : 'flex-1 py-4 px-6 text-center transition tab-inactive';
+            
+            // 显示/隐藏面板
+            document.getElementById('panel-users').className = tab === 'users' ? 'tab-panel' : 'tab-panel hidden';
+            document.getElementById('panel-smtp').className = tab === 'smtp' ? 'tab-panel' : 'tab-panel hidden';
+            
+            // 加载SMTP配置
+            if (tab === 'smtp') {
+                loadSmtpConfig();
+            }
+        }
+
+        // 刷新用户列表
+        async function refreshUsers() {
+            const loading = document.getElementById('users-loading');
+            const table = document.getElementById('users-table');
+            
+            loading.classList.remove('hidden');
+            table.classList.add('hidden');
+            
+            try {
+                const response = await fetch('/api/auth/admin/users');
+                if (response.ok) {
+                    const data = await response.json();
+                    allUsers = data.users;
+                    renderUsers();
+                    loading.classList.add('hidden');
+                    table.classList.remove('hidden');
+                } else {
+                    const error = await response.json();
+                    showAlert(error.error || '加载失败', 'error');
+                }
+            } catch (error) {
+                console.error('加载用户列表失败:', error);
+                showAlert('网络错误', 'error');
+            }
+        }
+
+        // 渲染用户表格
+        function renderUsers() {
+            const tbody = document.getElementById('users-tbody');
+            tbody.innerHTML = '';
+            
+            allUsers.forEach(user => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${escapeHtml(user.username)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${escapeHtml(user.email)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <span class="px-2 py-1 rounded-full text-xs ${user.is_admin ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'}">
+                            ${user.is_admin ? '管理员' : '普通用户'}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <span class="px-2 py-1 rounded-full text-xs ${user.mfa_enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+                            ${user.mfa_enabled ? '已启用' : '未启用'}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <span class="px-2 py-1 rounded-full text-xs ${user.is_locked ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}">
+                            ${user.is_locked ? '已锁定' : '正常'}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${user.login_count}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${user.last_login || '-'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                        <button onclick="editUser(${user.id})" class="text-blue-600 hover:text-blue-800">编辑</button>
+                        <button onclick="resetPassword(${user.id})" class="text-orange-600 hover:text-orange-800">重置密码</button>
+                        ${user.is_locked ? `<button onclick="unlockUser(${user.id})" class="text-green-600 hover:text-green-800">解锁</button>` : ''}
+                        <button onclick="deleteUser(${user.id}, '${escapeHtml(user.username)}')" class="text-red-600 hover:text-red-800">删除</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // 编辑用户
+        function editUser(userId) {
+            const user = allUsers.find(u => u.id === userId);
+            if (!user) return;
+            
+            document.getElementById('edit-user-id').value = user.id;
+            document.getElementById('edit-username').value = user.username;
+            document.getElementById('edit-email').value = user.email;
+            document.getElementById('edit-is-admin').checked = user.is_admin;
+            
+            // 如果是编辑自己，禁用管理员权限复选框
+            const isAdminCheckbox = document.getElementById('edit-is-admin');
+            if (userId === currentUserId) {
+                isAdminCheckbox.disabled = true;
+                isAdminCheckbox.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                isAdminCheckbox.disabled = false;
+                isAdminCheckbox.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+            
+            document.getElementById('edit-user-modal').classList.remove('hidden');
+        }
+
+        function closeEditModal() {
+            document.getElementById('edit-user-modal').classList.add('hidden');
+        }
+
+        // 提交编辑
+        document.getElementById('edit-user-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const userId = parseInt(document.getElementById('edit-user-id').value);
+            const data = {
+                username: document.getElementById('edit-username').value.trim(),
+                email: document.getElementById('edit-email').value.trim()
+            };
+            
+            // 只有在编辑其他用户时才发送is_admin字段
+            if (userId !== currentUserId) {
+                data.is_admin = document.getElementById('edit-is-admin').checked;
+            }
+            
+            try {
+                const response = await fetch(`/api/auth/admin/users/${userId}`, {
+                    method: 'PATCH',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                if (response.ok) {
+                    showAlert(result.message, 'success');
+                    closeEditModal();
+                    refreshUsers();
+                } else {
+                    showAlert(result.error, 'error');
+                }
+            } catch (error) {
+                console.error('编辑用户失败:', error);
+                showAlert('网络错误', 'error');
+            }
+        });
+
+        // 重置密码
+        function resetPassword(userId) {
+            const user = allUsers.find(u => u.id === userId);
+            if (!user) return;
+            
+            document.getElementById('reset-user-id').value = user.id;
+            document.getElementById('reset-username').textContent = user.username;
+            document.getElementById('reset-new-password').value = '';
+            document.getElementById('reset-confirm-password').value = '';
+            document.getElementById('reset-password-modal').classList.remove('hidden');
+        }
+
+        function closeResetModal() {
+            document.getElementById('reset-password-modal').classList.add('hidden');
+        }
+
+        // 提交重置密码
+        document.getElementById('reset-password-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const userId = document.getElementById('reset-user-id').value;
+            const newPassword = document.getElementById('reset-new-password').value;
+            const confirmPassword = document.getElementById('reset-confirm-password').value;
+            
+            if (newPassword !== confirmPassword) {
+                showAlert('两次输入的密码不一致', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/auth/admin/users/${userId}/reset-password`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({new_password: newPassword})
+                });
+                
+                const result = await response.json();
+                if (response.ok) {
+                    showAlert(result.message, 'success');
+                    closeResetModal();
+                } else {
+                    showAlert(result.error, 'error');
+                }
+            } catch (error) {
+                console.error('重置密码失败:', error);
+                showAlert('网络错误', 'error');
+            }
+        });
+
+        // 解锁用户
+        async function unlockUser(userId) {
+            if (!confirm('确认解锁该用户？')) return;
+            
+            try {
+                const response = await fetch(`/api/auth/admin/users/${userId}/unlock`, {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                if (response.ok) {
+                    showAlert(result.message, 'success');
+                    refreshUsers();
+                } else {
+                    showAlert(result.error, 'error');
+                }
+            } catch (error) {
+                console.error('解锁用户失败:', error);
+                showAlert('网络错误', 'error');
+            }
+        }
+
+        // 删除用户
+        async function deleteUser(userId, username) {
+            if (!confirm(`确认删除用户 ${username}？此操作不可撤销！`)) return;
+            
+            try {
+                const response = await fetch(`/api/auth/admin/users/${userId}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                if (response.ok) {
+                    showAlert(result.message, 'success');
+                    refreshUsers();
+                } else {
+                    showAlert(result.error, 'error');
+                }
+            } catch (error) {
+                console.error('删除用户失败:', error);
+                showAlert('网络错误', 'error');
+            }
+        }
+
+        // 加载SMTP配置
+        async function loadSmtpConfig() {
+            try {
+                const response = await fetch('/api/auth/admin/smtp-config');
+                if (response.ok) {
+                    const config = await response.json();
+                    document.getElementById('smtp_server').value = config.smtp_server || '';
+                    document.getElementById('smtp_port').value = config.smtp_port || '587';
+                    document.getElementById('smtp_username').value = config.smtp_username || '';
+                    document.getElementById('smtp_password').value = config.smtp_password || '';
+                    document.getElementById('smtp_from_name').value = config.smtp_from_name || 'AICouncil';
+                    document.getElementById('smtp_from_email').value = config.smtp_from_email || '';
+                    document.getElementById('smtp_use_tls').checked = config.smtp_use_tls;
+                    
+                    if (config.is_configured) {
+                        showSmtpStatus('SMTP已配置', 'success');
+                    } else {
+                        showSmtpStatus('SMTP未配置或配置不完整', 'warning');
+                    }
+                }
+            } catch (error) {
+                console.error('加载SMTP配置失败:', error);
+            }
+        }
+
+        // 保存SMTP配置
+        document.getElementById('smtp-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const data = {
+                smtp_server: document.getElementById('smtp_server').value.trim(),
+                smtp_port: document.getElementById('smtp_port').value.trim(),
+                smtp_username: document.getElementById('smtp_username').value.trim(),
+                smtp_password: document.getElementById('smtp_password').value,
+                smtp_from_name: document.getElementById('smtp_from_name').value.trim(),
+                smtp_from_email: document.getElementById('smtp_from_email').value.trim(),
+                smtp_use_tls: document.getElementById('smtp_use_tls').checked
+            };
+            
+            try {
+                const response = await fetch('/api/auth/admin/smtp-config', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                if (response.ok) {
+                    showSmtpStatus(result.message, 'success');
+                } else {
+                    showSmtpStatus(result.error, 'error');
+                }
+            } catch (error) {
+                console.error('保存SMTP配置失败:', error);
+                showSmtpStatus('网络错误', 'error');
+            }
+        });
+
+        // 测试SMTP
+        async function testSmtp() {
+            showSmtpStatus('正在测试连接...', 'info');
+            
+            try {
+                const response = await fetch('/api/auth/admin/smtp-config/test', {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                if (response.ok) {
+                    showSmtpStatus(result.message, 'success');
+                } else {
+                    showSmtpStatus(result.error, 'error');
+                }
+            } catch (error) {
+                console.error('测试SMTP失败:', error);
+                showSmtpStatus('网络错误', 'error');
+            }
+        }
+
+        // 重启应用
+        async function restartApp() {
+            if (!confirm('确认重启应用？这将使所有用户断开连接。')) return;
+            
+            showSmtpStatus('正在重启应用，请稍候...', 'info');
+            
+            try {
+                const response = await fetch('/api/auth/admin/restart', {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    showSmtpStatus('应用正在重启，页面将在5秒后自动刷新...', 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 5000);
+                } else {
+                    const result = await response.json();
+                    showSmtpStatus(result.error || '重启失败', 'error');
+                }
+            } catch (error) {
+                console.error('重启应用失败:', error);
+                showSmtpStatus('网络错误', 'error');
+            }
+        }
+
+        // 显示SMTP状态消息
+        function showSmtpStatus(message, type) {
+            const statusDiv = document.getElementById('smtp-status');
+            const colors = {
+                success: 'bg-green-100 text-green-800 border-green-300',
+                error: 'bg-red-100 text-red-800 border-red-300',
+                warning: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+                info: 'bg-blue-100 text-blue-800 border-blue-300'
+            };
+            
+            statusDiv.className = `p-4 rounded-lg border ${colors[type] || colors.info}`;
+            statusDiv.textContent = message;
+            statusDiv.classList.remove('hidden');
+            
+            if (type === 'success' || type === 'error') {
+                setTimeout(() => {
+                    statusDiv.classList.add('hidden');
+                }, 5000);
+            }
+        }
+
+        // 显示通用Alert
+        function showAlert(message, type) {
+            const alertDiv = document.createElement('div');
+            const colors = {
+                success: 'bg-green-500',
+                error: 'bg-red-500',
+                warning: 'bg-yellow-500',
+                info: 'bg-blue-500'
+            };
+            
+            alertDiv.className = `fixed top-4 right-4 ${colors[type] || colors.info} text-white px-6 py-3 rounded-lg shadow-lg z-50 transition-opacity duration-300`;
+            alertDiv.textContent = message;
+            document.body.appendChild(alertDiv);
+            
+            setTimeout(() => {
+                alertDiv.style.opacity = '0';
+                setTimeout(() => alertDiv.remove(), 300);
+            }, 3000);
+        }
+
+        // HTML转义
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
