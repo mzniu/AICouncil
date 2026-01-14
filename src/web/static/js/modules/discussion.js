@@ -416,10 +416,19 @@ export function updateProgress(event) {
 export async function pollStatus() {
     try {
         const data = await API.getStatus();
+        console.log('Poll status response:', {
+            is_running: data.is_running,
+            events_count: data.events?.length,
+            logs_count: data.logs?.length
+        });
+        
         updateStatusUI(data);
         
         if (data.events) {
             const events = data.events.slice(State.lastEventCount);
+            if (events.length > 0) {
+                console.log(`Processing ${events.length} new events`);
+            }
             events.forEach(event => {
                 appendEvent(event);
                 updateProgress(event);
@@ -432,6 +441,9 @@ export async function pollStatus() {
         
         if (data.logs) {
             const logs = data.logs.slice(State.lastLogCount);
+            if (logs.length > 0) {
+                console.log(`Processing ${logs.length} new logs`);
+            }
             logs.forEach(log => appendLog(log));
             State.setLastLogCount(data.logs.length);
         }
@@ -445,7 +457,12 @@ export async function pollStatus() {
  */
 export function startPolling() {
     if (!pollTimer) {
+        console.log('Starting polling (interval: 1000ms)');
         pollTimer = setInterval(pollStatus, POLL_INTERVAL);
+        // 立即执行一次
+        pollStatus();
+    } else {
+        console.log('Polling already active');
     }
 }
 
@@ -454,6 +471,7 @@ export function startPolling() {
  */
 export function stopPolling() {
     if (pollTimer) {
+        console.log('Stopping polling');
         clearInterval(pollTimer);
         pollTimer = null;
     }
