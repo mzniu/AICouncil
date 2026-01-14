@@ -302,7 +302,14 @@ pip install -r requirements-optional.txt
    # ========================================
    # 数据库配置（如需认证功能）
    # ========================================
-   DATABASE_URL=sqlite:///D:/git/MyCouncil/data/users.db  # 或使用 PostgreSQL
+   # 留空则使用默认相对路径 data/users.db（推荐）
+   DATABASE_URL=
+   
+   # 或使用绝对路径（不推荐，跨机器不兼容）：
+   # DATABASE_URL=sqlite:///D:/git/MyCouncil/data/users.db
+   
+   # 生产环境可使用 PostgreSQL 或 MySQL：
+   # DATABASE_URL=postgresql://user:password@localhost/dbname
    
    # ========================================
    # 用户认证配置（可选）
