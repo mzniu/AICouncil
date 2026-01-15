@@ -440,12 +440,9 @@ function initLogDragging() {
     if (!logSection || !logHeader) return;
     
     let isDragging = false;
-    let currentX;
-    let currentY;
-    let initialX;
-    let initialY;
-    let xOffset = 0;
-    let yOffset = 0;
+    let startX, startY;
+    let initialLeft, initialTop;
+    let isInitialized = false;
     
     logHeader.addEventListener('mousedown', dragStart);
     document.addEventListener('mousemove', drag);
@@ -457,45 +454,52 @@ function initLogDragging() {
             return;
         }
         
-        initialX = e.clientX - xOffset;
-        initialY = e.clientY - yOffset;
+        isDragging = true;
         
-        if (e.target === logHeader || logHeader.contains(e.target)) {
-            isDragging = true;
-            logSection.style.transition = 'none';
+        // 首次拖拽时，将 bottom/right 转换为 top/left
+        if (!isInitialized) {
+            const rect = logSection.getBoundingClientRect();
+            logSection.style.top = rect.top + 'px';
+            logSection.style.left = rect.left + 'px';
+            logSection.style.bottom = 'auto';
+            logSection.style.right = 'auto';
+            isInitialized = true;
         }
+        
+        startX = e.clientX;
+        startY = e.clientY;
+        initialLeft = parseInt(logSection.style.left) || 0;
+        initialTop = parseInt(logSection.style.top) || 0;
+        
+        logSection.style.transition = 'none';
+        logSection.style.cursor = 'move';
     }
     
     function drag(e) {
-        if (isDragging) {
-            e.preventDefault();
-            
-            currentX = e.clientX - initialX;
-            currentY = e.clientY - initialY;
-            
-            xOffset = currentX;
-            yOffset = currentY;
-            
-            // 限制在视口内
-            const rect = logSection.getBoundingClientRect();
-            const maxX = window.innerWidth - rect.width;
-            const maxY = window.innerHeight - rect.height;
-            
-            currentX = Math.max(0, Math.min(currentX, maxX));
-            currentY = Math.max(0, Math.min(currentY, maxY));
-            
-            setTranslate(currentX, currentY, logSection);
-        }
+        if (!isDragging) return;
+        
+        e.preventDefault();
+        
+        const deltaX = e.clientX - startX;
+        const deltaY = e.clientY - startY;
+        
+        let newLeft = initialLeft + deltaX;
+        let newTop = initialTop + deltaY;
+        
+        // 限制在视口内
+        const rect = logSection.getBoundingClientRect();
+        newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - rect.width));
+        newTop = Math.max(0, Math.min(newTop, window.innerHeight - rect.height));
+        
+        logSection.style.left = newLeft + 'px';
+        logSection.style.top = newTop + 'px';
     }
     
     function dragEnd() {
-        initialX = currentX;
-        initialY = currentY;
-        isDragging = false;
-    }
-    
-    function setTranslate(xPos, yPos, el) {
-        el.style.transform = `translate(${xPos}px, ${yPos}px)`;
+        if (isDragging) {
+            isDragging = false;
+            logSection.style.cursor = '';
+        }
     }
 }
 
