@@ -23,6 +23,9 @@ console.log('[Main] History module keys:', Object.keys(History));
 // 全局函数挂载（供HTML内联事件使用）
 // ========================
 
+// 核心模块
+window.State = State;
+
 // 语言切换
 window.t = t;
 window.setLanguage = setLanguage;
