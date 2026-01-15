@@ -1614,11 +1614,13 @@ def generate_report_from_workspace(workspace_path: str, model_config: Dict[str, 
         return "报告生成失败"
 
 
-def call_role_designer(requirement: str) -> schemas.RoleDesignOutput:
+def call_role_designer(requirement: str, backend_config: Optional[Dict[str, Any]] = None) -> schemas.RoleDesignOutput:
     """调用角色设计师Agent生成角色设计
     
     Args:
         requirement: 用户的需求描述
+        backend_config: 可选的后端配置，格式为 {"type": "backend_name", "model": "model_name"}
+                       如果不提供，则使用全局配置
     
     Returns:
         RoleDesignOutput: 角色设计输出
@@ -1642,11 +1644,16 @@ def call_role_designer(requirement: str) -> schemas.RoleDesignOutput:
         # 直接使用字符串替换，避免LangChain PromptTemplate对{{}}的解析问题
         prompt_text = prompt_template_str.replace('{{requirement}}', requirement)
         
-        # 调用LLM（使用stream模式捕获reasoning和content）
-        model_config = ModelConfig(
-            type="deepseek",
-            model="deepseek-reasoner"
-        )
+        # 使用传入的配置，或从全局配置读取
+        if backend_config:
+            model_config = ModelConfig(**backend_config)
+        else:
+            model_config = ModelConfig(
+                type=model_adapter.config.MODEL_BACKEND,
+                model=model_adapter.config.MODEL_NAME
+            )
+        
+        logger.info(f"[role_designer] 使用模型: backend={model_config.type}, model={model_config.model}")
         llm = AdapterLLM(backend_config=model_config)
         
         logger.info("[role_designer] 开始生成角色设计...")

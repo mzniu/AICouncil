@@ -589,6 +589,9 @@ def update_event():
     
     if etype == 'final_report':
         final_report = data.get('content')
+        # 同时将 content 添加为 report_html 供前端使用
+        data['report_html'] = data.get('content')
+        discussion_events.append(data)
     elif etype == 'log':
         backend_logs.append(data.get('content'))
         # 移除硬编码的 200 条限制，允许记录完整的议事日志

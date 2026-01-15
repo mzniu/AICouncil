@@ -206,7 +206,12 @@ export async function reReport() {
     toggleReportLoading(true, t('msg_re_reporting'), t('msg_re_reporting_sub').replace('{backend}', backend));
     
     try {
-        const data = await API.reReport(backend, model, reasoningEffort, agentConfigs);
+        const data = await API.reReport({
+            backend: backend,
+            model: model,
+            reasoning: reasoningEffort,
+            agent_configs: agentConfigs
+        });
         if (data.status !== 'ok') {
             const errorMsg = data.message || t('msg_request_failed');
             showAlert(errorMsg, t('title_error'), 'error');
@@ -755,7 +760,10 @@ export function formatContent(content, roleType) {
                                 .trim();
         
         if (cleanPrefix || prefix.includes('SEARCH PROGRESS')) {
-            let prefixHtml = marked.parse(cleanPrefix);
+            // 安全地使用marked解析，如果未定义则降级为纯文本
+            let prefixHtml = typeof marked !== 'undefined' && marked.parse 
+                ? marked.parse(cleanPrefix) 
+                : `<div class="whitespace-pre-wrap">${escapeHtml(cleanPrefix)}</div>`;
             if (prefix.includes('SEARCH PROGRESS')) {
                 prefixHtml = prefixHtml.replace(/<h3[^>]*>SEARCH PROGRESS<\/h3>/gi, '');
                 

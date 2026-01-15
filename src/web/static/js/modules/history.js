@@ -101,6 +101,10 @@ export async function loadWorkspace(sessionId) {
         console.log('[History] Load workspace response:', data);
         
         if (data.status === 'success') {
+            // 设置当前会话ID（重要：用于重新生成报告等操作）
+            State.setCurrentSessionId(sessionId);
+            console.log('[History] Session ID set:', sessionId);
+            
             // 重置UI
             document.getElementById('discussion-flow').innerHTML = '';
             
