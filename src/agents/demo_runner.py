@@ -289,7 +289,7 @@ def _build_reporter_input(user_requirement: str, orchestration_plan, execution_r
 
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument('--backend', type=str, choices=['ollama', 'deepseek', 'openai', 'openrouter'], help='Model backend type')
+    p.add_argument('--backend', type=str, choices=['ollama', 'deepseek', 'openai', 'openrouter', 'aliyun'], help='Model backend type')
     p.add_argument('--model', type=str, help='Override model name (e.g. qwen3:8b-q8_0 or deepseek-chat)')
     p.add_argument('--rounds', type=int, default=3, help='Number of discussion rounds')
     p.add_argument('--issue', type=str, help='The issue to discuss')
@@ -327,6 +327,8 @@ def run_demo():
             model_name = config.OPENROUTER_MODEL
         elif backend == 'openai':
             model_name = config.OPENAI_MODEL
+        elif backend == 'aliyun':
+            model_name = config.ALIYUN_MODEL
         else:
             model_name = config.MODEL_NAME
 

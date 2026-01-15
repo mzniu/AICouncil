@@ -172,6 +172,49 @@ def call_aliyun(model: str, prompt: str, timeout: int = 60, max_retries: int = 3
     raise RuntimeError(f"Aliyun API request failed after {max_retries} attempts: {last_exception}")
 
 
+def call_aliyun_with_tools(model: str, messages: list, tools: list = None, tool_choice: str = "auto", timeout: int = 60, max_retries: int = 3):
+    """调用阿里云 DashScope API，支持 function calling。"""
+    url = f"{config.ALIYUN_BASE_URL}/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {config.ALIYUN_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": model or config.ALIYUN_MODEL,
+        "messages": messages,
+        "stream": False
+    }
+    
+    if tools:
+        payload["tools"] = tools
+        if tool_choice:
+            payload["tool_choice"] = tool_choice
+    
+    last_exception = None
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"Aliyun API call starting (attempt {attempt + 1}/{max_retries}, with tools={bool(tools)})...")
+            resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
+            logger.info(f"Aliyun API response received (status: {resp.status_code})")
+            resp.raise_for_status()
+            data = resp.json()
+            
+            # 检查是否有tool_calls
+            message = data["choices"][0]["message"]
+            if message.get("tool_calls"):
+                logger.info(f"Aliyun returned {len(message['tool_calls'])} tool calls")
+                return message  # 返回完整消息（包含tool_calls）
+            
+            return message.get("content", "")
+        except RequestException as e:
+            last_exception = e
+            logger.warning(f"Aliyun API attempt {attempt + 1} failed: {e}. Retrying...")
+            if attempt < max_retries - 1:
+                time.sleep(2 * (attempt + 1))
+            
+    raise RuntimeError(f"Aliyun API request failed after {max_retries} attempts: {last_exception}")
+
+
 def call_openai(model: str, prompt: str, timeout: int = 60, max_retries: int = 3, stream: bool = False, tools: list = None, tool_choice: str = "auto"):
     """调用 OpenAI API，带重试机制。
     
@@ -663,6 +706,8 @@ def call_model_with_tools(agent_id: str, messages: list, model_config: dict = No
             response = call_deepseek(mname, conversation, tools=tools, tool_choice="auto")
         elif mtype == "openai":
             response = call_openai(mname, conversation, tools=tools, tool_choice="auto")
+        elif mtype == "aliyun":
+            response = call_aliyun_with_tools(mname, conversation, tools=tools, tool_choice="auto")
         else:
             logger.warning(f"Model type {mtype} may not support function calling, falling back to normal mode")
             return call_model(agent_id, conversation, model_config, stream=False)
