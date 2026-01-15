@@ -1297,10 +1297,16 @@ export function injectRevisionPanel(html) {
     if (!html || html.includes('revision-panel')) return html;
     
     const panelHtml = `
-        <div id="revision-panel" style="position: fixed; bottom: 20px; right: 20px; background: white; border: 2px solid #3b82f6; border-radius: 12px; padding: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); max-width: 400px; z-index: 9999; font-family: system-ui, -apple-system, sans-serif;">
+        <!-- 收缩后的浮动按钮 -->
+        <div id="revision-toggle-btn" style="position: fixed; bottom: 20px; right: 20px; background: #3b82f6; color: white; border: none; border-radius: 50%; width: 56px; height: 56px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4); cursor: pointer; z-index: 9999; font-size: 24px; transition: all 0.3s;" onclick="toggleRevisionPanel()" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+            📝
+        </div>
+        
+        <!-- 展开的修订面板（默认隐藏） -->
+        <div id="revision-panel" style="display: none; position: fixed; bottom: 20px; right: 20px; background: white; border: 2px solid #3b82f6; border-radius: 12px; padding: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); max-width: 400px; z-index: 10000; font-family: system-ui, -apple-system, sans-serif;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                 <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #1f2937;">📝 报告修订</h3>
-                <button onclick="document.getElementById('revision-panel').style.display='none'" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #6b7280;">&times;</button>
+                <button onclick="toggleRevisionPanel()" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #6b7280;">&times;</button>
             </div>
             <textarea id="revision-feedback" placeholder="请描述需要修订的内容..." style="width: 100%; min-height: 80px; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; resize: vertical; font-family: inherit;"></textarea>
             <button onclick="sendRevisionRequest()" style="margin-top: 12px; width: 100%; padding: 10px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='#2563eb'" onmouseout="this.style.background='#3b82f6'">
@@ -1308,6 +1314,19 @@ export function injectRevisionPanel(html) {
             </button>
         </div>
         <script>
+            function toggleRevisionPanel() {
+                const panel = document.getElementById('revision-panel');
+                const toggleBtn = document.getElementById('revision-toggle-btn');
+                
+                if (panel.style.display === 'none') {
+                    panel.style.display = 'block';
+                    toggleBtn.style.display = 'none';
+                } else {
+                    panel.style.display = 'none';
+                    toggleBtn.style.display = 'flex';
+                }
+            }
+            
             async function sendRevisionRequest() {
                 const feedback = document.getElementById('revision-feedback').value.trim();
                 if (!feedback) {
@@ -1328,6 +1347,8 @@ export function injectRevisionPanel(html) {
                         document.getElementById('revision-feedback').value = '';
                         // 通知父窗口开始轮询
                         window.parent.postMessage({ type: 'start_revision_poll' }, '*');
+                        // 关闭面板
+                        toggleRevisionPanel();
                     } else {
                         alert('修订请求失败: ' + (data.message || '未知错误'));
                     }
