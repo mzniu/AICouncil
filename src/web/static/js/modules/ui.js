@@ -192,6 +192,22 @@ export async function applyAdvancedConfig() {
     const event = new Event('change');
     backendSelect.dispatchEvent(event);
     
+    // 保存配置到localStorage
+    const config = {
+        backend: backendSelect.value,
+        model: document.getElementById('global-model-input').value,
+        reasoning: document.getElementById('global-reasoning-input').value,
+        rounds: document.getElementById('rounds-input').value,
+        planners: document.getElementById('planners-input').value,
+        auditors: document.getElementById('auditors-input').value
+    };
+    try {
+        localStorage.setItem('aicouncil_config', JSON.stringify(config));
+        console.log('配置已保存到localStorage:', config);
+    } catch (e) {
+        console.warn('保存配置失败:', e);
+    }
+    
     // 关闭modal
     toggleAdvancedConfigModal();
     

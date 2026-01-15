@@ -262,6 +262,37 @@ function initAgentCountListeners() {
 }
 
 /**
+ * 加载保存的配置
+ */
+function loadSavedConfig() {
+    try {
+        const savedConfig = localStorage.getItem('aicouncil_config');
+        if (savedConfig) {
+            const config = JSON.parse(savedConfig);
+            
+            // 应用到主表单
+            if (config.backend) document.getElementById('backend-select').value = config.backend;
+            if (config.model) document.getElementById('global-model-input').value = config.model;
+            if (config.reasoning) document.getElementById('global-reasoning-input').value = config.reasoning;
+            if (config.rounds) document.getElementById('rounds-input').value = config.rounds;
+            if (config.planners) document.getElementById('planners-input').value = config.planners;
+            if (config.auditors) document.getElementById('auditors-input').value = config.auditors;
+            
+            console.log('已从localStorage恢复配置:', config);
+            
+            // 触发后端选择变化事件以更新UI
+            const backendSelect = document.getElementById('backend-select');
+            if (backendSelect) {
+                const event = new Event('change');
+                backendSelect.dispatchEvent(event);
+            }
+        }
+    } catch (e) {
+        console.warn('加载配置失败:', e);
+    }
+}
+
+/**
  * 初始化Orchestrator模式开关
  */
 function initOrchestratorToggle() {
@@ -394,7 +425,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.log('Export module initialized');
         }
         
-        // 3. 初始化事件监听器
+        // 3. 加载保存的配置
+        loadSavedConfig();
+        console.log('Saved config loaded');
+        
+        // 4. 初始化事件监听器
         initButtonListeners();
         initBackendSelectListeners();
         initAgentCountListeners();
