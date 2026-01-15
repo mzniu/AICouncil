@@ -20,6 +20,8 @@ dist/
 workspaces/
 .env
 src/config.py
+*.bak
+*.backup
 
 # OS
 .DS_Store
