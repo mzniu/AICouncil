@@ -401,6 +401,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         initOrchestratorToggle();
         initGlobalAgentBackendListeners();
         initOutsideClickListeners();
+        initLogDragging(); // 初始化日志窗口拖拽
         console.log('Event listeners initialized');
         
         // 4. 启动状态轮询
@@ -428,6 +429,75 @@ document.addEventListener('DOMContentLoaded', async () => {
         Utils.showAlert('应用初始化失败: ' + error.message, '错误', 'error');
     }
 });
+
+/**
+ * 初始化日志窗口拖拽功能
+ */
+function initLogDragging() {
+    const logSection = document.getElementById('log-section');
+    const logHeader = document.getElementById('log-header');
+    
+    if (!logSection || !logHeader) return;
+    
+    let isDragging = false;
+    let currentX;
+    let currentY;
+    let initialX;
+    let initialY;
+    let xOffset = 0;
+    let yOffset = 0;
+    
+    logHeader.addEventListener('mousedown', dragStart);
+    document.addEventListener('mousemove', drag);
+    document.addEventListener('mouseup', dragEnd);
+    
+    function dragStart(e) {
+        // 只在点击头部时拖拽，不包括按钮
+        if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
+            return;
+        }
+        
+        initialX = e.clientX - xOffset;
+        initialY = e.clientY - yOffset;
+        
+        if (e.target === logHeader || logHeader.contains(e.target)) {
+            isDragging = true;
+            logSection.style.transition = 'none';
+        }
+    }
+    
+    function drag(e) {
+        if (isDragging) {
+            e.preventDefault();
+            
+            currentX = e.clientX - initialX;
+            currentY = e.clientY - initialY;
+            
+            xOffset = currentX;
+            yOffset = currentY;
+            
+            // 限制在视口内
+            const rect = logSection.getBoundingClientRect();
+            const maxX = window.innerWidth - rect.width;
+            const maxY = window.innerHeight - rect.height;
+            
+            currentX = Math.max(0, Math.min(currentX, maxX));
+            currentY = Math.max(0, Math.min(currentY, maxY));
+            
+            setTranslate(currentX, currentY, logSection);
+        }
+    }
+    
+    function dragEnd() {
+        initialX = currentX;
+        initialY = currentY;
+        isDragging = false;
+    }
+    
+    function setTranslate(xPos, yPos, el) {
+        el.style.transform = `translate(${xPos}px, ${yPos}px)`;
+    }
+}
 
 // ========================
 // 页面卸载清理
