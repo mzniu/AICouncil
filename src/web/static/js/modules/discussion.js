@@ -1237,9 +1237,45 @@ export async function handleFinalReport(event) {
         html = injectRevisionPanel(html);
     }
     
+    // 注入postMessage通信脚本（在</head>前注入）
+    const postMessageScript = `
+        <script>
+        (function() {
+            // 监听来自父窗口的服务器状态消息
+            window.addEventListener('message', function(event) {
+                if (event.data && event.data.type === 'SERVER_STATUS') {
+                    window.__SERVER_AVAILABLE__ = event.data.available;
+                    window.__SERVER_BASE_URL__ = event.data.baseUrl;
+                    console.log('[Report] 📡 收到服务器状态:', event.data.available ? '可用' : '不可用');
+                }
+            });
+            
+            // 请求父窗口发送服务器状态
+            if (window.parent !== window) {
+                window.parent.postMessage({ type: 'REQUEST_SERVER_STATUS' }, '*');
+            }
+        })();
+        </script>
+    `;
+    
+    if (html.includes('</head>')) {
+        html = html.replace('</head>', postMessageScript + '</head>');
+    }
+    
     // 显示报告
     reportIframe.srcdoc = html;
     State.setCachedReportHtml(event.report_html);
+    
+    // iframe加载完成后，发送服务器状态
+    reportIframe.onload = function() {
+        const serverStatus = {
+            type: 'SERVER_STATUS',
+            available: true,
+            baseUrl: window.location.origin
+        };
+        reportIframe.contentWindow.postMessage(serverStatus, '*');
+        console.log('[Discussion] 📤 已发送服务器状态到报告iframe');
+    };
     
     // 关闭加载遮罩
     toggleReportLoading(false);

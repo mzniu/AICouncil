@@ -449,6 +449,26 @@ window.addEventListener('unhandledrejection', (event) => {
     // 可以在这里添加错误上报逻辑
 });
 
+// ========================
+// 跨iframe通信（报告服务器状态同步）
+// ========================
+
+window.addEventListener('message', (event) => {
+    // 处理来自报告iframe的服务器状态请求
+    if (event.data && event.data.type === 'REQUEST_SERVER_STATUS') {
+        const reportIframe = document.getElementById('report-iframe');
+        if (reportIframe && reportIframe.contentWindow) {
+            const serverStatus = {
+                type: 'SERVER_STATUS',
+                available: true,
+                baseUrl: window.location.origin
+            };
+            reportIframe.contentWindow.postMessage(serverStatus, '*');
+            console.log('[Main] 📤 响应iframe服务器状态请求');
+        }
+    }
+});
+
 // 导出模块（用于调试）
 export {
     Utils,
