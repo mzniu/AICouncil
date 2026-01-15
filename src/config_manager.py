@@ -2,9 +2,10 @@
 配置管理器
 
 负责在开发环境和打包环境中加载配置，处理配置优先级：
-1. 环境变量（最高）
-2. 用户配置文件（src/config.py 或 %APPDATA%/AICouncil/config.py）
-3. 默认值（config_defaults.py，最低）
+1. 环境变量（.env 文件通过 python-dotenv 自动加载）
+2. 默认值（config_defaults.py）
+
+注意：不再支持 src/config.py 文件，所有配置统一使用 .env 文件管理
 """
 import os
 import sys
@@ -68,35 +69,14 @@ class ConfigManager:
     
     def __init__(self):
         self._config_cache = {}
-        self._user_config = None
-        self._load_user_config()
-    
-    def _load_user_config(self):
-        """加载用户配置文件"""
-        config_path = get_config_path()
-        
-        if not config_path.exists():
-            # 配置文件不存在，使用默认值
-            return
-        
-        # 动态加载配置文件
-        try:
-            import importlib.util
-            spec = importlib.util.spec_from_file_location("user_config", config_path)
-            if spec and spec.loader:
-                module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(module)
-                self._user_config = module
-        except Exception as e:
-            # 配置文件加载失败，记录警告但不中断
-            print(f"Warning: Failed to load config from {config_path}: {e}")
-            self._user_config = None
+        # .env 文件已在模块顶部通过 load_dotenv() 加载到环境变量
+        # 不再加载 src/config.py 文件
     
     def get(self, key: str, default: Any = None) -> Any:
         """
         获取配置值
         
-        优先级：环境变量 > 用户配置文件 > 默认值 > default参数
+        优先级：环境变量（含 .env）> 默认值 > default参数
         
         Args:
             key: 配置键名（大写）
@@ -109,26 +89,20 @@ class ConfigManager:
         if key in self._config_cache:
             return self._config_cache[key]
         
-        # 1. 检查环境变量（最高优先级）
+        # 1. 检查环境变量（最高优先级，包含 .env 文件）
         env_value = os.getenv(key)
         if env_value is not None:
             self._config_cache[key] = env_value
             return env_value
         
-        # 2. 检查用户配置文件
-        if self._user_config and hasattr(self._user_config, key):
-            user_value = getattr(self._user_config, key)
-            self._config_cache[key] = user_value
-            return user_value
-        
-        # 3. 检查默认值
+        # 2. 检查默认值
         default_key = f'DEFAULT_{key}'
         if default_key in globals():
             default_value = globals()[default_key]
             self._config_cache[key] = default_value
             return default_value
         
-        # 4. 返回传入的默认值
+        # 3. 返回传入的默认值
         return default
     
     def set(self, key: str, value: Any):
@@ -142,10 +116,16 @@ class ConfigManager:
         self._config_cache[key] = value
     
     def reload(self):
-        """重新加载配置"""
+        """重新加载配置（清除缓存，重新读取环境变量）"""
         self._config_cache.clear()
-        self._user_config = None
-        self._load_user_config()
+        # 重新加载 .env 文件
+        try:
+            from dotenv import load_dotenv
+            env_path = Path(__file__).resolve().parent.parent / '.env'
+            if env_path.exists():
+                load_dotenv(dotenv_path=env_path, override=True)
+        except ImportError:
+            pass
     
     def get_config_info(self) -> dict:
         """

@@ -19,7 +19,6 @@ dist/
 # Project specific
 workspaces/
 .env
-src/config.py
 *.bak
 *.backup
 
