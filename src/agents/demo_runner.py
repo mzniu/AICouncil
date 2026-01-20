@@ -22,7 +22,7 @@ from src.agents.langchain_agents import run_full_cycle, run_meta_orchestrator, e
 from src import config_manager as config
 
 
-def run_meta_orchestrator_flow(issue_text: str, model_config: dict, agent_configs: dict = None):
+def run_meta_orchestrator_flow(issue_text: str, model_config: dict, agent_configs: dict = None, user_id: int = None):
     """
     使用议事编排官的新流程：
     1. 议事编排官分析需求并生成规划
@@ -34,6 +34,7 @@ def run_meta_orchestrator_flow(issue_text: str, model_config: dict, agent_config
         issue_text: 用户需求
         model_config: 模型配置
         agent_configs: Agent配置覆盖
+        user_id: 用户ID（用于数据库保存）
         
     Returns:
         执行结果字典
@@ -135,7 +136,8 @@ def run_meta_orchestrator_flow(issue_text: str, model_config: dict, agent_config
             plan=orchestration_plan,
             user_requirement=issue_text,
             model_config=model_config,
-            agent_configs=agent_configs
+            agent_configs=agent_configs,
+            user_id=user_id
         )
         
         print(f"✅ 框架执行完成")
@@ -191,13 +193,8 @@ def run_meta_orchestrator_flow(issue_text: str, model_config: dict, agent_config
             event_type="agent_action"
         )
         
-        # 保存报告
-        workspace_path = Path(execution_result['workspace_path'])
-        report_path = workspace_path / "report.html"
-        with open(report_path, "w", encoding="utf-8") as f:
-            f.write(report_content)
-        
-        print(f"✅ 报告已保存: {report_path}")
+        # 报告已通过数据库保存，不再写入文件
+        print(f"✅ 报告已保存到数据库")
         
         # 发送讨论完成事件和最终报告内容
         from src.agents.langchain_agents import send_web_event
@@ -212,7 +209,8 @@ def run_meta_orchestrator_flow(issue_text: str, model_config: dict, agent_config
             "workspace_path": execution_result['workspace_path'],
             "orchestration_plan": orchestration_plan.model_dump(),
             "execution_result": execution_result,
-            "report_path": str(report_path),
+            "report_saved": True,
+            "report_session_id": execution_result['session_id'],
             "report_content": report_content
         }
         

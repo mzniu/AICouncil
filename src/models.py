@@ -139,3 +139,82 @@ class PasswordResetToken(db.Model):
     
     def __repr__(self):
         return f'<PasswordResetToken user_id={self.user_id} expires_at={self.expires_at}>'
+
+
+class DiscussionSession(db.Model):
+    """议事会话模型 - 存储完整的讨论数据"""
+    __tablename__ = 'discussion_sessions'
+    
+    # 复合索引定义（优化查询性能）
+    __table_args__ = (
+        # 用户ID + 创建时间：优化用户会话列表查询（按时间倒序）
+        db.Index('idx_user_created', 'user_id', 'created_at'),
+        
+        # 用户ID + 状态 + 创建时间：优化带状态过滤的查询
+        db.Index('idx_user_status_created', 'user_id', 'status', 'created_at'),
+        
+        # 用户ID + 状态：优化状态统计查询
+        db.Index('idx_user_status', 'user_id', 'status'),
+    )
+    
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    
+    # 讨论配置
+    issue = db.Column(db.Text, nullable=False)
+    backend = db.Column(db.String(50), nullable=True)
+    model = db.Column(db.String(100), nullable=True)
+    config = db.Column(db.JSON, nullable=True)  # {rounds, planners, auditors, reasoning, agent_configs}
+    
+    # 状态管理
+    status = db.Column(db.String(20), default='running', nullable=False, index=True)  # running/completed/failed/stopped
+    
+    # 讨论数据（JSON/JSONB存储，PostgreSQL会自动使用JSONB）
+    history = db.Column(db.JSON, nullable=True)                    # 完整history.json
+    decomposition = db.Column(db.JSON, nullable=True)              # decomposition.json
+    final_session_data = db.Column(db.JSON, nullable=True)         # final_session_data.json
+    search_references = db.Column(db.JSON, nullable=True)          # search_references.json
+    interventions = db.Column(db.JSON, nullable=True)              # 用户干预记录列表 [{content, timestamp}]
+    
+    # 报告数据
+    report_html = db.Column(db.Text, nullable=True)                # 最新报告HTML
+    report_json = db.Column(db.JSON, nullable=True)                # 结构化报告
+    report_version = db.Column(db.Integer, default=1, nullable=False)  # 支持重新生成计数
+    
+    # 时间戳
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    completed_at = db.Column(db.DateTime, nullable=True)
+    
+    # 关联关系
+    user = db.relationship('User', backref=db.backref('discussion_sessions', lazy='dynamic', cascade='all, delete-orphan'))
+    
+    def __repr__(self):
+        return f'<DiscussionSession {self.session_id} by user {self.user_id} status={self.status}>'
+    
+    def to_dict(self, include_data=True):
+        """转换为字典格式，用于API响应"""
+        result = {
+            'session_id': self.session_id,
+            'issue': self.issue,
+            'backend': self.backend,
+            'model': self.model,
+            'config': self.config,
+            'status': self.status,
+            'report_version': self.report_version,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'completed_at': self.completed_at.isoformat() if self.completed_at else None,
+        }
+        
+        if include_data:
+            result.update({
+                'history': self.history,
+                'decomposition': self.decomposition,
+                'final_session_data': self.final_session_data,
+                'search_references': self.search_references,
+                'interventions': self.interventions,
+                'report_html': self.report_html,
+                'report_json': self.report_json,
+            })
+        
+        return result

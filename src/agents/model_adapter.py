@@ -718,12 +718,18 @@ def call_model_with_tools(agent_id: str, messages: list, model_config: dict = No
             tool_calls = response["tool_calls"]
             logger.info(f"[call_model_with_tools] LLM requested {len(tool_calls)} tool calls")
             
-            # 将assistant消息添加到对话历史
-            conversation.append({
+            # 将assistant消息添加到对话历史（保留reasoning_content字段用于DeepSeek推理模型）
+            assistant_msg = {
                 "role": "assistant",
                 "content": response.get("content"),
                 "tool_calls": tool_calls
-            })
+            }
+            # 如果响应包含reasoning_content（DeepSeek推理模型），必须保留此字段
+            if response.get("reasoning_content"):
+                assistant_msg["reasoning_content"] = response["reasoning_content"]
+                logger.info(f"[call_model_with_tools] Preserved reasoning_content ({len(response['reasoning_content'])} chars)")
+            
+            conversation.append(assistant_msg)
             
             # 执行所有工具调用
             for tool_call in tool_calls:

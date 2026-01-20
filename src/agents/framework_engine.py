@@ -150,13 +150,10 @@ class FrameworkEngine:
                 # 3. 执行stage
                 stage_output = self._execute_stage(stage, chains, agent_counts)
                 
-                # 4. 保存输出
+                # 4. 保存输出到内存
                 self.stage_outputs[stage.name] = stage_output
                 
-                # 5. 保存stage数据到workspace
-                stage_file = self.workspace_path / f"stage_{stage_index}_{stage.name.replace(' ', '_')}.json"
-                with open(stage_file, "w", encoding="utf-8") as f:
-                    json.dump(stage_output, f, ensure_ascii=False, indent=4)
+                # stage数据已在执行结果中保存到数据库，不再单独写文件
                 
                 # 发送stage完成事件
                 send_web_event(

@@ -26,7 +26,7 @@ DEFAULT_DEEPSEEK_MODEL = 'deepseek-reasoner'
 
 # ============= Aliyun DashScope 配置 =============
 DEFAULT_ALIYUN_API_KEY = ''
-DEFAULT_ALIYUN_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+DEFAULT_ALIYUN_BASE_URL = 'https://dashscope.aliyuncs.com/api/v1'
 DEFAULT_ALIYUN_MODEL = 'qwen-plus'
 
 # ============= OpenRouter 配置 =============

@@ -29,6 +29,15 @@ from src.utils.path_manager import get_workspace_dir, get_config_path, is_frozen
 from src.utils.logger import logger
 import logging
 
+# 导入SessionRepository（可选，用于数据库功能）
+try:
+    from src.repositories import SessionRepository
+    DB_AVAILABLE = True
+    logger.info("✅ SessionRepository导入成功，数据库功能已启用")
+except ImportError as e:
+    DB_AVAILABLE = False
+    logger.warning(f"⚠️  SessionRepository导入失败，数据库功能未启用: {e}")
+
 # 动态检测Playwright是否可用（支持打包环境）
 def check_playwright_available():
     """检查Playwright是否可用"""
@@ -191,6 +200,7 @@ def mfa_verify_page():
     return render_template('mfa_verify.html')
 
 @app.route('/api/start', methods=['POST'])
+@login_required  # 需要登录才能创建讨论
 def start_discussion():
     global is_running, discussion_events, backend_logs, final_report, current_config
     if is_running:
@@ -237,14 +247,18 @@ def start_discussion():
     }
 
     is_running = True
+    # 获取当前用户ID（如果已登录）
+    user_id = current_user.id if current_user.is_authenticated else None
+    logger.info(f"[start_discussion] 当前用户: authenticated={current_user.is_authenticated}, user_id={user_id}")
+    
     # 在后台线程启动 demo_runner.py，设置为 daemon 确保主进程退出时线程也退出
-    thread = threading.Thread(target=run_backend, args=(issue, backend, model, rounds, planners, auditors, agent_configs, reasoning, use_meta_orchestrator))
+    thread = threading.Thread(target=run_backend, args=(issue, backend, model, rounds, planners, auditors, agent_configs, reasoning, use_meta_orchestrator, user_id))
     thread.daemon = True
     thread.start()
     
     return jsonify({"status": "ok"})
 
-def run_backend(issue, backend, model, rounds, planners, auditors, agent_configs=None, reasoning=None, use_meta_orchestrator=False):
+def run_backend(issue, backend, model, rounds, planners, auditors, agent_configs=None, reasoning=None, use_meta_orchestrator=False, user_id=None):
     global is_running, current_process
     try:
         # 确保参数为整数（前端传递的可能是字符串）
@@ -278,22 +292,21 @@ def run_backend(issue, backend, model, rounds, planners, auditors, agent_configs
             if use_meta_orchestrator:
                 from src.agents.demo_runner import run_meta_orchestrator_flow
                 result = run_meta_orchestrator_flow(
-                    issue=issue,
-                    backend=backend,
-                    model=model,
-                    reasoning=reasoning,
+                    issue_text=issue,
+                    model_config=model_cfg,
                     agent_configs=agent_configs,
-                    mode='plan_and_execute'
+                    user_id=user_id
                 )
             else:
                 # 传统模式：直接调用核心函数
                 result = run_full_cycle(
-                    issue, 
+                    issue=issue,
                     model_config=model_cfg, 
                     max_rounds=rounds,
                     num_planners=planners,
                     num_auditors=auditors,
-                    agent_configs=agent_configs
+                    agent_configs=agent_configs,
+                    user_id=user_id  # 传递user_id到run_full_cycle
                 )
             
             logger.info(f"[app] 完成 {rounds} 轮流程")
@@ -613,24 +626,29 @@ def intervene():
     if not content:
         return jsonify({"status": "error", "message": "干预内容不能为空"}), 400
     
-    workspace_path = get_workspace_dir() / current_session_id
-    if not workspace_path.exists():
-        return jsonify({"status": "error", "message": "工作区不存在"}), 400
+    # 保存用户干预到数据库
+    intervention_record = {
+        "content": content,
+        "timestamp": datetime.now().isoformat()
+    }
     
-    intervention_file = os.path.join(workspace_path, "user_intervention.json")
-    
-    # 如果已经存在干预，则追加
-    existing_content = ""
-    if os.path.exists(intervention_file):
+    if DB_AVAILABLE and SessionRepository:
         try:
-            with open(intervention_file, "r", encoding="utf-8") as f:
-                existing_data = json.load(f)
-                existing_content = existing_data.get("content", "") + "\n"
-        except:
-            pass
-            
-    with open(intervention_file, "w", encoding="utf-8") as f:
-        json.dump({"content": existing_content + content}, f, ensure_ascii=False, indent=4)
+            session = SessionRepository.get_session_by_id(current_session_id)
+            if session:
+                # 获取现有干预记录
+                interventions = session.interventions or []
+                interventions.append(intervention_record)
+                
+                # 更新数据库
+                session.interventions = interventions
+                SessionRepository.db.session.commit()
+                logger.info(f"[intervene] 干预记录已保存到数据库，当前共 {len(interventions)} 条")
+            else:
+                logger.warning(f"[intervene] 未找到会话: {current_session_id}")
+        except Exception as e:
+            logger.error(f"[intervene] 保存干预到数据库失败: {e}")
+            # 失败不影响流程继续
     
     # 同时作为一个事件记录到讨论流中，方便前端展示
     intervention_event = {
@@ -643,6 +661,7 @@ def intervene():
     return jsonify({"status": "ok"})
 
 @app.route('/api/rereport', methods=['POST'])
+@login_required  # 需要登录才能重新生成报告
 def rereport():
     global is_running, current_session_id, current_config, final_report
     
@@ -654,6 +673,21 @@ def rereport():
         if not current_session_id:
             logger.warning("[rereport] 未找到当前会话 ID")
             return jsonify({"status": "error", "message": "未找到当前会话 ID"}), 400
+        
+        # 权限检查
+        if DB_AVAILABLE and current_user.is_authenticated:
+            has_permission = SessionRepository.check_user_permission(current_user.id, current_session_id)
+            if not has_permission:
+                logger.warning(f"[rereport] 用户{current_user.id}尝试重新生成无权限的会话{current_session_id}")
+                return jsonify({
+                    "status": "error",
+                    "message": "您没有权限操作此会话"
+                }), 403
+            
+            # 递增报告版本号
+            new_version = SessionRepository.increment_report_version(current_session_id)
+            if new_version:
+                logger.info(f"[rereport] 报告版本已递增至 v{new_version}")
         
         logger.info(f"[rereport] 开始重新生成报告，Session ID: {current_session_id}")
         
@@ -733,222 +767,232 @@ def rereport():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/workspaces', methods=['GET'])
+@login_required  # 需要登录才能查看会话列表
 def list_workspaces():
-    workspace_root = get_workspace_dir()
-    if not workspace_root.exists():
-        return jsonify([])
-    
-    workspaces = []
-    for d in workspace_root.iterdir():
-        if d.is_dir():
-            # 尝试获取议题内容
-            issue = "未知议题"
-            try:
-                # 方式1：议事编排官 格式
-                orch_path = d / "orchestration_result.json"
-                if orch_path.exists():
-                    with open(str(orch_path), "r", encoding="utf-8") as f:
-                        orch_data = json.load(f)
-                        # 直接从顶层获取 user_requirement
-                        issue = orch_data.get("user_requirement", issue)
-                # 方式2：传统格式
-                else:
-                    data_path = d / "final_session_data.json"
-                    if data_path.exists():
-                        with open(str(data_path), "r", encoding="utf-8") as f:
-                            issue = json.load(f).get("issue", issue)
-                    else:
-                        decomp_path = d / "decomposition.json"
-                        if decomp_path.exists():
-                            with open(str(decomp_path), "r", encoding="utf-8") as f:
-                                issue = json.load(f).get("core_goal", issue)
-            except:
-                pass
+    """获取用户会话列表（优先从数据库查询，回退到文件系统）"""
+    try:
+        # 获取查询参数
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        status_filter = request.args.get('status', None)  # running/completed/failed/stopped
+        
+        # 方式1：从数据库查询（如果可用且用户已登录）
+        if DB_AVAILABLE and current_user.is_authenticated:
+            sessions = SessionRepository.get_user_sessions(
+                user_id=current_user.id,
+                page=page,
+                per_page=per_page,
+                status_filter=status_filter
+            )
+            total_count = SessionRepository.get_session_count(
+                user_id=current_user.id,
+                status_filter=status_filter
+            )
             
-            workspaces.append({
-                "id": d.name,
-                "issue": issue,
-                "timestamp": d.name.split('_')[0] if '_' in d.name else ""
+            workspaces = []
+            for session in sessions:
+                workspaces.append({
+                    "id": session.session_id,
+                    "issue": session.issue,
+                    "timestamp": session.created_at.strftime("%Y%m%d_%H%M%S"),
+                    "status": session.status,
+                    "backend": session.backend,
+                    "model": session.model,
+                    "created_at": session.created_at.isoformat(),
+                    "report_version": session.report_version
+                })
+            
+            return jsonify({
+                "status": "success",
+                "workspaces": workspaces,
+                "total": total_count,
+                "page": page,
+                "per_page": per_page,
+                "source": "database"
             })
+        
+        # 方式2：从文件系统扫描（向后兼容）
+        workspace_root = get_workspace_dir()
+        if not workspace_root.exists():
+            return jsonify({
+                "status": "success",
+                "workspaces": [],
+                "total": 0,
+                "source": "filesystem"
+            })
+        
+        workspaces = []
+        for d in workspace_root.iterdir():
+            if d.is_dir():
+                # 尝试获取议题内容
+                issue = "未知议题"
+                try:
+                    # 方式1：议事编排官 格式
+                    orch_path = d / "orchestration_result.json"
+                    if orch_path.exists():
+                        with open(str(orch_path), "r", encoding="utf-8") as f:
+                            orch_data = json.load(f)
+                            issue = orch_data.get("user_requirement", issue)
+                    # 方式2：传统格式
+                    else:
+                        data_path = d / "final_session_data.json"
+                        if data_path.exists():
+                            with open(str(data_path), "r", encoding="utf-8") as f:
+                                issue = json.load(f).get("issue", issue)
+                        else:
+                            decomp_path = d / "decomposition.json"
+                            if decomp_path.exists():
+                                with open(str(decomp_path), "r", encoding="utf-8") as f:
+                                    issue = json.load(f).get("core_goal", issue)
+                except:
+                    pass
+                
+                workspaces.append({
+                    "id": d.name,
+                    "issue": issue,
+                    "timestamp": d.name.split('_')[0] if '_' in d.name else ""
+                })
+        
+        # 按时间倒序排列
+        workspaces.sort(key=lambda x: x['id'], reverse=True)
+        return jsonify({
+            "status": "success",
+            "workspaces": workspaces,
+            "total": len(workspaces),
+            "source": "filesystem"
+        })
     
-    # 按时间倒序排列
-    workspaces.sort(key=lambda x: x['id'], reverse=True)
-    return jsonify({
-        "status": "success",
-        "workspaces": workspaces
-    })
+    except Exception as e:
+        logger.error(f"[list_workspaces] 获取会话列表失败: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "status": "error",
+            "message": f"获取会话列表失败: {str(e)}"
+        }), 500
 
 @app.route('/api/load_workspace/<session_id>', methods=['GET'])
+@login_required  # 需要登录才能加载会话
 def load_workspace(session_id):
+    """从数据库加载工作区（不再使用文件系统）"""
     global discussion_events, backend_logs, final_report, current_session_id, current_config
     
-    workspace_path = get_workspace_dir() / session_id
-    if not workspace_path.exists():
-        return jsonify({"status": "error", "message": "工作区不存在"}), 404
-    
     try:
-        # 重置当前状态
+        # 1. 从数据库查询会话
+        if not DB_AVAILABLE:
+            return jsonify({
+                "status": "error",
+                "message": "数据库功能未启用"
+            }), 503
+        
+        # 权限检查
+        if not SessionRepository.check_user_permission(current_user.id, session_id):
+            logger.warning(f"[load_workspace] 用户{current_user.id}尝试访问无权限的会话{session_id}")
+            return jsonify({
+                "status": "error",
+                "message": "您没有权限访问此会话"
+            }), 403
+        
+        # 获取会话数据
+        session = SessionRepository.get_session_by_id(session_id)
+        if not session:
+            return jsonify({
+                "status": "error",
+                "message": "会话不存在"
+            }), 404
+        
+        # 2. 重置当前状态
         discussion_events = []
         backend_logs = []
-        final_report = ""
+        final_report = session.report_html or ""
         current_session_id = session_id
+        current_config = {
+            "issue": session.issue,
+            "backend": session.backend,
+            "model": session.model,
+            "rounds": session.config.get("rounds", 3) if session.config else 3
+        }
         
-        # 1. 加载最终报告
-        report_path = os.path.join(workspace_path, "report.html")
-        if os.path.exists(report_path):
-            with open(report_path, "r", encoding="utf-8") as f:
-                final_report = f.read()
-        
-        # 2. 加载历史记录并重建事件流
-        history_path = os.path.join(workspace_path, "history.json")
-        final_data_path = os.path.join(workspace_path, "final_session_data.json")
-        orch_path = os.path.join(workspace_path, "orchestration_result.json")
-        
-        issue_text = "已加载的议题"
-        max_rounds = 3
-        history_data = []
-        
-        # 方式1：议事编排官 格式
-        if os.path.exists(orch_path):
-            with open(orch_path, "r", encoding="utf-8") as f:
-                orch_data = json.load(f)
-                # 优先使用 user_requirement，回退到 plan.summary.title
-                issue_text = orch_data.get("user_requirement") or \
-                             orch_data.get("plan", {}).get("summary", {}).get("title") or \
-                             issue_text
-                # 议事编排官 的执行数据在 execution 字段
-                execution = orch_data.get("execution", {})
-                stages = execution.get("stages", [])
-                max_rounds = len(stages) if stages else 1
-                current_config = {"issue": issue_text, "rounds": max_rounds}
-        # 方式2：传统格式
-        elif os.path.exists(final_data_path):
-            with open(final_data_path, "r", encoding="utf-8") as f:
-                fd = json.load(f)
-                issue_text = fd.get("issue", issue_text)
-                # 尝试从 history 长度获取轮数
-                history_data = fd.get("history", [])
-                if history_data:
-                    max_rounds = len(history_data)
-                current_config = {"issue": issue_text, "rounds": max_rounds}
-        
-        # 添加系统启动事件
+        # 3. 添加系统启动事件
         discussion_events.append({
             "type": "system_start",
-            "issue": issue_text,
+            "issue": session.issue,
             "session_id": session_id
         })
         
-        # 方式1：从 议事编排官 格式重建事件
-        if os.path.exists(orch_path):
-            with open(orch_path, "r", encoding="utf-8") as f:
-                orch_data = json.load(f)
-                
-                # 首先添加议事编排官的规划方案事件
-                plan_data = orch_data.get("plan")
-                if plan_data:
-                    discussion_events.append({
-                        "type": "agent_action",
-                        "agent_name": "议事编排官",
-                        "role_type": "meta_orchestrator",
-                        "content": json.dumps(plan_data, ensure_ascii=False),
-                        "chunk_id": f"load_{session_id}_orchestration_plan"
-                    })
-                
-                # execution 字段本身就是包含所有 stage 的字典
-                stages_data = orch_data.get("execution", {})
-                
-                # 遍历每个 stage（跳过 final_synthesis 等非 stage 字段）
-                agent_event_counter = 0  # 用于生成唯一的chunk_id
-                for stage_name, stage_output in stages_data.items():
-                    # 跳过非 stage 字段（如 final_synthesis）
-                    if not isinstance(stage_output, dict) or "agents" not in stage_output:
-                        continue
-                    
-                    # 添加 stage 开始事件
-                    discussion_events.append({
-                        "type": "stage_start",
-                        "stage_name": stage_name,
-                        "description": stage_output.get("description", "")
-                    })
-                    
-                    # 添加每个 agent 的输出事件
-                    agents = stage_output.get("agents", [])
-                    for agent_data in agents:
-                        agent_event_counter += 1
-                        discussion_events.append({
-                            "type": "agent_action",
-                            "agent_name": agent_data.get("display_name", agent_data.get("agent_id")),
-                            "role_type": agent_data.get("role_type"),
-                            "content": agent_data.get("content", ""),
-                            "chunk_id": f"load_{session_id}_{stage_name}_{agent_event_counter}"
-                        })
-                
-                # 添加最终综合（如果存在）
-                final_synthesis = stages_data.get("final_synthesis")
-                if final_synthesis:
-                    discussion_events.append({
-                        "type": "agent_action",
-                        "agent_name": "议长",
-                        "role_type": "Leader",
-                        "content": json.dumps(final_synthesis, ensure_ascii=False),
-                        "chunk_id": f"load_{session_id}_final_synthesis"
-                    })
+        # 4. 从history重建事件流
+        history = session.history or []
+        for h in history:
+            round_num = h.get("round")
+            discussion_events.append({"type": "round_start", "round": round_num})
+            
+            # Planner 事件
+            for i, p in enumerate(h.get("plans", []), 1):
+                discussion_events.append({
+                    "type": "agent_action",
+                    "agent_name": f"策论家 {i}",
+                    "role_type": "Planner",
+                    "content": json.dumps(p, ensure_ascii=False),
+                    "chunk_id": f"load_{session_id}_r{round_num}_p{i}"
+                })
+            
+            # Auditor 事件
+            for j, a in enumerate(h.get("audits", []), 1):
+                discussion_events.append({
+                    "type": "agent_action",
+                    "agent_name": f"监察官 {j}",
+                    "role_type": "Auditor",
+                    "content": json.dumps(a, ensure_ascii=False),
+                    "chunk_id": f"load_{session_id}_r{round_num}_a{j}"
+                })
+            
+            # Devil's Advocate 事件
+            if h.get("devils_advocate"):
+                discussion_events.append({
+                    "type": "agent_action",
+                    "agent_name": "质疑官",
+                    "role_type": "devils_advocate",
+                    "content": json.dumps(h["devils_advocate"], ensure_ascii=False),
+                    "chunk_id": f"load_{session_id}_r{round_num}_da"
+                })
+            
+            # Leader 总结
+            if h.get("summary"):
+                discussion_events.append({
+                    "type": "agent_action",
+                    "agent_name": "议长",
+                    "role_type": "Leader",
+                    "content": json.dumps(h["summary"], ensure_ascii=False),
+                    "chunk_id": f"load_{session_id}_r{round_num}_l"
+                })
         
-        # 方式2：从传统 history.json 重建事件
-        elif os.path.exists(history_path):
-            with open(history_path, "r", encoding="utf-8") as f:
-                history = json.load(f)
-                if not history_data: # 如果 final_data 没拿到，从 history.json 拿
-                    max_rounds = len(history)
-                for h in history:
-                    round_num = h.get("round")
-                    discussion_events.append({"type": "round_start", "round": round_num})
-                    
-                    # 为每个 Planner 和 Auditor 创建一个合成的 agent_action 事件
-                    for i, p in enumerate(h.get("plans", []), 1):
-                        discussion_events.append({
-                            "type": "agent_action",
-                            "agent_name": f"策论家 {i}",
-                            "role_type": "Planner",
-                            "content": json.dumps(p, ensure_ascii=False),
-                            "chunk_id": f"load_{session_id}_r{round_num}_p{i}"
-                        })
-                    
-                    for j, a in enumerate(h.get("audits", []), 1):
-                        discussion_events.append({
-                            "type": "agent_action",
-                            "agent_name": f"监察官 {j}",
-                            "role_type": "Auditor",
-                            "content": json.dumps(a, ensure_ascii=False),
-                            "chunk_id": f"load_{session_id}_r{round_num}_a{j}"
-                        })
-                    
-                    # 加载Devil's Advocate质疑官数据
-                    if h.get("devils_advocate"):
-                        discussion_events.append({
-                            "type": "agent_action",
-                            "agent_name": "质疑官",
-                            "role_type": "devils_advocate",
-                            "content": json.dumps(h["devils_advocate"], ensure_ascii=False),
-                            "chunk_id": f"load_{session_id}_r{round_num}_da"
-                        })
-                    
-                    if h.get("summary"):
-                        discussion_events.append({
-                            "type": "agent_action",
-                            "agent_name": "议长",
-                            "role_type": "Leader",
-                            "content": json.dumps(h["summary"], ensure_ascii=False),
-                            "chunk_id": f"load_{session_id}_r{round_num}_l"
-                        })
-        
-        # 如果存在最终报告，添加一个事件以更新进度条到 100%
+        # 5. 添加最终报告事件
         if final_report:
             discussion_events.append({
                 "type": "final_report",
-                "content": "" 
+                "content": ""
             })
+            discussion_events.append({
+                "type": "discussion_complete",
+                "session_id": session_id
+            })
+        
+        logger.info(f"[load_workspace] 成功从数据库加载会话: {session_id}")
+        
+        return jsonify({
+            "status": "success",
+            "message": "工作区加载成功",
+            "report_version": session.report_version
+        })
+        
+    except Exception as e:
+        logger.error(f"[load_workspace] 加载失败: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "status": "error",
+            "message": f"加载工作区失败: {str(e)}"
+        }), 500
         
         backend_logs.append(f"成功从工作区加载会话: {session_id}")
         return jsonify({
@@ -1083,16 +1127,77 @@ def delete_preset(name):
     return jsonify({"status": "error", "message": "未找到该配置"}), 404
 
 @app.route('/api/delete_workspace/<session_id>', methods=['DELETE'])
+@login_required  # 需要登录才能删除
 def delete_workspace(session_id):
-    workspace_path = get_workspace_dir() / session_id
-    if not workspace_path.exists():
-        return jsonify({"status": "error", "message": "工作区不存在"}), 404
-    
+    """删除工作区（同时删除数据库记录和文件系统目录）"""
     try:
-        shutil.rmtree(str(workspace_path))
-        return jsonify({"status": "success", "message": "工作区已删除"})
+        deleted_db = False
+        deleted_fs = False
+        
+        # 1. 删除数据库记录（如果可用）
+        if DB_AVAILABLE and current_user.is_authenticated:
+            # 检查权限
+            if not SessionRepository.check_user_permission(current_user.id, session_id):
+                return jsonify({
+                    "status": "error", 
+                    "message": "无权限删除此工作区"
+                }), 403
+            
+            # 删除数据库记录
+            try:
+                from src.models import db, DiscussionSession
+                session = DiscussionSession.query.filter_by(session_id=session_id).first()
+                if session:
+                    db.session.delete(session)
+                    db.session.commit()
+                    deleted_db = True
+                    logger.info(f"[delete_workspace] 数据库记录已删除: {session_id}")
+                else:
+                    logger.info(f"[delete_workspace] 数据库中未找到会话: {session_id}")
+            except Exception as e:
+                logger.error(f"[delete_workspace] 删除数据库记录失败: {e}")
+                db.session.rollback()
+        
+        # 2. 删除文件系统目录（如果存在）
+        workspace_path = get_workspace_dir() / session_id
+        if workspace_path.exists():
+            try:
+                shutil.rmtree(str(workspace_path))
+                deleted_fs = True
+                logger.info(f"[delete_workspace] 文件系统目录已删除: {workspace_path}")
+            except Exception as e:
+                logger.error(f"[delete_workspace] 删除文件系统目录失败: {e}")
+                return jsonify({
+                    "status": "error", 
+                    "message": f"删除文件失败: {str(e)}"
+                }), 500
+        
+        # 3. 返回结果
+        if deleted_db or deleted_fs:
+            message_parts = []
+            if deleted_db:
+                message_parts.append("数据库记录")
+            if deleted_fs:
+                message_parts.append("文件目录")
+            
+            return jsonify({
+                "status": "success", 
+                "message": f"已删除: {' 和 '.join(message_parts)}"
+            })
+        else:
+            return jsonify({
+                "status": "error", 
+                "message": "工作区不存在（数据库和文件系统中均未找到）"
+            }), 404
+    
     except Exception as e:
-        return jsonify({"status": "error", "message": f"删除失败: {str(e)}"}), 500
+        logger.error(f"[delete_workspace] 删除失败: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "status": "error", 
+            "message": f"删除失败: {str(e)}"
+        }), 500
 
 @app.route('/api/playwright/status', methods=['GET'])
 def playwright_status():
@@ -1686,7 +1791,7 @@ def list_report_versions():
 
 @app.route('/api/report_content', methods=['GET'])
 def fetch_report_content():
-    """获取指定版本的报告内容"""
+    """获取指定版本的报告内容（优先从数据库读取）"""
     global current_session_id
     
     workspace_id = request.args.get('workspace_id') or current_session_id
@@ -1695,20 +1800,35 @@ def fetch_report_content():
     if not workspace_id:
         return jsonify({"status": "error", "message": "缺少workspace_id"}), 400
     
-    workspace_path = get_workspace_dir() / workspace_id
-    report_path = workspace_path / filename
+    content = None
     
-    if not report_path.exists():
-        return jsonify({"status": "error", "message": f"报告不存在: {filename}"}), 404
+    # 优先从数据库读取主报告
+    if filename == 'report.html' and DB_AVAILABLE and SessionRepository:
+        try:
+            session = SessionRepository.get_session_by_id(workspace_id)
+            if session and session.report_html:
+                content = session.report_html
+                logger.info(f"[report_content] 从数据库加载报告，长度: {len(content)}")
+        except Exception as e:
+            logger.warning(f"[report_content] 从数据库加载报告失败: {e}")
     
-    # 安全检查：确保文件在workspace内
-    try:
-        report_path.resolve().relative_to(workspace_path.resolve())
-    except ValueError:
-        return jsonify({"status": "error", "message": "非法文件路径"}), 400
-    
-    with open(report_path, 'r', encoding='utf-8') as f:
-        content = f.read()
+    # 回退到文件系统（兼容旧会话和修订版本）
+    if not content:
+        workspace_path = get_workspace_dir() / workspace_id
+        report_path = workspace_path / filename
+        
+        if not report_path.exists():
+            return jsonify({"status": "error", "message": f"报告不存在: {filename}"}), 404
+        
+        # 安全检查：确保文件在workspace内
+        try:
+            report_path.resolve().relative_to(workspace_path.resolve())
+        except ValueError:
+            return jsonify({"status": "error", "message": "非法文件路径"}), 400
+        
+        with open(report_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        logger.info(f"[report_content] 从文件加载报告（兼容模式）: {filename}")
     
     return jsonify({"status": "success", "content": content, "filename": filename})
 
@@ -1731,15 +1851,30 @@ def revise_report():
         if not current_html:
             return jsonify({"status": "error", "message": "缺少当前报告内容"}), 400
         
-        # 加载原始议长总结作为参照
-        workspace_path = pathlib.Path(get_workspace_dir()) / workspace_id
-        history_path = workspace_path / "history.json"
+        # 加载原始议长总结作为参照（优先从数据库读取）
+        history = None
         
-        if not history_path.exists():
-            return jsonify({"status": "error", "message": f"找不到议事历史: {workspace_id}"}), 404
+        # 优先从数据库读取
+        if DB_AVAILABLE and SessionRepository:
+            try:
+                session = SessionRepository.get_session_by_id(workspace_id)
+                if session and session.history:
+                    history = session.history
+                    logger.info(f"[revise_report] 从数据库加载历史，条目数: {len(history)}")
+            except Exception as e:
+                logger.warning(f"[revise_report] 从数据库加载历史失败: {e}")
         
-        with open(history_path, 'r', encoding='utf-8') as f:
-            history = json.load(f)
+        # 回退到文件系统（兼容旧会话）
+        if not history:
+            workspace_path = pathlib.Path(get_workspace_dir()) / workspace_id
+            history_path = workspace_path / "history.json"
+            
+            if not history_path.exists():
+                return jsonify({"status": "error", "message": f"找不到议事历史: {workspace_id}"}), 404
+            
+            with open(history_path, 'r', encoding='utf-8') as f:
+                history = json.load(f)
+            logger.info(f"[revise_report] 从文件加载历史（旧会话兼容模式）")
         
         # 提取最后一轮的议长总结
         leader_summary = None
@@ -1807,30 +1942,20 @@ def revise_report():
             
             logger.info(f"[revise_report] 修订成功: {revision_result['revision_summary']}")
             
-            # 首次修订时，先保存原始版本
-            main_report_path = workspace_path / "report.html"
-            original_backup_path = workspace_path / "report_v0.html"
-            if not original_backup_path.exists() and main_report_path.exists():
-                # 复制原始报告到 v0
-                import shutil
-                shutil.copy2(main_report_path, original_backup_path)
-                logger.info(f"[revise_report] 已备份原始报告: {original_backup_path}")
-            
-            # 保存修订版本（从v1开始）
-            existing_versions = list(workspace_path.glob("report_v*.html"))
-            # 排除v0（原始版本），计算修订版本数
-            revision_versions = [f for f in existing_versions if f.stem != "report_v0"]
-            revision_count = len(revision_versions) + 1
-            revision_path = workspace_path / f"report_v{revision_count}.html"
-            
-            with open(revision_path, 'w', encoding='utf-8') as f:
-                f.write(revision_result['revised_html'])
-            
-            # 同时更新主报告
-            with open(main_report_path, 'w', encoding='utf-8') as f:
-                f.write(revision_result['revised_html'])
-            
-            logger.info(f"[revise_report] 已保存修订版本: {revision_path}")
+            # 将修订后的报告更新到数据库
+            revision_count = 1  # 简化版本号逻辑
+            if DB_AVAILABLE and SessionRepository:
+                try:
+                    SessionRepository.save_final_report(
+                        workspace_id,
+                        revision_result['revised_html'],
+                        report_json={'revision_summary': revision_result['revision_summary']}
+                    )
+                    logger.info(f"[revise_report] 修订后的报告已保存到数据库")
+                except Exception as e:
+                    logger.error(f"[revise_report] 保存修订报告到数据库失败: {e}")
+            else:
+                logger.warning(f"[revise_report] 数据库不可用，修订结果仅返回前端")
             
             return jsonify({
                 "status": "success",

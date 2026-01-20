@@ -16,6 +16,15 @@ import uuid
 import traceback
 from datetime import datetime
 
+# 数据库支持（可选，如果未初始化则跳过）
+try:
+    from src.repositories import SessionRepository
+    DB_AVAILABLE = True
+except Exception as e:
+    logger.warning(f"[langchain_agents] SessionRepository导入失败，数据库功能禁用: {e}")
+    DB_AVAILABLE = False
+    SessionRepository = None
+
 def send_web_event(event_type: str, **kwargs):
     """发送事件到 Web 监控面板。"""
     try:
@@ -773,45 +782,15 @@ def refine_search_references(
                        chunk_id=str(uuid.uuid4()))
         return fallback_text, output
     
-    # 3. 生成精简文本
+    # 3. 生成精简文本并返回
     refined_text_parts = []
     for i, ref in enumerate(output.refined_references, 1):
         refined_text_parts.append(f"{i}. [{ref.title}]({ref.url})\n   要点: {ref.summary}")
     
     refined_text = "\n\n".join(refined_text_parts) if refined_text_parts else "无相关联网搜索参考资料。"
     
-    # 4. 保存到文件
-    refined_path = os.path.join(workspace_path, "refined_references.json")
-    with open(refined_path, "w", encoding="utf-8") as f:
-        json.dump(output.model_dump(), f, ensure_ascii=False, indent=2)
-    logger.info(f"[refine] 已保存精简引用到: {refined_path}")
-    
-    # 5. 回写到orchestration_result.json（更新search_references字段）
-    orch_path = os.path.join(workspace_path, "orchestration_result.json")
-    if os.path.exists(orch_path):
-        try:
-            with open(orch_path, "r", encoding="utf-8") as f:
-                orch_data = json.load(f)
-            
-            # 更新all_outputs中的search_references为精简后的格式化文本列表
-            refined_refs_formatted = [
-                f"[{ref.title}]({ref.url})\n要点: {ref.summary}"
-                for ref in output.refined_references
-            ]
-            if "all_outputs" in orch_data:
-                orch_data["all_outputs"]["search_references"] = refined_refs_formatted
-                orch_data["all_outputs"]["refined_references_meta"] = {
-                    "original_count": output.original_count,
-                    "after_dedup_count": output.after_dedup_count,
-                    "refined_count": len(output.refined_references),
-                    "filtering_notes": output.filtering_notes
-                }
-            
-            with open(orch_path, "w", encoding="utf-8") as f:
-                json.dump(orch_data, f, ensure_ascii=False, indent=4)
-            logger.info(f"[refine] 已更新orchestration_result.json中的search_references")
-        except Exception as e:
-            logger.warning(f"[refine] 更新orchestration_result.json失败: {e}")
+    logger.info(f"[refine] 完成引用精简：原始{output.original_count}条 -> 去重{output.after_dedup_count}条 -> 精简{len(output.refined_references)}条")
+    logger.info(f"[refine] 完成引用精简：原始{output.original_count}条 -> 去重{output.after_dedup_count}条 -> 精简{len(output.refined_references)}条")
     
     # 发送完成事件
     send_web_event("agent_action",
@@ -823,14 +802,58 @@ def refine_search_references(
     return refined_text, output
 
 
-def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rounds: int = 3, num_planners: int = 2, num_auditors: int = 2, agent_configs: Dict[str, Any] = None) -> Dict[str, Any]:
+def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rounds: int = 3, num_planners: int = 2, num_auditors: int = 2, agent_configs: Dict[str, Any] = None, user_id: Optional[int] = None) -> Dict[str, Any]:
     """Run a multi-round LangChain-driven cycle: leader decomposes, planners generate plans, auditors review, leader summarizes.
+    
+    Args:
+        issue_text: 议题内容
+        model_config: 模型配置
+        max_rounds: 最大轮次
+        num_planners: 策论家数量
+        num_auditors: 监察官数量
+        agent_configs: Agent配置覆盖
+        user_id: 用户ID（用于数据库存储，可选）
+        
+    Returns:
+        dict: 包含decomposition, history, final, report_html的结果字典
     """
     # 1. 初始化 Session 和 Workspace
     session_id = datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + str(uuid.uuid4())[:8]
     workspace_path = get_workspace_dir() / session_id
     workspace_path.mkdir(parents=True, exist_ok=True)
-    logger.info(f"[cycle] Session ID: {session_id}, Workspace: {workspace_path}")
+    logger.info(f"[cycle] Session ID: {session_id}, Workspace: {workspace_path}, User: {user_id or 'anonymous'}")
+    
+    # 2. 创建数据库会话记录（需要Flask应用上下文）
+    if DB_AVAILABLE and user_id and SessionRepository:
+        try:
+            from src.web.app import app
+            
+            logger.info(f"[cycle] 准备创建数据库会话，user_id={user_id}, session_id={session_id}")
+            
+            config_data = {
+                "backend": model_config.get("type") if model_config else None,
+                "model": model_config.get("model") if model_config else None,
+                "rounds": max_rounds,
+                "planners": num_planners,
+                "auditors": num_auditors,
+                "agent_configs": agent_configs
+            }
+            
+            # 需要应用上下文进行数据库操作
+            with app.app_context():
+                db_session = SessionRepository.create_session(
+                    user_id=user_id,
+                    session_id=session_id,
+                    issue=issue_text,
+                    config=config_data
+                )
+                if db_session:
+                    logger.info(f"[cycle] ✅ 数据库会话创建成功: {session_id}")
+                else:
+                    logger.warning(f"[cycle] ⚠️ 数据库会话创建返回None: {session_id}")
+        except Exception as e:
+            logger.error(f"[cycle] ❌ 数据库操作失败: {e}")
+            logger.error(traceback.format_exc())
 
     # 重置 Web 面板
     try:
@@ -887,34 +910,37 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
             if search_res:
                 all_search_references.append(search_res)
             
-            # 保存原始输出用于调试
-            debug_file = os.path.join(workspace_path, f"debug_leader_raw_attempt_{attempt + 1}.txt")
-            with open(debug_file, "w", encoding="utf-8") as f:
-                f.write(out)
+            # 记录原始输出到日志（调试用）
+            logger.debug(f"[cycle] 议长原始输出 (尝试 {attempt + 1}): {out[:500]}...")
             
             cleaned = clean_json_string(out)
             if not cleaned:
-                logger.error(f"[cycle] 议长输出为空或不包含 JSON。原始输出已保存到: {debug_file}")
+                logger.error(f"[cycle] 议长输出为空或不包含 JSON。原始输出长度: {len(out)}")
+                logger.debug(f"[cycle] 完整原始输出: {out}")
                 raise ValueError("议长未返回有效的 JSON 拆解结果")
             
-            # 保存清理后的JSON用于调试
-            cleaned_file = os.path.join(workspace_path, f"debug_leader_cleaned_attempt_{attempt + 1}.json")
-            with open(cleaned_file, "w", encoding="utf-8") as f:
-                f.write(cleaned)
+            # 记录清理后的JSON到日志（调试用）
+            logger.debug(f"[cycle] 清理后JSON (尝试 {attempt + 1}): {cleaned[:500]}...")
                 
             try:
                 parsed = json.loads(cleaned)
             except json.JSONDecodeError as json_err:
                 logger.error(f"[cycle] JSON解析失败: {json_err}")
-                logger.error(f"清理后的JSON已保存到: {cleaned_file}")
+                logger.debug(f"[cycle] 完整清理后JSON: {cleaned}")
                 raise
                 
             summary = schemas.LeaderSummary(**parsed)
             decomposition = summary.decomposition.model_dump()
             
-            # 保存初始拆解结果
-            with open(os.path.join(workspace_path, "decomposition.json"), "w", encoding="utf-8") as f:
-                json.dump(decomposition, f, ensure_ascii=False, indent=4)
+            # 保存到数据库（需要应用上下文）
+            if DB_AVAILABLE and user_id and SessionRepository:
+                try:
+                    from src.web.app import app
+                    with app.app_context():
+                        SessionRepository.update_decomposition(session_id, decomposition)
+                        logger.info(f"[cycle] decomposition已保存到数据库")
+                except Exception as e:
+                    logger.error(f"[cycle] 数据库保存失败: {e}")
             
             logger.info(f"[cycle] 议长拆解成功 (尝试 {attempt + 1})")
             break
@@ -959,10 +985,6 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
             da_obj = schemas.DevilsAdvocateSchema(**parsed)
             decomposition_da_result = da_obj.model_dump()
             logger.info(f"[cycle] 质疑官验证拆解成功 (尝试 {attempt + 1})")
-            
-            # 保存拆解质疑结果
-            with open(os.path.join(workspace_path, "decomposition_challenge.json"), "w", encoding="utf-8") as f:
-                json.dump(decomposition_da_result, f, ensure_ascii=False, indent=4)
             break
         except Exception as e:
             logger.warning(f"[cycle] 质疑官验证拆解尝试 {attempt + 1} 失败: {e}")
@@ -1005,10 +1027,6 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
                 parsed = json.loads(cleaned)
                 summary = schemas.LeaderSummary(**parsed)
                 decomposition = summary.decomposition.model_dump()
-                
-                # 更新保存的拆解结果
-                with open(os.path.join(workspace_path, "decomposition_revised.json"), "w", encoding="utf-8") as f:
-                    json.dump(decomposition, f, ensure_ascii=False, indent=4)
                 
                 logger.info(f"[cycle] 议长修正拆解成功 (尝试 {attempt + 1})")
                 break
@@ -1143,8 +1161,7 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
             "plans": plans,
             "audits": audits
         }
-        with open(os.path.join(workspace_path, f"round_{r}_data.json"), "w", encoding="utf-8") as f:
-            json.dump(round_data, f, ensure_ascii=False, indent=4)
+        # round_data 不再保存到文件，已在history中记录
 
         # 4. Leader Summary & Next Instructions
         logger.info(f"[round {r}] 议长正在汇总本轮结果...")
@@ -1307,9 +1324,15 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
                         logger.warning(f"[round {r}] 议长最终修正失败，保留原总结")
                         send_web_event("agent_action", agent_name="议长", role_type="Leader", content=f"⚠️ 最终修正失败，保留原总结", chunk_id=str(uuid.uuid4()))
 
-        # 保存本轮汇总后的 history
-        with open(os.path.join(workspace_path, "history.json"), "w", encoding="utf-8") as f:
-            json.dump(history, f, ensure_ascii=False, indent=4)
+        # 保存history到数据库（需要应用上下文）
+        if DB_AVAILABLE and user_id and SessionRepository:
+            try:
+                from src.web.app import app
+                with app.app_context():
+                    SessionRepository.update_history(session_id, history)
+                    logger.info(f"[round {r}] history已保存到数据库")
+            except Exception as e:
+                logger.error(f"[round {r}] 数据库保存失败: {e}")
 
         # 更新下一轮指令
         current_instructions = f"核心目标: {decomposition['core_goal']}\n上轮总结: {final_summary['summary']}\n议长指令: {final_summary['instructions']}"
@@ -1387,103 +1410,74 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
         "final_summary": last_summary
     }
     
-    # 保存最终输入数据
-    with open(os.path.join(workspace_path, "final_session_data.json"), "w", encoding="utf-8") as f:
-        json.dump(final_data, f, ensure_ascii=False, indent=4)
-    
-    # 保存搜索参考资料
-    with open(os.path.join(workspace_path, "search_references.json"), "w", encoding="utf-8") as f:
-        json.dump(all_search_references, f, ensure_ascii=False, indent=4)
+    # 保存最终数据到数据库（需要应用上下文）
+    if DB_AVAILABLE and user_id and SessionRepository:
+        try:
+            from src.web.app import app
+            with app.app_context():
+                SessionRepository.update_final_session_data(session_id, final_data)
+                SessionRepository.update_search_references(session_id, all_search_references)
+                logger.info(f"[cycle] final_session_data 和 search_references 已保存到数据库")
+        except Exception as e:
+            logger.error(f"[cycle] 数据库保存失败: {e}")
 
     report_html = generate_report_from_workspace(workspace_path, model_config, session_id)
+    
+    # 保存报告到数据库（需要应用上下文）
+    if DB_AVAILABLE and user_id and SessionRepository:
+        try:
+            from src.web.app import app
+            with app.app_context():
+                SessionRepository.save_final_report(session_id, report_html)
+                logger.info(f"[cycle] 报告已保存到数据库")
+        except Exception as e:
+            logger.error(f"[cycle] 数据库更新失败（不影响主流程）: {e}")
 
     return {
         "decomposition": decomposition,
         "history": history,
         "final": last_summary,
-        "report_html": report_html
+        "report_html": report_html,
+        "session_id": session_id  # 返回session_id供app.py使用
     }
 
 def generate_report_from_workspace(workspace_path: str, model_config: Dict[str, Any], session_id: str = None) -> str:
-    """根据工作区保存的数据重新生成报告。
+    """从数据库重新生成报告（不再使用文件）。
     
     Args:
-        workspace_path: 工作区路径
+        workspace_path: 工作区路径（保留兼容性，实际不再使用）
         model_config: 模型配置
-        session_id: 会话ID，用于在HTML中嵌入workspace标识
+        session_id: 会话ID，必需
     """
-    # 如果没有传入session_id，从workspace_path中提取
     if not session_id:
         session_id = os.path.basename(workspace_path)
     
-    logger.info(f"[report] 正在从工作区 {workspace_path} 重新生成报告（Session ID: {session_id}）...")
+    logger.info(f"[report] 正在从数据库重新生成报告（Session ID: {session_id}）...")
     
     try:
-        # 尝试加载数据（支持两种文件结构）
-        final_data = None
+        # 从数据库加载会话数据（需要Flask应用上下文）
+        if not DB_AVAILABLE or not SessionRepository:
+            raise RuntimeError("数据库功能未启用，无法生成报告")
         
-        # 方式1：尝试加载新格式（议事编排官）：orchestration_result.json
-        orchestration_file = os.path.join(workspace_path, "orchestration_result.json")
-        if os.path.exists(orchestration_file):
-            logger.info(f"[report] 检测到议事编排官格式，从 orchestration_result.json 读取")
-            with open(orchestration_file, "r", encoding="utf-8") as f:
-                orchestration_data = json.load(f)
+        # 导入Flask app并创建应用上下文
+        from src.web.app import app
+        with app.app_context():
+            session = SessionRepository.get_session_by_id(session_id)
+            if not session:
+                raise ValueError(f"数据库中不存在会话: {session_id}")
             
-            # 从 orchestration_result.json 构造 final_data
+            # 构造 final_data 结构
             final_data = {
-                "issue": orchestration_data.get("user_requirement", ""),  # 修复：使用 user_requirement 而非 problem_type
-                "decomposition": {},  # 议事编排官没有分解步骤
+                "issue": session.issue,
+                "decomposition": session.decomposition or {},
                 "decomposition_challenge": "",
-                "history": orchestration_data.get("execution", {}),  # FrameworkEngine 的执行结果
-                "final_summary": orchestration_data.get("execution", {}).get("final_synthesis", {})
+                "history": session.history or [],
+                "final_summary": session.final_session_data or {}
             }
-            logger.info(f"[report] 成功从 orchestration_result.json 构造数据")
-        
-        # 方式2：尝试加载旧格式（传统 run_full_cycle）：final_session_data.json
-        else:
-            final_session_file = os.path.join(workspace_path, "final_session_data.json")
-            if os.path.exists(final_session_file):
-                logger.info(f"[report] 检测到传统格式，从 final_session_data.json 读取")
-                with open(final_session_file, "r", encoding="utf-8") as f:
-                    final_data = json.load(f)
-            else:
-                # 两种文件都不存在，尝试从 history.json 读取
-                history_file = os.path.join(workspace_path, "history.json")
-                if os.path.exists(history_file):
-                    logger.warning(f"[report] 未找到 final_session_data.json 或 orchestration_result.json，尝试从 history.json 构造")
-                    with open(history_file, "r", encoding="utf-8") as f:
-                        history_data = json.load(f)
-                    
-                    # 从 history.json 构造简化的 final_data
-                    final_data = {
-                        "issue": history_data.get("config", {}).get("issue", ""),
-                        "decomposition": {},
-                        "decomposition_challenge": "",
-                        "history": history_data.get("discussion_events", []),
-                        "final_summary": {}
-                    }
-                    logger.info(f"[report] 从 history.json 构造数据")
-                else:
-                    raise FileNotFoundError(f"工作区中找不到任何可用的数据文件: {workspace_path}")
-        
-        if not final_data:
-            raise ValueError("无法加载或构造 final_data")
-        
-        # 加载搜索参考资料，如果不存在则为空
-        all_search_references = []
-        refs_path = os.path.join(workspace_path, "search_references.json")
-        if os.path.exists(refs_path):
-            with open(refs_path, "r", encoding="utf-8") as f:
-                all_search_references = json.load(f)
-        else:
-            # Fallback: 尝试从orchestration_result.json读取
-            orch_path = os.path.join(workspace_path, "orchestration_result.json")
-            if os.path.exists(orch_path):
-                with open(orch_path, "r", encoding="utf-8") as f:
-                    orch_data = json.load(f)
-                all_search_references = orch_data.get("all_outputs", {}).get("search_references", [])
-                if all_search_references:
-                    logger.info(f"[report] 从orchestration_result.json加载搜索结果: {len(all_search_references)}条")
+            
+            # 从数据库获取搜索引用
+            all_search_references = session.search_references or []
+            logger.info(f"[report] 从数据库加载: 议题={session.issue}, 轮次={len(final_data['history'])}, 搜索结果={len(all_search_references)}条")
         
         # ===== 参考资料整理环节 =====
         # 获取原始议题用于相关性判断
@@ -1495,31 +1489,13 @@ def generate_report_from_workspace(workspace_path: str, model_config: Dict[str, 
         if all_search_references and len(all_search_references) > 0:
             logger.info(f"[report] 开始参考资料整理，原始结果: {len(all_search_references)}条")
             
-            # 检查是否已有精简后的引用文件
-            refined_path = os.path.join(workspace_path, "refined_references.json")
-            if os.path.exists(refined_path):
-                # 已整理过，直接加载
-                logger.info(f"[report] 发现已有精简引用文件，直接加载")
-                with open(refined_path, "r", encoding="utf-8") as f:
-                    refined_data = json.load(f)
-                
-                # 生成精简文本
-                refined_refs = refined_data.get("refined_references", [])
-                if refined_refs:
-                    search_refs_parts = []
-                    for i, ref in enumerate(refined_refs, 1):
-                        search_refs_parts.append(f"{i}. [{ref['title']}]({ref['url']})\n   要点: {ref['summary']}")
-                    search_refs_text = "\n\n".join(search_refs_parts)
-                else:
-                    search_refs_text = "无相关联网搜索参考资料。"
-            else:
-                # 执行整理流程
-                search_refs_text, refined_output = refine_search_references(
-                    all_search_references,
-                    issue_text,
-                    model_config,
-                    workspace_path
-                )
+            # 每次动态精简引用（不再依赖文件缓存）
+            search_refs_text, refined_output = refine_search_references(
+                all_search_references,
+                issue_text,
+                model_config,
+                workspace_path
+            )
         else:
             search_refs_text = "无联网搜索参考资料。"
             logger.info(f"[report] 无搜索结果需要整理")
@@ -1904,7 +1880,8 @@ def execute_orchestration_plan(
     model_config: Dict[str, Any] = None,
     workspace_path: Path = None,
     session_id: str = None,
-    agent_configs: Dict[str, Any] = None
+    agent_configs: Dict[str, Any] = None,
+    user_id: int = None
 ) -> Dict[str, Any]:
     """
     执行议事编排官生成的规划方案
@@ -1916,6 +1893,7 @@ def execute_orchestration_plan(
         workspace_path: 工作目录路径（可选，如果不提供会自动创建）
         session_id: 会话ID（可选，如果不提供会自动生成）
         agent_configs: 可选的每个Agent的模型配置覆盖
+        user_id: 用户ID（用于数据库保存）
         
     Returns:
         执行结果字典
@@ -1938,6 +1916,40 @@ def execute_orchestration_plan(
             workspace_path = get_workspace_dir() / session_id
             workspace_path.mkdir(parents=True, exist_ok=True)
             logger.info(f"[execute_orchestration_plan] 创建workspace: {workspace_path}")
+        
+        # 1.5 创建数据库会话记录（如果提供了user_id）
+        if user_id and DB_AVAILABLE:
+            try:
+                from src.repositories.session_repository import SessionRepository
+                from src.web.app import app
+                
+                logger.info(f"[execute_orchestration_plan] 准备创建数据库会话，user_id={user_id}, session_id={session_id}")
+                
+                config_data = {
+                    "framework_id": plan.framework_selection.framework_id,
+                    "framework_name": plan.framework_selection.framework_name,
+                    "backend": model_config.get("type") if model_config else None,
+                    "model": model_config.get("model") if model_config else None,
+                    "rounds": plan.execution_config.total_rounds,
+                    "agent_counts": plan.execution_config.agent_counts,
+                    "agent_configs": agent_configs
+                }
+                
+                # 需要应用上下文进行数据库操作
+                with app.app_context():
+                    db_session = SessionRepository.create_session(
+                        user_id=user_id,
+                        session_id=session_id,
+                        issue=user_requirement,
+                        config=config_data
+                    )
+                    if db_session:
+                        logger.info(f"[execute_orchestration_plan] ✅ 数据库会话创建成功: {session_id}")
+                    else:
+                        logger.warning(f"[execute_orchestration_plan] ⚠️ 数据库会话创建返回None: {session_id}")
+            except Exception as e:
+                logger.error(f"[execute_orchestration_plan] ❌ 数据库操作失败: {e}")
+                logger.error(traceback.format_exc())
         
         # 2. 获取框架定义
         framework = get_framework(plan.framework_selection.framework_id)
@@ -2004,7 +2016,7 @@ def execute_orchestration_plan(
             role_stage_mapping=role_stage_mapping
         )
         
-        # 6. 保存完整结果
+        # 6. 构造完整结果（仅内存）
         final_result = {
             "success": True,
             "session_id": session_id,
@@ -2016,21 +2028,15 @@ def execute_orchestration_plan(
             "timestamp": datetime.now().isoformat()
         }
         
-        # 保存到workspace
-        result_file = workspace_path / "orchestration_result.json"
-        with open(result_file, "w", encoding="utf-8") as f:
-            json.dump(final_result, f, ensure_ascii=False, indent=4)
+        # 议事编排官结果已在数据库保存，不再写入文件
         
-        # 单独保存search_references.json（供报告生成流程使用）
+        # 提取搜索引用（已在数据库中）
         all_outputs = engine.get_all_outputs()
         search_refs = all_outputs.get("search_references", [])
         if search_refs:
-            refs_file = workspace_path / "search_references.json"
-            with open(refs_file, "w", encoding="utf-8") as f:
-                json.dump(search_refs, f, ensure_ascii=False, indent=4)
-            logger.info(f"[execute_orchestration_plan] 搜索结果已保存到 {refs_file}，共 {len(search_refs)} 条")
+            logger.info(f"[execute_orchestration_plan] 搜索结果已保存到数据库，共 {len(search_refs)} 条")
         
-        logger.info(f"[execute_orchestration_plan] 执行完成，结果已保存到 {result_file}")
+        logger.info(f"[execute_orchestration_plan] 执行完成，结果已保存到数据库")
         
         # 7. 生成报告
         logger.info(f"[execute_orchestration_plan] 开始生成报告...")
