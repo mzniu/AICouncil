@@ -5,6 +5,7 @@ from src.utils.logger import logger
 from src.utils import search_utils
 from src.utils.path_manager import get_workspace_dir
 from src.agents.frameworks import get_framework
+from src.agents.tool_calling_agent import stream_tool_calling_agent
 from pydantic import ValidationError
 import json
 import requests
@@ -33,6 +34,57 @@ def send_web_event(event_type: str, **kwargs):
         requests.post(url, json=payload, timeout=1)
     except Exception:
         pass
+
+def convert_chain_to_tool_calling_format(chain, prompt_vars: Dict[str, Any], role_type: str) -> tuple:
+    """将PromptTemplate chain转换为tool-calling格式
+    
+    Args:
+        chain: PromptTemplate | LLM chain
+        prompt_vars: prompt变量字典
+        role_type: 角色类型（用于获取system prompt）
+        
+    Returns:
+        (system_prompt: str, user_prompt: str, model_config: Dict)
+    """
+    from src.agents.role_manager import RoleManager
+    
+    # 从chain中提取prompt和model_config
+    if hasattr(chain, 'first') and isinstance(chain.first, PromptTemplate):
+        prompt_template = chain.first
+    else:
+        # 如果不是标准chain结构，返回默认值
+        logger.warning(f"Cannot extract PromptTemplate from chain for role_type: {role_type}")
+        return "You are an AI assistant.", json.dumps(prompt_vars, ensure_ascii=False), {"type": "deepseek", "model": "deepseek-reasoner"}
+    
+    # 从chain中提取LLM配置
+    if hasattr(chain, 'last') and hasattr(chain.last, 'backend_config'):
+        backend_config = chain.last.backend_config
+        model_config = {
+            "type": backend_config.backend,
+            "model": backend_config.model
+        }
+    else:
+        # 使用默认配置
+        model_config = {"type": "deepseek", "model": "deepseek-reasoner"}
+    
+    # 渲染prompt
+    try:
+        full_prompt = prompt_template.format(**prompt_vars)
+    except Exception as e:
+        logger.error(f"Failed to format prompt: {e}")
+        full_prompt = json.dumps(prompt_vars, ensure_ascii=False)
+    
+    # 分离system和user部分（简单策略：将prompt作为user prompt，system为角色说明）
+    role_manager = RoleManager()
+    try:
+        role_config = role_manager.get_role(role_type.lower())
+        system_prompt = f"你是{role_config.display_name}。\n{role_config.description}"
+    except:
+        system_prompt = f"You are a {role_type} agent."
+    
+    user_prompt = full_prompt
+    
+    return system_prompt, user_prompt, model_config
 
 def clean_json_string(s: str) -> str:
     """清理字符串中的 Markdown JSON 标签，并尝试提取第一个完整的 JSON 对象。
@@ -404,9 +456,15 @@ def make_generic_role_chain(role_name: str, stage_name: str, model_config: Dict[
     return prompt | llm
 
 
-def make_planner_chain(model_config: Dict[str, Any]):
-    """创建策论家链（使用RoleManager）"""
+def make_planner_chain(model_config: Dict[str, Any], tenant_id: Optional[int] = None):
+    """创建策论家链（使用RoleManager + Skills注入）
+    
+    Args:
+        model_config: 模型配置
+        tenant_id: 租户ID（用于加载订阅的Skills）
+    """
     from src.agents.role_manager import RoleManager
+    from src.skills.loader_v2 import SkillLoaderV2
     
     llm = AdapterLLM(backend_config=ModelConfig(**model_config))
     role_manager = RoleManager()
@@ -417,14 +475,37 @@ def make_planner_chain(model_config: Dict[str, Any]):
     role_config = role_manager.get_role("planner")
     input_vars = role_config.stages[stage_name].input_vars
     
+    # 加载并注入Skills
+    try:
+        skill_loader = SkillLoaderV2()
+        # 加载策论家适用的技能（包含订阅的builtin + custom skills）
+        skills = skill_loader.get_skills_by_role('策论家', tenant_id=tenant_id)
+        
+        if skills:
+            logger.info(f"[planner_chain] Loaded {len(skills)} skills for tenant {tenant_id}")
+            # 格式化技能为prompt（不包含metadata以节省token）
+            skills_text = skill_loader.format_all_skills_for_prompt(skills, include_metadata=False)
+            # 在prompt末尾注入技能库
+            prompt_text = prompt_text + "\n\n" + skills_text
+        else:
+            logger.info(f"[planner_chain] No skills loaded for tenant {tenant_id}")
+    except Exception as e:
+        logger.warning(f"[planner_chain] Failed to load skills: {e}")
+    
     prompt = PromptTemplate(template=prompt_text, input_variables=input_vars)
     return prompt | llm
 
 
 
-def make_auditor_chain(model_config: Dict[str, Any]):
-    """创建监察官链（使用RoleManager）"""
+def make_auditor_chain(model_config: Dict[str, Any], tenant_id: Optional[int] = None):
+    """创建监察官链（使用RoleManager + Skills注入）
+    
+    Args:
+        model_config: 模型配置
+        tenant_id: 租户ID（用于加载订阅的Skills）
+    """
     from src.agents.role_manager import RoleManager
+    from src.skills.loader_v2 import SkillLoaderV2
     
     llm = AdapterLLM(backend_config=ModelConfig(**model_config))
     role_manager = RoleManager()
@@ -434,6 +515,23 @@ def make_auditor_chain(model_config: Dict[str, Any]):
     prompt_text = role_manager.load_prompt("auditor", stage_name)
     role_config = role_manager.get_role("auditor")
     input_vars = role_config.stages[stage_name].input_vars
+    
+    # 加载并注入Skills
+    try:
+        skill_loader = SkillLoaderV2()
+        # 加载监察官适用的技能（包含订阅的builtin + custom skills）
+        skills = skill_loader.get_skills_by_role('监察官', tenant_id=tenant_id)
+        
+        if skills:
+            logger.info(f"[auditor_chain] Loaded {len(skills)} skills for tenant {tenant_id}")
+            # 格式化技能为prompt（不包含metadata以节省token）
+            skills_text = skill_loader.format_all_skills_for_prompt(skills, include_metadata=False)
+            # 在prompt末尾注入技能库
+            prompt_text = prompt_text + "\n\n" + skills_text
+        else:
+            logger.info(f"[auditor_chain] No skills loaded for tenant {tenant_id}")
+    except Exception as e:
+        logger.warning(f"[auditor_chain] Failed to load skills: {e}")
     
     prompt = PromptTemplate(template=prompt_text, input_variables=input_vars)
     return prompt | llm
@@ -802,7 +900,7 @@ def refine_search_references(
     return refined_text, output
 
 
-def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rounds: int = 3, num_planners: int = 2, num_auditors: int = 2, agent_configs: Dict[str, Any] = None, user_id: Optional[int] = None) -> Dict[str, Any]:
+def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rounds: int = 3, num_planners: int = 2, num_auditors: int = 2, agent_configs: Dict[str, Any] = None, user_id: Optional[int] = None, tenant_id: Optional[int] = None) -> Dict[str, Any]:
     """Run a multi-round LangChain-driven cycle: leader decomposes, planners generate plans, auditors review, leader summarizes.
     
     Args:
@@ -813,6 +911,7 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
         num_auditors: 监察官数量
         agent_configs: Agent配置覆盖
         user_id: 用户ID（用于数据库存储，可选）
+        tenant_id: 租户ID（用于多租户隔离，可选）
         
     Returns:
         dict: 包含decomposition, history, final, report_html的结果字典
@@ -821,14 +920,14 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
     session_id = datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + str(uuid.uuid4())[:8]
     workspace_path = get_workspace_dir() / session_id
     workspace_path.mkdir(parents=True, exist_ok=True)
-    logger.info(f"[cycle] Session ID: {session_id}, Workspace: {workspace_path}, User: {user_id or 'anonymous'}")
+    logger.info(f"[cycle] Session ID: {session_id}, Workspace: {workspace_path}, User: {user_id or 'anonymous'}, Tenant: {tenant_id or 'N/A'}")
     
     # 2. 创建数据库会话记录（需要Flask应用上下文）
     if DB_AVAILABLE and user_id and SessionRepository:
         try:
             from src.web.app import app
             
-            logger.info(f"[cycle] 准备创建数据库会话，user_id={user_id}, session_id={session_id}")
+            logger.info(f"[cycle] 准备创建数据库会话，user_id={user_id}, tenant_id={tenant_id}, session_id={session_id}")
             
             config_data = {
                 "backend": model_config.get("type") if model_config else None,
@@ -845,7 +944,8 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
                     user_id=user_id,
                     session_id=session_id,
                     issue=issue_text,
-                    config=config_data
+                    config=config_data,
+                    tenant_id=tenant_id  # 传递tenant_id
                 )
                 if db_session:
                     logger.info(f"[cycle] ✅ 数据库会话创建成功: {session_id}")
@@ -886,13 +986,13 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
     for i in range(num_planners):
         # 优先从 agent_configs 获取 planner_i，否则使用全局 model_config
         p_cfg = agent_configs.get(f"planner_{i}") or model_config
-        planner_chains.append(make_planner_chain(p_cfg))
+        planner_chains.append(make_planner_chain(p_cfg, tenant_id=tenant_id))
         
     auditor_chains = []
     for i in range(num_auditors):
         # 优先从 agent_configs 获取 auditor_i，否则使用全局 model_config
         a_cfg = agent_configs.get(f"auditor_{i}") or model_config
-        auditor_chains.append(make_auditor_chain(a_cfg))
+        auditor_chains.append(make_auditor_chain(a_cfg, tenant_id=tenant_id))
 
     # 1. Leader initial decomposition
     logger.info("[cycle] 议长正在进行初始议题拆解...")
@@ -906,9 +1006,24 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
         try:
             logger.info(f"[cycle] 议长正在调用模型进行拆解 (尝试 {attempt + 1}/{max_retries})...")
             current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            out, search_res = stream_agent_output(leader_chain, {"inputs": issue_text, "current_time": current_time_str}, "议长", "Leader")
-            if search_res:
-                all_search_references.append(search_res)
+            
+            # 使用tool-calling agent
+            prompt_vars = {"inputs": issue_text, "current_time": current_time_str}
+            system_prompt, user_prompt, model_config = convert_chain_to_tool_calling_format(leader_chain, prompt_vars, "leader")
+            out, tool_calls = stream_tool_calling_agent(
+                role_type="leader",
+                agent_name="议长",
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                model_config=model_config,
+                event_type="agent_action"
+            )
+            
+            # 记录工具调用（替代search_res）
+            if tool_calls:
+                search_results = [tc for tc in tool_calls if tc['tool_name'] == 'web_search']
+                if search_results:
+                    all_search_references.append("\n".join([sr['formatted_result'] for sr in search_results]))
             
             # 记录原始输出到日志（调试用）
             logger.debug(f"[cycle] 议长原始输出 (尝试 {attempt + 1}): {out[:500]}...")
@@ -1092,9 +1207,22 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
             
             for attempt in range(max_retries):
                 try:
-                    out, search_res = stream_agent_output(planner_chains[i-1], prompt_vars, f"策论家 {i}", "Planner")
-                    if search_res:
-                        all_search_references.append(search_res)
+                    # 使用tool-calling agent
+                    system_prompt, user_prompt, model_config = convert_chain_to_tool_calling_format(planner_chains[i-1], prompt_vars, "planner")
+                    out, tool_calls = stream_tool_calling_agent(
+                        role_type="planner",
+                        agent_name=f"策论家 {i}",
+                        system_prompt=system_prompt,
+                        user_prompt=user_prompt,
+                        model_config=model_config,
+                        event_type="agent_action"
+                    )
+                    
+                    # 记录工具调用
+                    if tool_calls:
+                        search_results = [tc for tc in tool_calls if tc['tool_name'] == 'web_search']
+                        if search_results:
+                            all_search_references.append("\n".join([sr['formatted_result'] for sr in search_results]))
                     
                     cleaned = clean_json_string(out)
                     if not cleaned:
@@ -1131,9 +1259,22 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
             
             for attempt in range(max_retries):
                 try:
-                    out, search_res = stream_agent_output(auditor_chains[j-1], prompt_vars, f"监察官 {j}", "Auditor")
-                    if search_res:
-                        all_search_references.append(search_res)
+                    # 使用tool-calling agent
+                    system_prompt, user_prompt, model_config = convert_chain_to_tool_calling_format(auditor_chains[j-1], prompt_vars, "auditor")
+                    out, tool_calls = stream_tool_calling_agent(
+                        role_type="auditor",
+                        agent_name=f"监察官 {j}",
+                        system_prompt=system_prompt,
+                        user_prompt=user_prompt,
+                        model_config=model_config,
+                        event_type="agent_action"
+                    )
+                    
+                    # 记录工具调用
+                    if tool_calls:
+                        search_results = [tc for tc in tool_calls if tc['tool_name'] == 'web_search']
+                        if search_results:
+                            all_search_references.append("\n".join([sr['formatted_result'] for sr in search_results]))
                     
                     cleaned = clean_json_string(out)
                     if not cleaned:
@@ -1185,8 +1326,24 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
             logger.info(f"[round {r}] 议长正在调用模型进行汇总 (尝试 {attempt + 1}/{max_retries})...")
             try:
                 current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                out, search_res = stream_agent_output(current_leader_chain, {"inputs": json.dumps(inputs, ensure_ascii=False), "current_time": current_time_str}, "议长", "Leader")
-                if search_res:
+                
+                # 使用tool-calling agent
+                prompt_vars = {"inputs": json.dumps(inputs, ensure_ascii=False), "current_time": current_time_str}
+                system_prompt, user_prompt, model_config = convert_chain_to_tool_calling_format(current_leader_chain, prompt_vars, "leader")
+                out, tool_calls = stream_tool_calling_agent(
+                    role_type="leader",
+                    agent_name="议长",
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    model_config=model_config,
+                    event_type="agent_action"
+                )
+                
+                # 记录工具调用
+                if tool_calls:
+                    search_results = [tc for tc in tool_calls if tc['tool_name'] == 'web_search']
+                    if search_results:
+                        all_search_references.append("\n".join([sr['formatted_result'] for sr in search_results]))
                     all_search_references.append(search_res)
                 
                 cleaned = clean_json_string(out)
