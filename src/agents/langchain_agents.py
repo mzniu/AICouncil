@@ -1047,6 +1047,15 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
             summary = schemas.LeaderSummary(**parsed)
             decomposition = summary.decomposition.model_dump()
             
+            # 保存decomposition到文件
+            try:
+                decomposition_file = workspace_path / "decomposition.json"
+                with open(decomposition_file, "w", encoding="utf-8") as f:
+                    json.dump(decomposition, f, ensure_ascii=False, indent=2)
+                logger.info(f"[cycle] decomposition.json 已保存到文件")
+            except Exception as e:
+                logger.error(f"[cycle] 保存decomposition文件失败: {e}")
+            
             # 保存到数据库（需要应用上下文）
             if DB_AVAILABLE and user_id and SessionRepository:
                 try:
@@ -1302,7 +1311,15 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
             "plans": plans,
             "audits": audits
         }
-        # round_data 不再保存到文件，已在history中记录
+        
+        # 保存round_data到文件（用于历史记录查看）
+        try:
+            round_file = workspace_path / f"round_{r}_data.json"
+            with open(round_file, "w", encoding="utf-8") as f:
+                json.dump(round_data, f, ensure_ascii=False, indent=2)
+            logger.info(f"[round {r}] round_{r}_data.json 已保存到文件")
+        except Exception as e:
+            logger.error(f"[round {r}] 保存round_data失败: {e}")
 
         # 4. Leader Summary & Next Instructions
         logger.info(f"[round {r}] 议长正在汇总本轮结果...")
@@ -1566,6 +1583,20 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
         "history": simplified_history,
         "final_summary": last_summary
     }
+    
+    # 保存到文件系统（必须！用于历史记录查看）
+    try:
+        history_file = workspace_path / "history.json"
+        with open(history_file, "w", encoding="utf-8") as f:
+            json.dump(history, f, ensure_ascii=False, indent=2)
+        logger.info(f"[cycle] history.json 已保存到文件: {history_file}")
+        
+        final_data_file = workspace_path / "final_session_data.json"
+        with open(final_data_file, "w", encoding="utf-8") as f:
+            json.dump(final_data, f, ensure_ascii=False, indent=2)
+        logger.info(f"[cycle] final_session_data.json 已保存到文件: {final_data_file}")
+    except Exception as e:
+        logger.error(f"[cycle] 保存文件失败: {e}")
     
     # 保存最终数据到数据库（需要应用上下文）
     if DB_AVAILABLE and user_id and SessionRepository:
