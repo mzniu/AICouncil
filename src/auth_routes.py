@@ -182,11 +182,16 @@ def register():
     
     # 创建新用户
     try:
+        # 获取或创建默认租户
+        from src.utils.tenant_utils import get_or_create_default_tenant
+        default_tenant = get_or_create_default_tenant()
+        
         user = User(
             username=username,
             email=email,
             mfa_enabled=False,
-            is_admin=is_first_user  # 第一个用户自动设为管理员
+            is_admin=is_first_user,  # 第一个用户自动设为管理员
+            tenant_id=default_tenant.id  # 分配到默认租户
         )
         user.set_password(password)
         

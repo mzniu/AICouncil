@@ -12,6 +12,11 @@ import { pollStatus } from './discussion.js';
 // 动态获取全局t()函数
 const t = (key) => (window.t && typeof window.t === 'function') ? window.t(key) : key;
 
+// 历史记录分页状态
+let currentPage = 1;
+let currentStatus = ''; // '', 'running', 'completed', 'failed'
+const perPage = 20;
+
 /**
  * 切换历史记录模态框的显示/隐藏状态
  * @async
@@ -28,48 +33,121 @@ export async function toggleHistoryModal() {
     
     if (modal.classList.contains('hidden')) {
         modal.classList.remove('hidden');
-        list.innerHTML = `<div class="text-center py-8 text-slate-400 italic">${t('history_loading')}</div>`;
-        
-        try {
-            const data = await getWorkspaces();
-            
-            if (data.status === 'success' && data.workspaces.length > 0) {
-                renderHistoryList(data.workspaces);
-            } else {
-                list.innerHTML = `<div class="text-center py-8 text-slate-400 italic">${t('msg_history_empty')}</div>`;
-            }
-        } catch (error) {
-            list.innerHTML = `<div class="text-center py-8 text-red-400 italic">加载失败: ${error.message}</div>`;
-        }
+        // 重置分页
+        currentPage = 1;
+        currentStatus = '';
+        await loadHistoryPage();
     } else {
         modal.classList.add('hidden');
     }
 }
 
 /**
+ * 加载历史记录页面
+ * @async
+ * @returns {Promise<void>}
+ */
+async function loadHistoryPage() {
+    const list = document.getElementById('history-list');
+    list.innerHTML = `<div class="text-center py-8 text-slate-400 italic">${t('history_loading')}</div>`;
+    
+    try {
+        const options = { page: currentPage, per_page: perPage };
+        if (currentStatus) options.status = currentStatus;
+        
+        const data = await getWorkspaces(options);
+        
+        if (data.status === 'success' && data.workspaces && data.workspaces.length > 0) {
+            renderHistoryList(data.workspaces, data.pagination);
+        } else {
+            list.innerHTML = `<div class="text-center py-8 text-slate-400 italic">${t('msg_history_empty')}</div>`;
+        }
+    } catch (error) {
+        list.innerHTML = `<div class="text-center py-8 text-red-400 italic">加载失败: ${error.message}</div>`;
+    }
+}
+
+/**
  * 渲染历史记录列表HTML
  * @param {Array<Object>} workspaces - 工作区数组
- * @param {string} workspaces[].id - 工作区ID
- * @param {string} workspaces[].issue - 议题标题
- * @param {string} workspaces[].timestamp - 时间戳
+ * @param {Object} pagination - 分页信息
  * @returns {void}
  */
-export function renderHistoryList(workspaces) {
+export function renderHistoryList(workspaces, pagination) {
     const list = document.getElementById('history-list');
     list.innerHTML = '';
+    
+    // 添加筛选器和分页控件容器
+    const controls = document.createElement('div');
+    controls.className = 'mb-4 flex items-center justify-between pb-3 border-b border-slate-200';
+    controls.innerHTML = `
+        <div class="flex items-center space-x-2">
+            <label class="text-sm font-medium text-slate-600">状态筛选：</label>
+            <select id="status-filter" class="px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">全部</option>
+                <option value="running">运行中</option>
+                <option value="completed">已完成</option>
+                <option value="failed">失败</option>
+            </select>
+        </div>
+        <div class="text-sm text-slate-500">
+            共 <span class="font-bold text-slate-700">${pagination ? pagination.total : workspaces.length}</span> 条记录
+        </div>
+    `;
+    list.appendChild(controls);
+    
+    // 设置当前筛选状态
+    const statusFilter = document.getElementById('status-filter');
+    statusFilter.value = currentStatus;
+    statusFilter.onchange = async (e) => {
+        currentStatus = e.target.value;
+        currentPage = 1; // 重置页码
+        await loadHistoryPage();
+    };
+    
+    // 渲染工作区列表
+    const wsContainer = document.createElement('div');
+    wsContainer.className = 'space-y-2 mb-4';
     
     workspaces.forEach(ws => {
         const item = document.createElement('div');
         item.className = 'p-4 border border-slate-100 rounded-xl hover:bg-indigo-50 hover:border-indigo-200 cursor-pointer transition group';
         item.onclick = () => loadWorkspace(ws.id);
+        
+        // 状态徽章颜色
+        const statusColors = {
+            'running': 'bg-blue-100 text-blue-700',
+            'completed': 'bg-green-100 text-green-700',
+            'failed': 'bg-red-100 text-red-700'
+        };
+        const statusColor = statusColors[ws.status] || 'bg-gray-100 text-gray-700';
+        
+        // 后端图标
+        const backendIcons = {
+            'deepseek': '🧠',
+            'openai': '🤖',
+            'openrouter': '🔀',
+            'aliyun': '☁️',
+            'ollama': '🦙'
+        };
+        const backendIcon = backendIcons[ws.backend] || '⚙️';
+        
         item.innerHTML = `
             <div class="flex justify-between items-start">
                 <div class="flex-1">
-                    <h4 class="font-bold text-slate-800 group-hover:text-indigo-700">${ws.issue || t('msg_untitled_issue')}</h4>
+                    <div class="flex items-center space-x-2 mb-1">
+                        <h4 class="font-bold text-slate-800 group-hover:text-indigo-700">${ws.issue || t('msg_untitled_issue')}</h4>
+                        <span class="text-xs px-2 py-0.5 rounded-full ${statusColor} font-medium">${ws.status || 'unknown'}</span>
+                    </div>
+                    <div class="flex items-center space-x-3 text-xs text-slate-500 mt-1">
+                        <span>📅 ${ws.created_at || ws.timestamp || 'N/A'}</span>
+                        <span>${backendIcon} ${ws.backend || 'unknown'}</span>
+                        <span>🤖 ${ws.model || 'N/A'}</span>
+                        ${ws.report_version ? `<span>📝 v${ws.report_version}</span>` : ''}
+                    </div>
                     <p class="text-xs text-slate-400 mt-1">ID: ${ws.id}</p>
                 </div>
                 <div class="flex flex-col items-end space-y-2">
-                    <span class="text-xs font-mono text-slate-400 bg-slate-50 px-2 py-1 rounded">${ws.timestamp}</span>
                     <button onclick="deleteWorkspace(event, '${ws.id}')" 
                             class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition opacity-0 group-hover:opacity-100"
                             title="${t('btn_delete_record')}">
@@ -80,8 +158,57 @@ export function renderHistoryList(workspaces) {
                 </div>
             </div>
         `;
-        list.appendChild(item);
+        wsContainer.appendChild(item);
     });
+    list.appendChild(wsContainer);
+    
+    // 渲染分页控件
+    if (pagination && pagination.total > perPage) {
+        const paginationEl = document.createElement('div');
+        paginationEl.className = 'flex items-center justify-between pt-3 border-t border-slate-200';
+        
+        const prevDisabled = currentPage <= 1;
+        const nextDisabled = currentPage >= pagination.pages;
+        
+        paginationEl.innerHTML = `
+            <button id="prev-page" 
+                    class="px-4 py-2 text-sm font-medium rounded-lg transition ${
+                        prevDisabled 
+                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }"
+                    ${prevDisabled ? 'disabled' : ''}>
+                ← 上一页
+            </button>
+            <div class="text-sm text-slate-600">
+                第 <span class="font-bold">${currentPage}</span> / <span class="font-bold">${pagination.pages}</span> 页
+            </div>
+            <button id="next-page" 
+                    class="px-4 py-2 text-sm font-medium rounded-lg transition ${
+                        nextDisabled 
+                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }"
+                    ${nextDisabled ? 'disabled' : ''}>
+                下一页 →
+            </button>
+        `;
+        list.appendChild(paginationEl);
+        
+        // 绑定分页按钮事件
+        if (!prevDisabled) {
+            document.getElementById('prev-page').onclick = async () => {
+                currentPage--;
+                await loadHistoryPage();
+            };
+        }
+        if (!nextDisabled) {
+            document.getElementById('next-page').onclick = async () => {
+                currentPage++;
+                await loadHistoryPage();
+            };
+        }
+    }
 }
 
 /**
@@ -137,13 +264,37 @@ export async function loadWorkspace(sessionId) {
             console.log('[History] Triggering pollStatus to load historical events...');
             // 触发一次轮询以拉取所有历史事件
             pollStatus();
+            
+            // 显示报告版本信息（如果有）
+            if (data.report_version) {
+                // 动态导入discussion模块以避免循环依赖
+                import('./discussion.js').then(Discussion => {
+                    Discussion.updateReportVersionDisplay(data.report_version, data.updated_at || data.created_at);
+                });
+            }
         } else {
             console.error('[History] Load failed:', data.message);
             showAlert(t('msg_load_failed') + ': ' + (data.message || 'unknown'), t('title_error'), 'error');
         }
     } catch (error) {
         console.error('[History] Load error:', error);
-        showAlert(t('msg_load_failed') + ': ' + error.message, t('title_error'), 'error');
+        
+        // 特殊处理403权限错误
+        if (error.status === 403 || (error.message && error.message.includes('[403]'))) {
+            showAlert(
+                '🔒 您没有权限访问此会话\\n\\n可能原因：\\n• 此会话属于其他用户\\n• 您的账户权限不足\\n\\n请联系会话所有者或管理员获取访问权限。',
+                '⛔ 访问被拒绝',
+                'error'
+            );
+        } else if (error.status === 404 || (error.message && error.message.includes('[404]'))) {
+            showAlert(
+                '📂 找不到此会话\\n\\n可能原因：\\n• 会话已被删除\\n• 会话ID不正确\\n\\n请刷新列表后重试。',
+                '🔍 会话不存在',
+                'error'
+            );
+        } else {
+            showAlert(t('msg_load_failed') + ': ' + error.message, t('title_error'), 'error');
+        }
     }
 }
 

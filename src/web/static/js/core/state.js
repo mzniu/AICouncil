@@ -174,6 +174,14 @@ export function setIsFetchingModels(value) {
 }
 
 /**
+ * 获取当前语言
+ * @returns {string} 语言代码 (zh-CN | en-US)
+ */
+export function getCurrentLang() {
+    return currentLang;
+}
+
+/**
  * 设置当前语言
  * @param {string} value - 语言代码 (zh-CN | en-US)
  */

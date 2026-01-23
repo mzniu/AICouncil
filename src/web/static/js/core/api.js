@@ -33,7 +33,12 @@ async function apiFetch(url, options = {}) {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.message || `HTTP ${response.status}`);
+            // 在错误消息中包含HTTP状态码，方便前端识别
+            const errorMsg = data.message || `HTTP ${response.status}`;
+            const error = new Error(`[${response.status}] ${errorMsg}`);
+            error.status = response.status;
+            error.statusText = response.statusText;
+            throw error;
         }
 
         return data;
@@ -110,6 +115,17 @@ export async function reReport(config) {
 }
 
 /**
+ * 快速重新生成当前会话的报告（使用原配置）
+ * @returns {Promise<Object>} 生成结果
+ */
+export async function regenerateReport() {
+    return apiFetch(`${API_BASE}/rereport`, {
+        method: 'POST',
+        body: JSON.stringify({})
+    });
+}
+
+/**
  * 修订报告
  * @param {Object} config - 修订配置
  * @param {string} config.feedback - 用户反馈
@@ -143,10 +159,21 @@ export async function intervention(config) {
 
 /**
  * 获取工作区列表
- * @returns {Promise<Object>} 工作区列表
+ * @param {Object} options - 查询选项
+ * @param {number} [options.page=1] - 页码
+ * @param {number} [options.per_page=20] - 每页数量
+ * @param {string} [options.status] - 状态筛选（running/completed/failed）
+ * @returns {Promise<Object>} 工作区列表（包含分页信息）
  */
-export async function getWorkspaces() {
-    return apiFetch(`${API_BASE}/workspaces`);
+export async function getWorkspaces(options = {}) {
+    const params = new URLSearchParams();
+    if (options.page) params.append('page', options.page);
+    if (options.per_page) params.append('per_page', options.per_page);
+    if (options.status) params.append('status', options.status);
+    
+    const queryString = params.toString();
+    const url = queryString ? `${API_BASE}/workspaces?${queryString}` : `${API_BASE}/workspaces`;
+    return apiFetch(url);
 }
 
 /**

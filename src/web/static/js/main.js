@@ -36,6 +36,7 @@ window.stopDiscussion = Discussion.stopDiscussion;
 window.submitIntervention = Discussion.submitIntervention;
 window.submitRevisionFeedback = Discussion.submitRevisionFeedback;
 window.reReport = Discussion.reReport;
+window.regenerateReport = Discussion.regenerateReport;
 
 // 认证相关
 window.logout = UI.handleLogout;

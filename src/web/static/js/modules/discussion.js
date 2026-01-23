@@ -1286,6 +1286,13 @@ export async function handleFinalReport(event) {
     
     // 获取报告版本列表
     fetchReportVersions();
+    
+    // 显示版本信息（新生成的报告版本号为1）
+    if (event.report_version) {
+        updateReportVersionDisplay(event.report_version, new Date().toISOString());
+    } else {
+        updateReportVersionDisplay(1, new Date().toISOString());
+    }
 }
 
 /**
@@ -1684,5 +1691,109 @@ export function toggleStage(stageId) {
     } else {
         content.classList.add('hidden');
         icon.style.transform = 'rotate(-90deg)';
+    }
+}
+
+/**
+ * 更新报告版本显示
+ * @param {number} version - 版本号
+ * @param {string} updatedAt - 更新时间
+ */
+export function updateReportVersionDisplay(version, updatedAt) {
+    const versionBar = document.getElementById('report-version-bar');
+    const versionDisplay = document.getElementById('report-version-display');
+    const updatedAtDisplay = document.getElementById('report-updated-at');
+    
+    if (!versionBar || !versionDisplay) return;
+    
+    // 显示版本栏
+    versionBar.classList.remove('hidden');
+    
+    // 更新版本号
+    versionDisplay.textContent = `v${version || 1}`;
+    
+    // 更新时间
+    if (updatedAtDisplay && updatedAt) {
+        const date = new Date(updatedAt);
+        const formattedDate = date.toLocaleString('zh-CN', { 
+            year: 'numeric', 
+            month: '2-digit', 
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+        updatedAtDisplay.textContent = `生成于 ${formattedDate}`;
+    }
+}
+
+/**
+ * 隐藏报告版本栏
+ */
+export function hideReportVersionBar() {
+    const versionBar = document.getElementById('report-version-bar');
+    if (versionBar) {
+        versionBar.classList.add('hidden');
+    }
+}
+
+/**
+ * 重新生成报告
+ * @async
+ */
+export async function regenerateReport() {
+    const sessionId = State.getCurrentSessionId();
+    if (!sessionId) {
+        showAlert('请先选择一个会话', '错误', 'error');
+        return;
+    }
+    
+    const confirmed = await showConfirm(
+        '确定要重新生成报告吗？\\n\\n这将创建一个新版本的报告，原报告仍会保留。',
+        '重新生成报告'
+    );
+    if (!confirmed) return;
+    
+    try {
+        // 显示加载状态
+        toggleReportLoading(true, '正在重新生成报告...', '请稍候，这可能需要几秒钟');
+        
+        const btn = document.getElementById('regenerate-report-btn');
+        if (btn) {
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+        
+        // 调用重新生成API
+        const data = await API.regenerateReport();
+        
+        if (data.status === 'success') {
+            // 更新报告内容
+            if (data.report) {
+                const iframe = document.getElementById('report-iframe');
+                if (iframe) {
+                    iframe.srcdoc = data.report;
+                }
+            }
+            
+            // 更新版本号
+            if (data.version) {
+                updateReportVersionDisplay(data.version, new Date().toISOString());
+            }
+            
+            showAlert('报告已成功重新生成！', '成功');
+        } else {
+            throw new Error(data.message || '重新生成失败');
+        }
+    } catch (error) {
+        console.error('[Discussion] Regenerate report error:', error);
+        showAlert('重新生成报告失败: ' + error.message, '错误', 'error');
+    } finally {
+        toggleReportLoading(false);
+        const btn = document.getElementById('regenerate-report-btn');
+        if (btn) {
+            btn.disabled = false;
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
     }
 }

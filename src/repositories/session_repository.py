@@ -13,15 +13,17 @@ class SessionRepository:
     """议事会话数据仓库，封装所有数据库操作"""
     
     @staticmethod
-    def create_session(user_id: int, session_id: str, issue: str, config: dict) -> Optional[DiscussionSession]:
+    def create_session(user_id: Optional[int], session_id: str, issue: str, config: dict, 
+                      tenant_id: Optional[int] = None) -> Optional[DiscussionSession]:
         """
         创建新会话
         
         Args:
-            user_id: 用户ID
+            user_id: 用户ID（None表示匿名用户）
             session_id: 会话ID（格式：20251224_183032_uuid）
             issue: 议题内容
             config: 配置字典 {backend, model, rounds, planners, auditors, reasoning, agent_configs}
+            tenant_id: 租户ID（可选，用于多租户隔离）
             
         Returns:
             DiscussionSession对象，失败返回None
@@ -30,6 +32,7 @@ class SessionRepository:
             session = DiscussionSession(
                 session_id=session_id,
                 user_id=user_id,
+                tenant_id=tenant_id,
                 issue=issue,
                 backend=config.get('backend'),
                 model=config.get('model'),
@@ -39,7 +42,7 @@ class SessionRepository:
             )
             db.session.add(session)
             db.session.commit()
-            logger.info(f"[SessionRepo] 创建会话成功: {session_id} (用户{user_id})")
+            logger.info(f"[SessionRepo] 创建会话成功: {session_id} (用户{user_id}, 租户{tenant_id})")
             return session
         except SQLAlchemyError as e:
             db.session.rollback()
@@ -236,22 +239,31 @@ class SessionRepository:
             return False
     
     @staticmethod
-    def get_user_sessions(user_id: int, page: int = 1, per_page: int = 50, 
-                         status_filter: Optional[str] = None) -> List[DiscussionSession]:
+    def get_user_sessions(user_id: Optional[int], page: int = 1, per_page: int = 50, 
+                         status_filter: Optional[str] = None, tenant_id: Optional[int] = None) -> List[DiscussionSession]:
         """
         获取用户会话列表（分页）
         
         Args:
-            user_id: 用户ID
+            user_id: 用户ID（None表示匿名用户）
             page: 页码（从1开始）
             per_page: 每页数量
             status_filter: 状态过滤（可选：running/completed/failed/stopped）
+            tenant_id: 租户ID（多租户隔离，None表示不过滤）
             
         Returns:
             List[DiscussionSession]: 会话列表
         """
         try:
-            query = DiscussionSession.query.filter_by(user_id=user_id)
+            # 支持匿名用户查询（user_id为None时查询所有匿名会话）
+            if user_id is None:
+                query = DiscussionSession.query.filter(DiscussionSession.user_id.is_(None))
+            else:
+                query = DiscussionSession.query.filter_by(user_id=user_id)
+            
+            # 多租户隔离
+            if tenant_id is not None:
+                query = query.filter_by(tenant_id=tenant_id)
             
             if status_filter:
                 query = query.filter_by(status=status_filter)
@@ -288,19 +300,29 @@ class SessionRepository:
             return None
     
     @staticmethod
-    def get_session_count(user_id: int, status_filter: Optional[str] = None) -> int:
+    def get_session_count(user_id: Optional[int], status_filter: Optional[str] = None, tenant_id: Optional[int] = None) -> int:
         """
         获取用户会话总数
         
         Args:
-            user_id: 用户ID
+            user_id: 用户ID（None表示匿名用户）
             status_filter: 状态过滤（可选）
+            tenant_id: 租户ID（多租户隔离，None表示不过滤）
             
         Returns:
             int: 会话总数
         """
         try:
-            query = DiscussionSession.query.filter_by(user_id=user_id)
+            # 支持匿名用户查询
+            if user_id is None:
+                query = DiscussionSession.query.filter(DiscussionSession.user_id.is_(None))
+            else:
+                query = DiscussionSession.query.filter_by(user_id=user_id)
+            
+            # 多租户隔离
+            if tenant_id is not None:
+                query = query.filter_by(tenant_id=tenant_id)
+            
             if status_filter:
                 query = query.filter_by(status=status_filter)
             return query.count()
@@ -328,4 +350,54 @@ class SessionRepository:
             return session is not None
         except SQLAlchemyError as e:
             logger.error(f"[SessionRepo] 权限检查失败: {e}")
-            return False
+            return False    
+    @staticmethod
+    def get_sessions_by_tenant(tenant_id: int, page: int = 1, per_page: int = 50,
+                               status_filter: Optional[str] = None) -> List[DiscussionSession]:
+        """
+        获取租户下所有会话（tenant-aware查询）
+        
+        Args:
+            tenant_id: 租户ID
+            page: 页码（从1开始）
+            per_page: 每页数量
+            status_filter: 状态过滤（可选）
+            
+        Returns:
+            List[DiscussionSession]: 会话列表
+        """
+        try:
+            query = DiscussionSession.query.filter_by(tenant_id=tenant_id)
+            
+            if status_filter:
+                query = query.filter_by(status=status_filter)
+            
+            sessions = query.order_by(DiscussionSession.created_at.desc())\
+                           .paginate(page=page, per_page=per_page, error_out=False)
+            
+            logger.debug(f"[SessionRepo] 获取租户{tenant_id}会话列表: {len(sessions.items)}条")
+            return sessions.items
+        except SQLAlchemyError as e:
+            logger.error(f"[SessionRepo] 获取租户会话列表失败: {e}")
+            return []
+    
+    @staticmethod
+    def get_tenant_session_count(tenant_id: int, status_filter: Optional[str] = None) -> int:
+        """
+        获取租户会话总数
+        
+        Args:
+            tenant_id: 租户ID
+            status_filter: 状态过滤（可选）
+            
+        Returns:
+            int: 会话总数
+        """
+        try:
+            query = DiscussionSession.query.filter_by(tenant_id=tenant_id)
+            if status_filter:
+                query = query.filter_by(status=status_filter)
+            return query.count()
+        except SQLAlchemyError as e:
+            logger.error(f"[SessionRepo] 获取租户会话计数失败: {e}")
+            return 0

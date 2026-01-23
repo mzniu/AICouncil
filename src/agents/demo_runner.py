@@ -22,7 +22,7 @@ from src.agents.langchain_agents import run_full_cycle, run_meta_orchestrator, e
 from src import config_manager as config
 
 
-def run_meta_orchestrator_flow(issue_text: str, model_config: dict, agent_configs: dict = None, user_id: int = None):
+def run_meta_orchestrator_flow(issue_text: str, model_config: dict, agent_configs: dict = None, user_id: int = None, tenant_id: int = None):
     """
     使用议事编排官的新流程：
     1. 议事编排官分析需求并生成规划
@@ -35,11 +35,12 @@ def run_meta_orchestrator_flow(issue_text: str, model_config: dict, agent_config
         model_config: 模型配置
         agent_configs: Agent配置覆盖
         user_id: 用户ID（用于数据库保存）
+        tenant_id: 租户ID（用于多租户隔离）
         
     Returns:
         执行结果字典
     """
-    logger.info("[meta_flow] 启动议事编排官智能规划流程")
+    logger.info(f"[meta_flow] 启动议事编排官智能规划流程 (User: {user_id}, Tenant: {tenant_id})")
     
     try:
         # Stage 0: 议事编排官智能规划

@@ -71,6 +71,18 @@ def init_auth(app: Flask):
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
+    # SQLite 并发优化配置
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'connect_args': {
+            'timeout': 30,  # 等待锁释放的超时时间（秒）
+            'check_same_thread': False  # 允许多线程访问
+        },
+        'pool_pre_ping': True,  # 连接前检查可用性
+        'pool_recycle': 3600,  # 1小时后回收连接
+        'pool_size': 10,  # 连接池大小
+        'max_overflow': 20  # 最大溢出连接数
+    }
+    
     # === Session配置（服务端存储） ===
     app.config['SESSION_TYPE'] = os.getenv('SESSION_TYPE', 'sqlalchemy')
     app.config['SESSION_SQLALCHEMY'] = db
@@ -95,7 +107,6 @@ def init_auth(app: Flask):
     
     # === 初始化扩展 ===
     db.init_app(app)
-    Session(app)  # 初始化Flask-Session
     migrate = Migrate(app, db)
     
     # === Flask-Login配置 ===
@@ -121,10 +132,31 @@ def init_auth(app: Flask):
         # 检查是否需要创建表（首次运行）
         try:
             db.create_all()
-            logger.info("✅ 数据库表检查完成")
+            logger.info("✅ 数据库表检查完成（用户表、登录历史表等）")
+            
+            # 启用 WAL 模式以支持并发读写（SQLite 3.7.0+）
+            if database_url.startswith('sqlite'):
+                from sqlalchemy import text
+                db.session.execute(text('PRAGMA journal_mode=WAL'))
+                db.session.execute(text('PRAGMA busy_timeout=30000'))  # 30秒
+                db.session.commit()
+                logger.info("✅ SQLite WAL 模式已启用（支持并发访问）")
         except Exception as e:
             logger.error(f"❌ 数据库初始化失败: {e}")
             raise
+    
+    # === 初始化Flask-Session（必须在表创建后） ===
+    # Flask-Session 会自动创建 sessions 表
+    Session(app)
+    logger.info("✅ Flask-Session 初始化完成")
+    
+    # 再次确保 sessions 表已创建
+    with app.app_context():
+        try:
+            db.create_all()
+            logger.info("✅ Sessions表检查完成")
+        except Exception as e:
+            logger.warning(f"⚠️  Sessions表检查失败: {e}")
     
     # === CLI命令 ===
     @app.cli.command('create-admin')
@@ -152,11 +184,16 @@ def init_auth(app: Flask):
             click.echo(f'❌ 邮箱 "{email}" 已被使用', err=True)
             sys.exit(1)
         
+        # 获取或创建默认租户
+        from src.utils.tenant_utils import get_or_create_default_tenant
+        default_tenant = get_or_create_default_tenant()
+        
         # 创建管理员用户
         admin = User(
             username=username,
             email=email,
-            mfa_enabled=False
+            mfa_enabled=False,
+            tenant_id=default_tenant.id  # 分配到默认租户
         )
         admin.set_password(password)
         

@@ -1,0 +1,1427 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>技能管理 - AICouncil v{{ version }}</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <script src="/static/vendor/tailwindcss.js"></script>
+    <script src="/static/vendor/marked.min.js"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .tab-active {
+            border-bottom: 3px solid #7c3aed;
+            color: #7c3aed;
+            font-weight: 600;
+        }
+        .tab-inactive {
+            color: #6b7280;
+        }
+        .tab-inactive:hover {
+            color: #4b5563;
+        }
+        .skill-card {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .skill-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        .category-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .category-policy { background: #dbeafe; color: #1e40af; }
+        .category-technology { background: #d1fae5; color: #065f46; }
+        .category-stakeholder { background: #fce7f3; color: #9f1239; }
+        .category-risk { background: #fed7aa; color: #92400e; }
+        .category-finance { background: #e9d5ff; color: #6b21a8; }
+        .category-other { background: #e5e7eb; color: #374151; }
+        .markdown-preview {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .markdown-preview h1 { font-size: 1.5rem; font-weight: bold; margin-top: 1rem; }
+        .markdown-preview h2 { font-size: 1.25rem; font-weight: bold; margin-top: 0.75rem; }
+        .markdown-preview h3 { font-size: 1.125rem; font-weight: bold; margin-top: 0.5rem; }
+        .markdown-preview p { margin-bottom: 0.5rem; }
+        .markdown-preview ul { list-style-type: disc; margin-left: 1.5rem; }
+        .markdown-preview ol { list-style-type: decimal; margin-left: 1.5rem; }
+        .markdown-preview code { background: #f3f4f6; padding: 0.125rem 0.25rem; border-radius: 0.25rem; }
+        .markdown-preview pre { background: #f3f4f6; padding: 0.75rem; border-radius: 0.5rem; overflow-x: auto; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- 顶部导航栏 -->
+    <nav class="gradient-bg shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <svg class="w-8 h-8 text-white mr-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z"/>
+                    </svg>
+                    <h1 class="text-white text-2xl font-bold">技能管理</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-white text-sm" id="current-username"></span>
+                    <a href="/" class="text-white hover:text-gray-200 transition">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主内容区 -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Tab导航 -->
+        <div class="bg-white rounded-lg shadow-md mb-6">
+            <div class="flex border-b overflow-x-auto">
+                <button onclick="switchTab('browse')" id="tab-browse" class="flex-1 py-4 px-6 text-center transition tab-active">
+                    <svg class="w-5 h-5 inline-block mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/>
+                    </svg>
+                    技能库
+                </button>
+                <button onclick="switchTab('subscribed')" id="tab-subscribed" class="flex-1 py-4 px-6 text-center transition tab-inactive">
+                    <svg class="w-5 h-5 inline-block mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z"/>
+                    </svg>
+                    我的订阅
+                </button>
+                <button onclick="switchTab('create')" id="tab-create" class="flex-1 py-4 px-6 text-center transition tab-inactive">
+                    <svg class="w-5 h-5 inline-block mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
+                    </svg>
+                    创建技能
+                </button>
+                <button onclick="switchTab('stats')" id="tab-stats" class="flex-1 py-4 px-6 text-center transition tab-inactive">
+                    <svg class="w-5 h-5 inline-block mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/>
+                    </svg>
+                    使用统计
+                </button>
+                <button onclick="switchTab('import')" id="tab-import" class="flex-1 py-4 px-6 text-center transition tab-inactive">
+                    <svg class="w-5 h-5 inline-block mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                    </svg>
+                    导入技能
+                </button>
+            </div>
+        </div>
+
+        <!-- 技能库Tab -->
+        <div id="panel-browse" class="tab-panel">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <!-- 搜索和筛选栏 -->
+                <div class="mb-6 flex flex-col md:flex-row gap-4">
+                    <div class="flex-1">
+                        <input type="text" id="search-input" placeholder="搜索技能名称、描述..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                    </div>
+                    <select id="category-filter" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                        <option value="">全部分类</option>
+                        <option value="policy">政策分析</option>
+                        <option value="technology">技术评估</option>
+                        <option value="stakeholder">利益相关方</option>
+                        <option value="risk">风险评估</option>
+                        <option value="finance">财务分析</option>
+                        <option value="other">其他</option>
+                    </select>
+                    <button onclick="applyFilters()" class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                        <svg class="w-5 h-5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+                        </svg>
+                        筛选
+                    </button>
+                </div>
+
+                <!-- 加载状态 -->
+                <div id="browse-loading" class="text-center py-12">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                    <p class="text-gray-600 mt-4">加载中...</p>
+                </div>
+
+                <!-- 技能卡片列表 -->
+                <div id="skills-grid" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- 技能卡片将由JS动态生成 -->
+                </div>
+
+                <!-- 分页 -->
+                <div id="pagination" class="hidden mt-6 flex justify-center items-center space-x-2">
+                    <!-- 分页按钮将由JS动态生成 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 我的订阅Tab -->
+        <div id="panel-subscribed" class="tab-panel hidden">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold text-gray-800">已订阅技能</h2>
+                    <button onclick="loadSubscribedSkills()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                        <svg class="w-5 h-5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        刷新
+                    </button>
+                </div>
+
+                <div id="subscribed-loading" class="text-center py-12">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                    <p class="text-gray-600 mt-4">加载中...</p>
+                </div>
+
+                <div id="subscribed-empty" class="hidden text-center py-12">
+                    <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                    </svg>
+                    <p class="text-gray-600">您还没有订阅任何技能</p>
+                    <button onclick="switchTab('browse')" class="mt-4 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                        浏览技能库
+                    </button>
+                </div>
+
+                <div id="subscribed-list" class="hidden space-y-4">
+                    <!-- 订阅列表将由JS动态生成 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 创建技能Tab -->
+        <div id="panel-create" class="tab-panel hidden">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-6">创建自定义技能</h2>
+                
+                <form id="create-skill-form" class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">技能名称 *</label>
+                        <input type="text" id="skill-name" required maxlength="100" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent" placeholder="例如：项目管理框架">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">分类 *</label>
+                        <select id="skill-category" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                            <option value="">请选择分类</option>
+                            <option value="policy">政策分析</option>
+                            <option value="technology">技术评估</option>
+                            <option value="stakeholder">利益相关方</option>
+                            <option value="risk">风险评估</option>
+                            <option value="finance">财务分析</option>
+                            <option value="other">其他</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">简短描述</label>
+                        <input type="text" id="skill-description" maxlength="500" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent" placeholder="简要说明该技能的用途">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">适用角色</label>
+                        <div class="flex flex-wrap gap-3">
+                            <label class="flex items-center">
+                                <input type="checkbox" value="策论家" class="role-checkbox w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
+                                <span class="ml-2 text-sm text-gray-700">策论家</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" value="监察官" class="role-checkbox w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
+                                <span class="ml-2 text-sm text-gray-700">监察官</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" value="议长" class="role-checkbox w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
+                                <span class="ml-2 text-sm text-gray-700">议长</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">技能内容 * <span class="text-xs text-gray-500">(支持Markdown格式)</span></label>
+                        <textarea id="skill-content" required rows="12" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent font-mono text-sm" placeholder="请输入技能的详细内容，支持Markdown语法..."></textarea>
+                        <div class="mt-2 flex justify-between items-center">
+                            <button type="button" onclick="togglePreview()" class="text-sm text-purple-600 hover:text-purple-800">
+                                <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                </svg>
+                                预览
+                            </button>
+                            <span id="content-length" class="text-xs text-gray-500">0 字符</span>
+                        </div>
+                    </div>
+
+                    <!-- Markdown预览区域 -->
+                    <div id="markdown-preview-panel" class="hidden">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">预览</label>
+                        <div id="markdown-preview-content" class="markdown-preview border border-gray-300 rounded-lg p-4 bg-gray-50"></div>
+                    </div>
+
+                    <div class="flex justify-end space-x-4">
+                        <button type="button" onclick="resetCreateForm()" class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition">
+                            重置
+                        </button>
+                        <button type="submit" class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                            <svg class="w-5 h-5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            创建技能
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 使用统计Tab -->
+        <div id="panel-stats" class="tab-panel hidden">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-6">技能使用统计</h2>
+
+                <!-- 统计概览 -->
+                <div id="stats-summary" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-blue-600 font-medium">总使用次数</p>
+                                <p id="total-usage" class="text-3xl font-bold text-blue-900 mt-2">-</p>
+                            </div>
+                            <svg class="w-12 h-12 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-green-600 font-medium">平均评分</p>
+                                <p id="avg-rating" class="text-3xl font-bold text-green-900 mt-2">-</p>
+                            </div>
+                            <svg class="w-12 h-12 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-purple-600 font-medium">最常用技能</p>
+                                <p id="top-skill" class="text-lg font-bold text-purple-900 mt-2 truncate">-</p>
+                            </div>
+                            <svg class="w-12 h-12 text-purple-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clip-rule="evenodd"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 热门技能排行 -->
+                <div id="top-skills-section" class="mb-8">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">热门技能排行</h3>
+                    <div id="top-skills-list" class="space-y-3">
+                        <!-- 排行榜将由JS动态生成 -->
+                    </div>
+                </div>
+
+                <!-- 详细使用记录 -->
+                <div id="usage-detail-section">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">最近使用记录</h3>
+                    <div id="stats-loading" class="text-center py-8">
+                        <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
+                    </div>
+                    <div id="usage-detail-table" class="hidden overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">技能名称</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">使用次数</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最后使用</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">平均响应时间</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usage-detail-tbody" class="bg-white divide-y divide-gray-200">
+                                <!-- 使用记录将由JS动态生成 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 导入技能Tab -->
+        <div id="panel-import" class="tab-panel hidden">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-6">
+                    <svg class="w-6 h-6 inline-block mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                    </svg>
+                    从外部源导入技能
+                </h2>
+
+                <!-- 选项卡切换：预设 vs 自定义URL -->
+                <div class="flex border-b border-gray-200 mb-6">
+                    <button onclick="switchImportMode('presets')" id="import-mode-presets" class="px-6 py-3 font-medium text-purple-600 border-b-2 border-purple-600">
+                        Anthropic官方预设
+                    </button>
+                    <button onclick="switchImportMode('custom')" id="import-mode-custom" class="px-6 py-3 font-medium text-gray-500 hover:text-gray-700">
+                        自定义URL导入
+                    </button>
+                </div>
+
+                <!-- 预设技能选择器 -->
+                <div id="import-presets-panel">
+                    <p class="text-gray-600 mb-4">
+                        选择Anthropic官方技能库中的预设技能进行导入（这些是经过官方验证的高质量技能模板）
+                    </p>
+
+                    <!-- 加载状态 -->
+                    <div id="presets-loading" class="text-center py-8">
+                        <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
+                        <p class="text-gray-600 mt-2">加载预设技能...</p>
+                    </div>
+
+                    <!-- 预设列表 -->
+                    <div id="presets-list" class="hidden space-y-3 mb-6">
+                        <!-- 预设项将由JS动态生成 -->
+                    </div>
+
+                    <!-- 批量导入按钮 -->
+                    <div id="presets-actions" class="hidden flex justify-end gap-3">
+                        <button onclick="selectAllPresets()" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                            全选
+                        </button>
+                        <button onclick="deselectAllPresets()" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                            取消全选
+                        </button>
+                        <button onclick="importSelectedPresets()" class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                            导入选中项 (<span id="selected-count">0</span>)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 自定义URL导入 -->
+                <div id="import-custom-panel" class="hidden">
+                    <p class="text-gray-600 mb-4">
+                        从任意GitHub raw URL或其他公开Markdown URL导入技能（支持YAML front matter元数据）
+                    </p>
+
+                    <!-- URL输入表单 -->
+                    <div class="space-y-4 mb-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Skill URL <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" id="custom-url-input" placeholder="https://raw.githubusercontent.com/username/repo/main/skill.md" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                            <p class="text-xs text-gray-500 mt-1">
+                                示例: https://raw.githubusercontent.com/anthropics/anthropic-cookbook/main/skills/policy_analysis.md
+                            </p>
+                        </div>
+
+                        <div class="flex items-center">
+                            <input type="checkbox" id="strict-security-checkbox" class="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
+                            <label for="strict-security-checkbox" class="ml-2 text-sm text-gray-700">
+                                启用严格安全模式（更严格的安全扫描）
+                            </label>
+                        </div>
+
+                        <button onclick="importFromCustomUrl()" class="w-full px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium">
+                            <svg class="w-5 h-5 inline-block mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                            </svg>
+                            导入该技能
+                        </button>
+                    </div>
+
+                    <!-- 批量URL导入 -->
+                    <div class="border-t pt-6">
+                        <h3 class="font-medium text-gray-800 mb-3">批量导入（多个URL）</h3>
+                        <textarea id="batch-urls-input" rows="5" placeholder="每行一个URL，例如：&#10;https://raw.githubusercontent.com/.../skill1.md&#10;https://raw.githubusercontent.com/.../skill2.md" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent font-mono text-sm"></textarea>
+                        <button onclick="importFromBatchUrls()" class="mt-3 w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium">
+                            批量导入
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 导入进度显示 -->
+                <div id="import-progress" class="hidden mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div class="flex items-center mb-2">
+                        <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-3"></div>
+                        <span class="font-medium text-blue-900">正在导入...</span>
+                    </div>
+                    <p id="import-status" class="text-sm text-blue-700">准备中...</p>
+                    <div class="mt-3 bg-blue-200 rounded-full h-2">
+                        <div id="import-progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- 导入结果 -->
+                <div id="import-results" class="hidden mt-6">
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <h3 class="font-medium text-gray-800 mb-3">导入结果</h3>
+                        <div class="space-y-2" id="import-results-list">
+                            <!-- 结果列表将由JS动态生成 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 技能详情模态框 -->
+    <div id="skill-detail-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="flex-1">
+                        <h3 id="modal-skill-name" class="text-2xl font-bold text-gray-900 mb-2"></h3>
+                        <div class="flex items-center gap-3 mb-3">
+                            <span id="modal-skill-category" class="category-badge"></span>
+                            <span id="modal-skill-source" class="text-sm text-gray-500"></span>
+                        </div>
+                        <p id="modal-skill-description" class="text-gray-600 mb-4"></p>
+                    </div>
+                    <button onclick="closeSkillModal()" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <div id="modal-skill-roles" class="mb-4"></div>
+
+                <div class="mb-4">
+                    <h4 class="text-sm font-semibold text-gray-700 mb-2">技能内容</h4>
+                    <div id="modal-skill-content" class="markdown-preview border border-gray-200 rounded-lg p-4 bg-gray-50"></div>
+                </div>
+
+                <div class="flex justify-end gap-3">
+                    <button onclick="closeSkillModal()" class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition">
+                        关闭
+                    </button>
+                    <button id="modal-subscribe-btn" class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                        订阅
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局状态
+        let currentTab = 'browse';
+        let currentPage = 1;
+        let totalPages = 1;
+        let pageSize = 12;
+        let currentCategory = '';
+        let currentSearch = '';
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuth();
+            loadSkills();
+            
+            // 绑定表单事件
+            document.getElementById('create-skill-form').addEventListener('submit', handleCreateSkill);
+            document.getElementById('skill-content').addEventListener('input', updateContentLength);
+        });
+
+        // 检查认证状态
+        function checkAuth() {
+            fetch('/api/user/profile')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        document.getElementById('current-username').textContent = data.user.username;
+                    } else {
+                        window.location.href = '/login';
+                    }
+                })
+                .catch(() => {
+                    window.location.href = '/login';
+                });
+        }
+
+        // Tab切换
+        function switchTab(tabName) {
+            // 更新Tab样式
+            document.querySelectorAll('[id^="tab-"]').forEach(tab => {
+                tab.classList.remove('tab-active');
+                tab.classList.add('tab-inactive');
+            });
+            document.getElementById(`tab-${tabName}`).classList.add('tab-active');
+            document.getElementById(`tab-${tabName}`).classList.remove('tab-inactive');
+
+            // 切换面板
+            document.querySelectorAll('[id^="panel-"]').forEach(panel => {
+                panel.classList.add('hidden');
+            });
+            document.getElementById(`panel-${tabName}`).classList.remove('hidden');
+
+            currentTab = tabName;
+
+            // 加载对应数据
+            if (tabName === 'browse') {
+                loadSkills();
+            } else if (tabName === 'subscribed') {
+                loadSubscribedSkills();
+            } else if (tabName === 'stats') {
+                loadStats();
+            } else if (tabName === 'import') {
+                loadImportPresets();
+            }
+        }
+
+        // 加载技能列表
+        function loadSkills(page = 1) {
+            document.getElementById('browse-loading').classList.remove('hidden');
+            document.getElementById('skills-grid').classList.add('hidden');
+            document.getElementById('pagination').classList.add('hidden');
+
+            const params = new URLSearchParams({
+                page: page,
+                page_size: pageSize,
+                include_content: 'false'
+            });
+
+            if (currentCategory) params.append('category', currentCategory);
+            if (currentSearch) params.append('search', currentSearch);
+
+            fetch(`/api/skills?${params}`)
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('browse-loading').classList.add('hidden');
+                    
+                    if (data.status === 'success' && data.data) {
+                        const skills = data.data.items || [];
+                        displaySkills(skills);
+                        currentPage = data.data.page || 1;
+                        totalPages = Math.ceil((data.data.total || 0) / pageSize);
+                        updatePagination();
+                    } else {
+                        showError('加载技能失败: ' + (data.message || '数据格式错误'));
+                        displaySkills([]);  // 显示空状态
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('browse-loading').classList.add('hidden');
+                    showError('网络错误: ' + err.message);
+                });
+        }
+
+        // 显示技能卡片
+        function displaySkills(skills) {
+            const grid = document.getElementById('skills-grid');
+            grid.innerHTML = '';
+
+            // 确保skills是数组
+            if (!skills || !Array.isArray(skills)) {
+                skills = [];
+            }
+
+            if (skills.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full text-center py-12">
+                        <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <p class="text-gray-600">未找到匹配的技能</p>
+                    </div>
+                `;
+            } else {
+                skills.forEach(skill => {
+                    const card = createSkillCard(skill);
+                    grid.appendChild(card);
+                });
+            }
+
+            grid.classList.remove('hidden');
+        }
+
+        // 创建技能卡片
+        function createSkillCard(skill) {
+            const div = document.createElement('div');
+            div.className = 'skill-card bg-white rounded-lg shadow-md p-5 cursor-pointer';
+            div.onclick = () => showSkillDetail(skill.id);
+
+            const categoryClass = `category-${skill.category || 'other'}`;
+            const sourceText = skill.is_builtin ? '内置' : '自定义';
+            const rolesText = skill.applicable_roles ? skill.applicable_roles.join(', ') : '通用';
+
+            div.innerHTML = `
+                <div class="flex justify-between items-start mb-3">
+                    <h3 class="text-lg font-bold text-gray-900">${escapeHtml(skill.name)}</h3>
+                    <span class="category-badge ${categoryClass}">${getCategoryName(skill.category)}</span>
+                </div>
+                <p class="text-sm text-gray-600 mb-3 line-clamp-2">${escapeHtml(skill.description || '暂无描述')}</p>
+                <div class="flex items-center justify-between text-xs text-gray-500">
+                    <span>${sourceText}</span>
+                    <span>${rolesText}</span>
+                </div>
+            `;
+
+            return div;
+        }
+
+        // 显示技能详情
+        function showSkillDetail(skillId) {
+            fetch(`/api/skills/${skillId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        const skill = data.data;
+                        document.getElementById('modal-skill-name').textContent = skill.name;
+                        document.getElementById('modal-skill-category').textContent = getCategoryName(skill.category);
+                        document.getElementById('modal-skill-category').className = `category-badge category-${skill.category || 'other'}`;
+                        document.getElementById('modal-skill-source').textContent = skill.is_builtin ? '内置技能' : '自定义技能';
+                        document.getElementById('modal-skill-description').textContent = skill.description || '暂无描述';
+                        
+                        // 显示适用角色
+                        const rolesDiv = document.getElementById('modal-skill-roles');
+                        if (skill.applicable_roles && skill.applicable_roles.length > 0) {
+                            rolesDiv.innerHTML = `
+                                <span class="text-sm text-gray-700 font-medium">适用角色：</span>
+                                ${skill.applicable_roles.map(role => `<span class="text-sm text-purple-600">${role}</span>`).join(', ')}
+                            `;
+                        } else {
+                            rolesDiv.innerHTML = '<span class="text-sm text-gray-500">适用所有角色</span>';
+                        }
+
+                        // 渲染Markdown内容
+                        const contentDiv = document.getElementById('modal-skill-content');
+                        contentDiv.innerHTML = marked.parse(skill.content || '暂无内容');
+
+                        // 检查订阅状态
+                        checkSubscriptionStatus(skillId);
+
+                        document.getElementById('skill-detail-modal').classList.remove('hidden');
+                    }
+                })
+                .catch(err => showError('加载技能详情失败'));
+        }
+
+        // 检查订阅状态
+        function checkSubscriptionStatus(skillId) {
+            fetch('/api/skills/subscriptions')
+                .then(res => res.json())
+                .then(data => {
+                    const btn = document.getElementById('modal-subscribe-btn');
+                    const isSubscribed = data.status === 'success' && 
+                        data.data.subscriptions.some(sub => sub.skill_id === skillId && sub.enabled);
+
+                    if (isSubscribed) {
+                        btn.textContent = '已订阅';
+                        btn.className = 'px-6 py-2 bg-gray-400 text-white rounded-lg cursor-not-allowed';
+                        btn.disabled = true;
+                    } else {
+                        btn.textContent = '订阅';
+                        btn.className = 'px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition';
+                        btn.disabled = false;
+                        btn.onclick = () => subscribeSkill(skillId);
+                    }
+                });
+        }
+
+        // 订阅技能
+        function subscribeSkill(skillId) {
+            fetch(`/api/skills/${skillId}/subscribe`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showSuccess('订阅成功！');
+                    checkSubscriptionStatus(skillId);
+                } else {
+                    showError('订阅失败: ' + data.message);
+                }
+            })
+            .catch(err => showError('网络错误'));
+        }
+
+        // 加载已订阅技能
+        function loadSubscribedSkills() {
+            document.getElementById('subscribed-loading').classList.remove('hidden');
+            document.getElementById('subscribed-empty').classList.add('hidden');
+            document.getElementById('subscribed-list').classList.add('hidden');
+
+            fetch('/api/skills/subscriptions')
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('subscribed-loading').classList.add('hidden');
+                    
+                    if (data.status === 'success' && data.data && Array.isArray(data.data)) {
+                        const subs = data.data.filter(skill => !skill.is_builtin || skill.subscribed);
+                        if (subs.length === 0) {
+                            document.getElementById('subscribed-empty').classList.remove('hidden');
+                        } else {
+                            displaySubscriptions(subs);
+                        }
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('subscribed-loading').classList.add('hidden');
+                    showError('加载失败');
+                });
+        }
+
+        // 显示订阅列表
+        function displaySubscriptions(subscriptions) {
+            const list = document.getElementById('subscribed-list');
+            list.innerHTML = '';
+
+            subscriptions.forEach(sub => {
+                const item = document.createElement('div');
+                item.className = 'flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:shadow-md transition';
+                
+                const categoryClass = `category-${sub.skill.category || 'other'}`;
+                
+                item.innerHTML = `
+                    <div class="flex-1">
+                        <div class="flex items-center gap-3 mb-2">
+                            <h4 class="text-lg font-bold text-gray-900">${escapeHtml(sub.skill.name)}</h4>
+                            <span class="category-badge ${categoryClass}">${getCategoryName(sub.skill.category)}</span>
+                        </div>
+                        <p class="text-sm text-gray-600">${escapeHtml(sub.skill.description || '暂无描述')}</p>
+                        <p class="text-xs text-gray-500 mt-2">订阅时间: ${formatDate(sub.subscribed_at)}</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button onclick="showSkillDetail(${sub.skill_id})" class="px-4 py-2 text-purple-600 hover:text-purple-800 transition">
+                            查看
+                        </button>
+                        <button onclick="unsubscribeSkill(${sub.skill_id})" class="px-4 py-2 text-red-600 hover:text-red-800 transition">
+                            取消订阅
+                        </button>
+                    </div>
+                `;
+                
+                list.appendChild(item);
+            });
+
+            list.classList.remove('hidden');
+        }
+
+        // 取消订阅
+        function unsubscribeSkill(skillId) {
+            if (!confirm('确定要取消订阅该技能吗？')) return;
+
+            fetch(`/api/skills/${skillId}/unsubscribe`, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showSuccess('已取消订阅');
+                        loadSubscribedSkills();
+                    } else {
+                        showError('操作失败: ' + data.message);
+                    }
+                })
+                .catch(err => showError('网络错误'));
+        }
+
+        // 创建技能
+        function handleCreateSkill(e) {
+            e.preventDefault();
+
+            const roles = Array.from(document.querySelectorAll('.role-checkbox:checked')).map(cb => cb.value);
+            
+            const data = {
+                name: document.getElementById('skill-name').value.trim(),
+                category: document.getElementById('skill-category').value,
+                description: document.getElementById('skill-description').value.trim(),
+                content: document.getElementById('skill-content').value.trim(),
+                applicable_roles: roles.length > 0 ? roles : null
+            };
+
+            fetch('/api/skills', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(res => res.json())
+            .then(result => {
+                if (result.status === 'success') {
+                    showSuccess('技能创建成功！');
+                    resetCreateForm();
+                    switchTab('browse');
+                } else {
+                    showError('创建失败: ' + result.message);
+                }
+            })
+            .catch(err => showError('网络错误'));
+        }
+
+        // 加载统计数据
+        function loadStats() {
+            document.getElementById('stats-loading').classList.remove('hidden');
+
+            // 加载概览统计
+            fetch('/api/skills/stats?type=summary')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        document.getElementById('total-usage').textContent = data.data.total_usage_count || 0;
+                        document.getElementById('avg-rating').textContent = (data.data.average_avg_response_time || 0).toFixed(2) + 's';
+                    }
+                });
+
+            // 加载热门技能
+            fetch('/api/skills/stats?type=top&limit=5')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success' && data.data && Array.isArray(data.data) && data.data.length > 0) {
+                        document.getElementById('top-skill').textContent = data.data[0].skill_name;
+                        displayTopSkills(data.data);
+                    }
+                });
+
+            // 加载详细记录
+            fetch('/api/skills/stats?type=detail')
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('stats-loading').classList.add('hidden');
+                    
+                    if (data.status === 'success') {
+                        displayUsageDetail(data.data);
+                    }
+                });
+        }
+
+        // 显示热门技能排行
+        function displayTopSkills(skills) {
+            const list = document.getElementById('top-skills-list');
+            list.innerHTML = '';
+
+            skills.forEach((skill, index) => {
+                const item = document.createElement('div');
+                item.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-lg';
+                
+                const medals = ['🥇', '🥈', '🥉'];
+                const medal = index < 3 ? medals[index] : `${index + 1}.`;
+                
+                item.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl">${medal}</span>
+                        <div>
+                            <p class="font-semibold text-gray-900">${escapeHtml(skill.skill_name)}</p>
+                            <p class="text-sm text-gray-500">使用 ${skill.usage_count} 次</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm text-gray-600">平均响应</p>
+                        <p class="font-semibold text-purple-600">${(skill.avg_response_time || 0).toFixed(2)}s</p>
+                    </div>
+                `;
+                
+                list.appendChild(item);
+            });
+        }
+
+        // 显示使用详情表格
+        function displayUsageDetail(details) {
+            const tbody = document.getElementById('usage-detail-tbody');
+            tbody.innerHTML = '';
+
+            details.forEach(detail => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${escapeHtml(detail.skill_name)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${detail.usage_count}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatDate(detail.last_used_at)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${(detail.avg_response_time || 0).toFixed(2)}s</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('usage-detail-table').classList.remove('hidden');
+        }
+
+        // 应用筛选
+        function applyFilters() {
+            currentCategory = document.getElementById('category-filter').value;
+            currentSearch = document.getElementById('search-input').value.trim();
+            currentPage = 1;
+            loadSkills();
+        }
+
+        // 更新分页
+        function updatePagination() {
+            const pagination = document.getElementById('pagination');
+            pagination.innerHTML = '';
+
+            if (totalPages <= 1) {
+                pagination.classList.add('hidden');
+                return;
+            }
+
+            // 上一页
+            const prevBtn = document.createElement('button');
+            prevBtn.textContent = '上一页';
+            prevBtn.className = `px-4 py-2 border rounded ${currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-purple-600 hover:bg-purple-50'}`;
+            prevBtn.disabled = currentPage === 1;
+            prevBtn.onclick = () => { if (currentPage > 1) loadSkills(currentPage - 1); };
+            pagination.appendChild(prevBtn);
+
+            // 页码
+            for (let i = 1; i <= totalPages; i++) {
+                if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+                    const pageBtn = document.createElement('button');
+                    pageBtn.textContent = i;
+                    pageBtn.className = `px-4 py-2 border rounded ${i === currentPage ? 'bg-purple-600 text-white' : 'bg-white text-purple-600 hover:bg-purple-50'}`;
+                    pageBtn.onclick = () => loadSkills(i);
+                    pagination.appendChild(pageBtn);
+                } else if (i === currentPage - 3 || i === currentPage + 3) {
+                    const ellipsis = document.createElement('span');
+                    ellipsis.textContent = '...';
+                    ellipsis.className = 'px-2 text-gray-500';
+                    pagination.appendChild(ellipsis);
+                }
+            }
+
+            // 下一页
+            const nextBtn = document.createElement('button');
+            nextBtn.textContent = '下一页';
+            nextBtn.className = `px-4 py-2 border rounded ${currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-purple-600 hover:bg-purple-50'}`;
+            nextBtn.disabled = currentPage === totalPages;
+            nextBtn.onclick = () => { if (currentPage < totalPages) loadSkills(currentPage + 1); };
+            pagination.appendChild(nextBtn);
+
+            pagination.classList.remove('hidden');
+        }
+
+        // 工具函数
+        function closeSkillModal() {
+            document.getElementById('skill-detail-modal').classList.add('hidden');
+        }
+
+        function togglePreview() {
+            const panel = document.getElementById('markdown-preview-panel');
+            const content = document.getElementById('skill-content').value;
+            const preview = document.getElementById('markdown-preview-content');
+            
+            if (panel.classList.contains('hidden')) {
+                preview.innerHTML = marked.parse(content || '(暂无内容)');
+                panel.classList.remove('hidden');
+            } else {
+                panel.classList.add('hidden');
+            }
+        }
+
+        function updateContentLength() {
+            const length = document.getElementById('skill-content').value.length;
+            document.getElementById('content-length').textContent = `${length} 字符`;
+        }
+
+        function resetCreateForm() {
+            document.getElementById('create-skill-form').reset();
+            document.getElementById('content-length').textContent = '0 字符';
+            document.getElementById('markdown-preview-panel').classList.add('hidden');
+        }
+
+        function getCategoryName(category) {
+            const names = {
+                'policy': '政策分析',
+                'technology': '技术评估',
+                'stakeholder': '利益相关方',
+                'risk': '风险评估',
+                'finance': '财务分析',
+                'other': '其他'
+            };
+            return names[category] || '其他';
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('zh-CN') + ' ' + date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function escapeHtml(text) {
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            return text ? text.replace(/[&<>"']/g, m => map[m]) : '';
+        }
+
+        function showSuccess(message) {
+            alert('✅ ' + message);
+        }
+
+        function showError(message) {
+            alert('❌ ' + message);
+        }
+
+        // ========== Import相关函数 ==========
+        
+        let selectedPresets = new Set();
+        let currentImportMode = 'presets';
+
+        // 切换导入模式（预设 vs 自定义URL）
+        function switchImportMode(mode) {
+            currentImportMode = mode;
+            
+            // 更新按钮样式
+            const presetsBtn = document.getElementById('import-mode-presets');
+            const customBtn = document.getElementById('import-mode-custom');
+            
+            if (mode === 'presets') {
+                presetsBtn.classList.add('text-purple-600', 'border-b-2', 'border-purple-600');
+                presetsBtn.classList.remove('text-gray-500');
+                customBtn.classList.remove('text-purple-600', 'border-b-2', 'border-purple-600');
+                customBtn.classList.add('text-gray-500');
+                
+                document.getElementById('import-presets-panel').classList.remove('hidden');
+                document.getElementById('import-custom-panel').classList.add('hidden');
+            } else {
+                customBtn.classList.add('text-purple-600', 'border-b-2', 'border-purple-600');
+                customBtn.classList.remove('text-gray-500');
+                presetsBtn.classList.remove('text-purple-600', 'border-b-2', 'border-purple-600');
+                presetsBtn.classList.add('text-gray-500');
+                
+                document.getElementById('import-custom-panel').classList.remove('hidden');
+                document.getElementById('import-presets-panel').classList.add('hidden');
+            }
+        }
+
+        // 加载Anthropic预设技能
+        function loadImportPresets() {
+            const loading = document.getElementById('presets-loading');
+            const list = document.getElementById('presets-list');
+            const actions = document.getElementById('presets-actions');
+            
+            loading.classList.remove('hidden');
+            list.classList.add('hidden');
+            
+            fetch('/api/skills/import/presets')
+                .then(res => res.json())
+                .then(data => {
+                    loading.classList.add('hidden');
+                    
+                    if (data.status === 'success') {
+                        displayPresets(data.data);
+                        list.classList.remove('hidden');
+                        actions.classList.remove('hidden');
+                    } else {
+                        showError('加载预设失败: ' + data.message);
+                    }
+                })
+                .catch(err => {
+                    loading.classList.add('hidden');
+                    showError('加载预设失败: ' + err.message);
+                });
+        }
+
+        // 显示预设列表
+        function displayPresets(presets) {
+            const list = document.getElementById('presets-list');
+            list.innerHTML = '';
+            
+            // 确保presets是数组
+            if (!presets || !Array.isArray(presets)) {
+                presets = [];
+            }
+            
+            presets.forEach(preset => {
+                const item = document.createElement('div');
+                item.className = 'flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition';
+                item.innerHTML = `
+                    <input type="checkbox" id="preset-${preset.id}" value="${preset.id}" 
+                           onchange="togglePresetSelection('${preset.id}')"
+                           class="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
+                    <label for="preset-${preset.id}" class="ml-3 flex-1 cursor-pointer">
+                        <div class="font-medium text-gray-900">${escapeHtml(preset.name)}</div>
+                        <div class="text-sm text-gray-600 mt-1">${escapeHtml(preset.description)}</div>
+                        <div class="flex items-center gap-2 mt-2">
+                            <span class="category-badge category-${preset.category}">${getCategoryName(preset.category)}</span>
+                            <span class="text-xs text-gray-500">来源: ${escapeHtml(preset.source)}</span>
+                        </div>
+                    </label>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        // 切换预设选择
+        function togglePresetSelection(presetId) {
+            const checkbox = document.getElementById(`preset-${presetId}`);
+            if (checkbox.checked) {
+                selectedPresets.add(presetId);
+            } else {
+                selectedPresets.delete(presetId);
+            }
+            updateSelectedCount();
+        }
+
+        // 更新已选择数量
+        function updateSelectedCount() {
+            document.getElementById('selected-count').textContent = selectedPresets.size;
+        }
+
+        // 全选预设
+        function selectAllPresets() {
+            document.querySelectorAll('[id^="preset-"]').forEach(checkbox => {
+                checkbox.checked = true;
+                selectedPresets.add(checkbox.value);
+            });
+            updateSelectedCount();
+        }
+
+        // 取消全选
+        function deselectAllPresets() {
+            document.querySelectorAll('[id^="preset-"]').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            selectedPresets.clear();
+            updateSelectedCount();
+        }
+
+        // 导入选中的预设
+        async function importSelectedPresets() {
+            if (selectedPresets.size === 0) {
+                showError('请至少选择一个技能');
+                return;
+            }
+
+            // 获取选中预设的URL
+            const urls = [];
+            try {
+                const presetsResponse = await fetch('/api/skills/import/presets');
+                const presetsData = await presetsResponse.json();
+                
+                if (presetsData.status === 'success' && presetsData.data && Array.isArray(presetsData.data)) {
+                    presetsData.data.forEach(preset => {
+                        if (selectedPresets.has(preset.id)) {
+                            urls.push(preset.url);
+                        }
+                    });
+                }
+            } catch (err) {
+                showError('获取预设URL失败: ' + err.message);
+                return;
+            }
+
+            if (urls.length === 0) {
+                showError('未找到有效的URL');
+                return;
+            }
+
+            // 显示进度
+            showImportProgress(true);
+            updateImportStatus('正在批量导入...');
+            updateProgressBar(0);
+
+            const strictSecurity = false; // 预设不使用严格模式
+
+            // 批量导入
+            fetch('/api/skills/import/batch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ urls: urls, strict_security: strictSecurity })
+            })
+            .then(res => res.json())
+            .then(data => {
+                updateProgressBar(100);
+                
+                if (data.status === 'success') {
+                    displayImportResults(data.data);
+                    selectedPresets.clear();
+                    updateSelectedCount();
+                    deselectAllPresets();
+                    
+                    if (data.data.summary.succeeded > 0) {
+                        showSuccess(`成功导入 ${data.data.summary.succeeded}/${data.data.summary.total} 个技能`);
+                    }
+                } else {
+                    showError('批量导入失败: ' + data.message);
+                }
+                
+                showImportProgress(false);
+            })
+            .catch(err => {
+                updateProgressBar(100);
+                showImportProgress(false);
+                showError('批量导入失败: ' + err.message);
+            });
+        }
+
+        // 从自定义URL导入
+        function importFromCustomUrl() {
+            const urlInput = document.getElementById('custom-url-input');
+            const url = urlInput.value.trim();
+            
+            if (!url) {
+                showError('请输入URL');
+                return;
+            }
+
+            const strictSecurity = document.getElementById('strict-security-checkbox').checked;
+
+            showImportProgress(true);
+            updateImportStatus('正在导入: ' + url);
+            updateProgressBar(50);
+
+            fetch('/api/skills/import/url', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: url, strict_security: strictSecurity })
+            })
+            .then(res => res.json())
+            .then(data => {
+                updateProgressBar(100);
+                
+                if (data.status === 'success') {
+                    displayImportResults({
+                        created: [{ url: url, skill: data.data, security_score: data.security_score }],
+                        errors: [],
+                        summary: { total: 1, succeeded: 1, failed: 0 }
+                    });
+                    urlInput.value = '';
+                    showSuccess('导入成功: ' + data.data.name);
+                } else {
+                    displayImportResults({
+                        created: [],
+                        errors: [{ url: url, error: data.message, security_issues: data.security_issues }],
+                        summary: { total: 1, succeeded: 0, failed: 1 }
+                    });
+                    showError('导入失败: ' + data.message);
+                }
+                
+                showImportProgress(false);
+            })
+            .catch(err => {
+                updateProgressBar(100);
+                showImportProgress(false);
+                showError('导入失败: ' + err.message);
+            });
+        }
+
+        // 从批量URL导入
+        function importFromBatchUrls() {
+            const textarea = document.getElementById('batch-urls-input');
+            const text = textarea.value.trim();
+            
+            if (!text) {
+                showError('请输入至少一个URL');
+                return;
+            }
+
+            const urls = text.split('\n')
+                .map(line => line.trim())
+                .filter(line => line && line.startsWith('http'));
+
+            if (urls.length === 0) {
+                showError('未找到有效的URL');
+                return;
+            }
+
+            const strictSecurity = document.getElementById('strict-security-checkbox').checked;
+
+            showImportProgress(true);
+            updateImportStatus(`正在批量导入 ${urls.length} 个技能...`);
+            updateProgressBar(0);
+
+            fetch('/api/skills/import/batch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ urls: urls, strict_security: strictSecurity })
+            })
+            .then(res => res.json())
+            .then(data => {
+                updateProgressBar(100);
+                
+                if (data.status === 'success') {
+                    displayImportResults(data.data);
+                    textarea.value = '';
+                    
+                    if (data.data.summary.succeeded > 0) {
+                        showSuccess(`成功导入 ${data.data.summary.succeeded}/${data.data.summary.total} 个技能`);
+                    }
+                } else {
+                    showError('批量导入失败: ' + data.message);
+                }
+                
+                showImportProgress(false);
+            })
+            .catch(err => {
+                updateProgressBar(100);
+                showImportProgress(false);
+                showError('批量导入失败: ' + err.message);
+            });
+        }
+
+        // 显示/隐藏导入进度
+        function showImportProgress(show) {
+            const progress = document.getElementById('import-progress');
+            if (show) {
+                progress.classList.remove('hidden');
+                document.getElementById('import-results').classList.add('hidden');
+            } else {
+                progress.classList.add('hidden');
+            }
+        }
+
+        // 更新导入状态文本
+        function updateImportStatus(message) {
+            document.getElementById('import-status').textContent = message;
+        }
+
+        // 更新进度条
+        function updateProgressBar(percent) {
+            document.getElementById('import-progress-bar').style.width = percent + '%';
+        }
+
+        // 显示导入结果
+        function displayImportResults(data) {
+            const results = document.getElementById('import-results');
+            const list = document.getElementById('import-results-list');
+            
+            list.innerHTML = '';
+
+            // 显示成功导入的技能
+            data.created.forEach(item => {
+                const resultItem = document.createElement('div');
+                resultItem.className = 'flex items-start p-3 bg-green-50 border border-green-200 rounded-lg';
+                resultItem.innerHTML = `
+                    <svg class="w-5 h-5 text-green-600 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                    <div class="flex-1">
+                        <div class="font-medium text-green-900">${escapeHtml(item.skill.name)}</div>
+                        <div class="text-sm text-green-700 mt-1">安全评分: ${item.security_score}/100</div>
+                        <div class="text-xs text-green-600 mt-1 break-all">${escapeHtml(item.url)}</div>
+                    </div>
+                `;
+                list.appendChild(resultItem);
+            });
+
+            // 显示失败的导入
+            data.errors.forEach(error => {
+                const resultItem = document.createElement('div');
+                resultItem.className = 'flex items-start p-3 bg-red-50 border border-red-200 rounded-lg';
+                resultItem.innerHTML = `
+                    <svg class="w-5 h-5 text-red-600 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                    </svg>
+                    <div class="flex-1">
+                        <div class="font-medium text-red-900">导入失败</div>
+                        <div class="text-sm text-red-700 mt-1">${escapeHtml(error.error)}</div>
+                        <div class="text-xs text-red-600 mt-1 break-all">${escapeHtml(error.url)}</div>
+                    </div>
+                `;
+                list.appendChild(resultItem);
+            });
+
+            // 显示汇总
+            const summary = document.createElement('div');
+            summary.className = 'p-3 bg-gray-100 border border-gray-300 rounded-lg font-medium text-gray-800';
+            summary.textContent = `总计: ${data.summary.total} | 成功: ${data.summary.succeeded} | 失败: ${data.summary.failed}`;
+            list.appendChild(summary);
+
+            results.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>

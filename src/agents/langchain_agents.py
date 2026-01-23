@@ -91,12 +91,18 @@ def clean_json_string(s: str) -> str:
     
     修复内容：
     1. 移除 Markdown 代码块标记（```json 和 ```）
-    2. 提取完整的 JSON 对象/数组（使用括号匹配）
-    3. 修复常见的格式问题（尾随逗号、未闭合的字符串等）
+    2. 移除工具调用相关的文本（🔧、✅等）
+    3. 提取完整的 JSON 对象/数组（使用括号匹配）
+    4. 修复常见的格式问题（尾随逗号、未闭合的字符串等）
     """
     if not s:
         return ""
     s = s.strip()
+    
+    # 移除工具调用相关的文本标记
+    import re
+    s = re.sub(r'🔧\s*\*\*调用工具\*\*:.*?\n', '', s)
+    s = re.sub(r'✅\s*\*\*工具结果\*\*:.*?(?=\n\n|$)', '', s, flags=re.DOTALL)
     
     # 移除 Markdown 代码块标记
     s = s.replace('```json', '').replace('```', '').strip()
@@ -1218,6 +1224,8 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
                         event_type="agent_action"
                     )
                     
+                    logger.debug(f"[round {r}] 策论家 {i} 原始输出长度: {len(out)} 字符")
+                    
                     # 记录工具调用
                     if tool_calls:
                         search_results = [tc for tc in tool_calls if tc['tool_name'] == 'web_search']
@@ -1226,6 +1234,7 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
                     
                     cleaned = clean_json_string(out)
                     if not cleaned:
+                        logger.error(f"[round {r}] 策论家 {i} clean_json_string返回空! 原始输出前500字符: {out[:500]}")
                         raise ValueError("策论家输出为空或不包含 JSON")
                         
                     parsed = json.loads(cleaned)
@@ -1248,6 +1257,24 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
             if res:
                 plans.append(res)
                 last_plans_map[i] = res
+        
+        # 调试日志：检查plans是否为空
+        logger.info(f"[round {r}] 收集到 {len(plans)} 个策论家方案")
+        if not plans:
+            logger.error(f"[round {r}] ⚠️ 策论家方案列表为空！planner_results={planner_results}")
+            # 创建错误提示方案，让Auditor知道发生了什么
+            error_plan = {
+                "id": "系统错误",
+                "title": "策论家输出解析失败",
+                "description": "本轮所有策论家的输出均无法正确解析为JSON格式。可能原因：1. 模型输出包含非JSON文本 2. JSON格式不符合schema 3. 工具调用后未输出完整JSON",
+                "implementation_steps": [{"step": 1, "action": "检查日志文件获取详细错误信息", "responsible": "系统"}],
+                "expected_outcome": "无法提供预期结果",
+                "constraints": "所有策论家均失败"
+            }
+            plans.append(error_plan)
+        else:
+            for idx, plan in enumerate(plans, 1):
+                logger.debug(f"[round {r}] 策论家方案{idx}: id={plan.get('id', 'N/A')}, title={plan.get('title', 'N/A')[:30]}...")
 
         def execute_auditor(j):
             logger.info(f"[round {r}] 监察官 {j} 正在审核方案...")
