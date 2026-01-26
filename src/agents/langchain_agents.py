@@ -906,7 +906,7 @@ def refine_search_references(
     return refined_text, output
 
 
-def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rounds: int = 3, num_planners: int = 2, num_auditors: int = 2, agent_configs: Dict[str, Any] = None, user_id: Optional[int] = None, tenant_id: Optional[int] = None) -> Dict[str, Any]:
+def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rounds: int = 3, num_planners: int = 2, num_auditors: int = 2, agent_configs: Dict[str, Any] = None, user_id: Optional[int] = None, tenant_id: Optional[int] = None, session_id: Optional[str] = None) -> Dict[str, Any]:
     """Run a multi-round LangChain-driven cycle: leader decomposes, planners generate plans, auditors review, leader summarizes.
     
     Args:
@@ -918,45 +918,59 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
         agent_configs: Agent配置覆盖
         user_id: 用户ID（用于数据库存储，可选）
         tenant_id: 租户ID（用于多租户隔离，可选）
+        session_id: 预创建的会话ID（可选，如果提供则使用，否则生成新的）
         
     Returns:
         dict: 包含decomposition, history, final, report_html的结果字典
     """
     # 1. 初始化 Session 和 Workspace
-    session_id = datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + str(uuid.uuid4())[:8]
+    # 如果提供了session_id则使用，否则生成新的
+    if not session_id:
+        session_id = datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + str(uuid.uuid4())[:8]
+    
     workspace_path = get_workspace_dir() / session_id
     workspace_path.mkdir(parents=True, exist_ok=True)
     logger.info(f"[cycle] Session ID: {session_id}, Workspace: {workspace_path}, User: {user_id or 'anonymous'}, Tenant: {tenant_id or 'N/A'}")
     
-    # 2. 创建数据库会话记录（需要Flask应用上下文）
+    # 2. 数据库会话记录处理
+    # 如果session_id是预创建的，则不需要重新创建，只需要设置执行上下文
     if DB_AVAILABLE and user_id and SessionRepository:
+        # 检查session_id是否已存在
+        from src.web.app import app
+        session_exists = False
+        
         try:
-            from src.web.app import app
-            
-            logger.info(f"[cycle] 准备创建数据库会话，user_id={user_id}, tenant_id={tenant_id}, session_id={session_id}")
-            
-            config_data = {
-                "backend": model_config.get("type") if model_config else None,
-                "model": model_config.get("model") if model_config else None,
-                "rounds": max_rounds,
-                "planners": num_planners,
-                "auditors": num_auditors,
-                "agent_configs": agent_configs
-            }
-            
-            # 需要应用上下文进行数据库操作
             with app.app_context():
-                db_session = SessionRepository.create_session(
-                    user_id=user_id,
-                    session_id=session_id,
-                    issue=issue_text,
-                    config=config_data,
-                    tenant_id=tenant_id  # 传递tenant_id
-                )
-                if db_session:
-                    logger.info(f"[cycle] ✅ 数据库会话创建成功: {session_id}")
+                from src.models import DiscussionSession
+                existing = DiscussionSession.query.filter_by(session_id=session_id).first()
+                session_exists = existing is not None
+                
+                if session_exists:
+                    logger.info(f"[cycle] 使用预创建的会话记录: {session_id}")
                 else:
-                    logger.warning(f"[cycle] ⚠️ 数据库会话创建返回None: {session_id}")
+                    # 如果不存在，则创建（向后兼容直接调用run_full_cycle的情况）
+                    logger.info(f"[cycle] 准备创建数据库会话，user_id={user_id}, tenant_id={tenant_id}, session_id={session_id}")
+                    
+                    config_data = {
+                        "backend": model_config.get("type") if model_config else None,
+                        "model": model_config.get("model") if model_config else None,
+                        "rounds": max_rounds,
+                        "planners": num_planners,
+                        "auditors": num_auditors,
+                        "agent_configs": agent_configs
+                    }
+                    
+                    db_session = SessionRepository.create_session(
+                        user_id=user_id,
+                        session_id=session_id,
+                        issue=issue_text,
+                        config=config_data,
+                        tenant_id=tenant_id
+                    )
+                    if db_session:
+                        logger.info(f"[cycle] ✅ 数据库会话创建成功: {session_id}")
+                    else:
+                        logger.warning(f"[cycle] ⚠️ 数据库会话创建返回None: {session_id}")
         except Exception as e:
             logger.error(f"[cycle] ❌ 数据库操作失败: {e}")
             logger.error(traceback.format_exc())

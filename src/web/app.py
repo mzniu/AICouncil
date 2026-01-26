@@ -258,15 +258,53 @@ def start_discussion():
     tenant_id = current_user.tenant_id if current_user.is_authenticated else None
     logger.info(f"[start_discussion] 当前用户: authenticated={current_user.is_authenticated}, user_id={user_id}, tenant_id={tenant_id}")
     
+    # ===【改进】在启动线程前立即创建数据库记录===
+    session_id = None
+    if DB_AVAILABLE and user_id:
+        from datetime import datetime
+        import uuid
+        session_id = datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + str(uuid.uuid4())[:8]
+        
+        config_data = {
+            "backend": backend,
+            "model": model,
+            "rounds": rounds,
+            "planners": planners,
+            "auditors": auditors,
+            "reasoning": reasoning,
+            "agent_configs": agent_configs,
+            "use_meta_orchestrator": use_meta_orchestrator
+        }
+        
+        try:
+            db_session = SessionRepository.create_session(
+                user_id=user_id,
+                session_id=session_id,
+                issue=issue,
+                config=config_data,
+                tenant_id=tenant_id
+            )
+            if db_session:
+                logger.info(f"[start_discussion] ✅ 会话记录已创建: {session_id}")
+            else:
+                logger.warning(f"[start_discussion] ⚠️ 会话记录创建失败: {session_id}")
+        except Exception as e:
+            logger.error(f"[start_discussion] ❌ 创建会话记录时出错: {e}")
+            session_id = None  # 创建失败，清空session_id
+    
     # 在后台线程启动 demo_runner.py，设置为 daemon 确保主进程退出时线程也退出
-    thread = threading.Thread(target=run_backend, args=(issue, backend, model, rounds, planners, auditors, agent_configs, reasoning, use_meta_orchestrator, user_id, tenant_id))
+    thread = threading.Thread(target=run_backend, args=(issue, backend, model, rounds, planners, auditors, agent_configs, reasoning, use_meta_orchestrator, user_id, tenant_id, session_id))
     thread.daemon = True
     thread.start()
     
-    return jsonify({"status": "ok"})
+    return jsonify({"status": "ok", "session_id": session_id})
 
-def run_backend(issue, backend, model, rounds, planners, auditors, agent_configs=None, reasoning=None, use_meta_orchestrator=False, user_id=None, tenant_id=None):
-    global is_running, current_process
+def run_backend(issue, backend, model, rounds, planners, auditors, agent_configs=None, reasoning=None, use_meta_orchestrator=False, user_id=None, tenant_id=None, session_id=None):
+    global is_running, current_process, current_session_id
+    
+    # 保存session_id到全局变量（用于异常处理时更新状态）
+    current_session_id = session_id
+    
     try:
         # 确保参数为整数（前端传递的可能是字符串）
         rounds = int(rounds)
@@ -303,7 +341,8 @@ def run_backend(issue, backend, model, rounds, planners, auditors, agent_configs
                     model_config=model_cfg,
                     agent_configs=agent_configs,
                     user_id=user_id,
-                    tenant_id=tenant_id
+                    tenant_id=tenant_id,
+                    session_id=session_id  # 传递预创建的session_id
                 )
             else:
                 # 传统模式：直接调用核心函数
@@ -315,7 +354,8 @@ def run_backend(issue, backend, model, rounds, planners, auditors, agent_configs
                     num_auditors=auditors,
                     agent_configs=agent_configs,
                     user_id=user_id,
-                    tenant_id=tenant_id  # 传递tenant_id到run_full_cycle
+                    tenant_id=tenant_id,
+                    session_id=session_id  # 传递预创建的session_id
                 )
             
             logger.info(f"[app] 完成 {rounds} 轮流程")
@@ -358,6 +398,14 @@ def run_backend(issue, backend, model, rounds, planners, auditors, agent_configs
     except Exception as e:
         logger.error(f"[app] 启动后端失败: {e}")
         traceback.print_exc()
+        
+        # 更新数据库会话状态为failed
+        if DB_AVAILABLE and user_id and current_session_id:
+            try:
+                SessionRepository.update_status(current_session_id, 'failed')
+                logger.info(f"[app] 会话状态已更新为failed: {current_session_id}")
+            except Exception as db_err:
+                logger.error(f"[app] 更新失败状态时出错: {db_err}")
     finally:
         is_running = False
         current_process = None
@@ -2534,14 +2582,15 @@ def list_skills():
                 'page_size': len(skills)
             }
         else:
-            # 分页列表模式
+            # 分页列表模式（get_tenant_skills已经返回字典格式）
             result = SkillRepository.get_tenant_skills(
                 tenant_id=tenant_id,
                 category=category,
+                include_content=include_content,  # 传递include_content参数
                 page=page,
                 page_size=page_size
             )
-            result['items'] = [s.to_dict(include_content=include_content) for s in result['items']]
+            # result['items'] 已经是字典列表，无需再次调用to_dict()
         
         return jsonify({
             'status': 'success',
@@ -2786,7 +2835,7 @@ def get_skills_stats():
             order_by = request.args.get('order_by', 'usage_count')
             limit = int(request.args.get('limit', 10))
             
-            top_skills = SkillRepository.get_top_skills(tenant_id, order_by, limit)
+            top_skills = SkillRepository.get_top_skills(tenant_id, limit, order_by)
             
             return jsonify({
                 'status': 'success',
