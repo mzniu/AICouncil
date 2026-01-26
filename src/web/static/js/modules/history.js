@@ -122,6 +122,14 @@ export function renderHistoryList(workspaces, pagination) {
         };
         const statusColor = statusColors[ws.status] || 'bg-gray-100 text-gray-700';
         
+        // 状态图标
+        const statusIcons = {
+            'running': '🟡',
+            'completed': '🟢',
+            'failed': '🔴'
+        };
+        const statusIcon = statusIcons[ws.status] || '⚪';
+        
         // 后端图标
         const backendIcons = {
             'deepseek': '🧠',
@@ -137,7 +145,10 @@ export function renderHistoryList(workspaces, pagination) {
                 <div class="flex-1">
                     <div class="flex items-center space-x-2 mb-1">
                         <h4 class="font-bold text-slate-800 group-hover:text-indigo-700">${ws.issue || t('msg_untitled_issue')}</h4>
-                        <span class="text-xs px-2 py-0.5 rounded-full ${statusColor} font-medium">${ws.status || 'unknown'}</span>
+                        <span class="text-xs px-2 py-0.5 rounded-full ${statusColor} font-medium flex items-center gap-1">
+                            <span>${statusIcon}</span>
+                            <span>${ws.status || 'unknown'}</span>
+                        </span>
                     </div>
                     <div class="flex items-center space-x-3 text-xs text-slate-500 mt-1">
                         <span>📅 ${ws.created_at || ws.timestamp || 'N/A'}</span>
