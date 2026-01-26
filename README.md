@@ -281,6 +281,26 @@ pip install -r requirements-optional.txt
 - `requirements-minimal.txt`: 核心依赖（基本功能，体积更小）
 - `requirements-optional.txt`: 可选增强（PDF导出、浏览器搜索）
 
+> 注意：如果需要 Playwright 支持 PDF 导出，安装后请运行 `playwright install chromium`。
+
+推荐配置方式（优先级）：环境变量 / `.env`（推荐） > `src/config.py`（兼容旧版本）
+
+如果需要兼容旧配置文件，可以复制模板并编辑：
+
+```bash
+# 仅在需要兼容旧配置时使用
+cp src/config_template.py src/config.py
+```
+
+更推荐的做法是使用 `.env`：
+
+```bash
+cp .env.example .env
+# 编辑 .env 填入 API 密钥与配置
+```
+
+您也可以在应用的 Web 界面“设置”中在线填写 API 密钥，系统会将其保存到 `.env`。
+
 #### 4. 配置系统（环境变量方式）
 
 **⚠️ 重要变更**：配置已从 `src/config.py` 迁移到 `.env` 文件（更安全、更易管理）。

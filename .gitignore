@@ -6,7 +6,7 @@ __pycache__/
 venv/
 ENV/
 env/
-
+src/config.py
 # Logs
 *.log
 aicouncil.log
