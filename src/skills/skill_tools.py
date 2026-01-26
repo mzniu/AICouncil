@@ -1,56 +1,91 @@
 """
-Skills工具函数库 - 将Skills转换为Function Calling工具
+Skills工具函数库 - 将Skills转换为Function Calling工具 (数据库版本)
 
 提供Skills作为可调用工具，供Agent在思考过程中主动调用：
-1. 按需加载：工具列表包含Skill元数据，完整内容仅在调用时加载
-2. 自动发现：扫描skills/builtin/目录，自动注册所有Skills
+1. 按需加载：工具列表包含Skill元数据，完整内容仅在调用时加载  
+2. 数据库驱动：从数据库加载租户的Skills（支持多租户隔离）
 3. 标准格式：遵循OpenAI Function Calling规范
 
 架构设计：
+- set_execution_context(tenant_id) -> 设置当前执行租户
 - get_skill_tool_schemas() -> 返回所有Skill的工具schema列表
 - execute_skill_tool(skill_name) -> 返回指定Skill的完整内容
-- 与现有meta_tools.py架构保持一致
 """
 
 import json
+import threading
 from typing import Dict, List, Any, Optional
-from pathlib import Path
 
-from src.skills.loader import SkillLoader, Skill
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
 
-# 全局SkillLoader实例（懒加载）
-_skill_loader: Optional[SkillLoader] = None
-_cached_skills: Optional[List[Skill]] = None
+# 线程本地存储：当前执行上下文
+_execution_context = threading.local()
 
 
-def _get_skill_loader() -> SkillLoader:
-    """获取SkillLoader单例"""
-    global _skill_loader
-    if _skill_loader is None:
-        _skill_loader = SkillLoader()
-        logger.info("[skill_tools] SkillLoader initialized")
-    return _skill_loader
+def set_execution_context(tenant_id: Optional[int] = None, user_id: Optional[int] = None):
+    """
+    设置当前线程的执行上下文
+    
+    Args:
+        tenant_id: 租户ID
+        user_id: 用户ID
+    """
+    _execution_context.tenant_id = tenant_id
+    _execution_context.user_id = user_id
+    logger.debug(f"[skill_tools] Execution context set: tenant_id={tenant_id}, user_id={user_id}")
 
 
-def _load_all_skills() -> List[Skill]:
-    """加载所有Skills（带缓存）"""
-    global _cached_skills
-    if _cached_skills is None:
-        loader = _get_skill_loader()
-        _cached_skills = loader.load_all_builtin_skills()
-        logger.info(f"[skill_tools] Loaded {len(_cached_skills)} skills from builtin directory")
-    return _cached_skills
+def get_execution_context() -> Dict[str, Optional[int]]:
+    """获取当前线程的执行上下文"""
+    return {
+        "tenant_id": getattr(_execution_context, "tenant_id", None),
+        "user_id": getattr(_execution_context, "user_id", None)
+    }
+
+
+def _load_all_skills() -> List[Dict[str, Any]]:
+    """
+    从数据库加载所有Skills（基于当前租户）
+    
+    Returns:
+        Skills字典列表（包含元数据，不含完整content）
+    """
+    try:
+        # 获取当前租户ID
+        ctx = get_execution_context()
+        tenant_id = ctx.get("tenant_id")
+        
+        if not tenant_id:
+            logger.warning("[skill_tools] No tenant_id in execution context, returning empty skills list")
+            return []
+        
+        # 从数据库加载（延迟导入避免循环依赖）
+        from src.repositories.skill_repository import SkillRepository
+        
+        # 获取租户所有激活的Skills
+        result = SkillRepository.get_tenant_skills(
+            tenant_id=tenant_id,
+            is_active=True,
+            include_content=False,  # 不加载完整内容，只要元数据
+            page=1,
+            page_size=1000  # 一次加载所有（合理租户不会超过1000个Skills）
+        )
+        
+        skills = result.get("items", [])
+        logger.info(f"[skill_tools] Loaded {len(skills)} skills for tenant {tenant_id}")
+        return skills
+        
+    except Exception as e:
+        logger.error(f"[skill_tools] Failed to load skills: {e}", exc_info=True)
+        return []
 
 
 def refresh_skills_cache():
-    """刷新Skills缓存（用于热重载）"""
-    global _cached_skills
-    _cached_skills = None
-    logger.info("[skill_tools] Skills cache cleared")
+    """刷新Skills缓存（当前实现直接从数据库读取，无需缓存）"""
+    logger.info("[skill_tools] Skills are loaded from database, no cache to clear")
 
 
 # ========== 工具1: list_skills ==========
@@ -77,25 +112,25 @@ def list_skills(filter_category: Optional[str] = None, filter_tags: Optional[Lis
         # 应用过滤器
         filtered_skills = all_skills
         if filter_category:
-            filtered_skills = [s for s in filtered_skills if s.category == filter_category]
+            filtered_skills = [s for s in filtered_skills if s.get("category") == filter_category]
         if filter_tags:
             filtered_skills = [
                 s for s in filtered_skills 
-                if any(tag in s.tags for tag in filter_tags)
+                if any(tag in s.get("tags", []) for tag in filter_tags)
             ]
         
-        # 格式化为摘要信息
+        # 格式化为摘要信息（数据已经是字典格式，直接提取）
         skills_summary = []
         for skill in filtered_skills:
             skills_summary.append({
-                "name": skill.name,
-                "display_name": skill.display_name,
-                "category": skill.category,
-                "tags": skill.tags,
-                "description": skill.description,
-                "version": skill.version,
-                "applicable_roles": skill.applicable_roles,
-                "author": skill.author
+                "name": skill.get("name"),
+                "display_name": skill.get("display_name"),
+                "category": skill.get("category"),
+                "tags": skill.get("tags", []),
+                "description": skill.get("description", ""),
+                "version": skill.get("version"),
+                "applicable_roles": skill.get("applicable_roles", []),
+                "author": skill.get("author", "")
             })
         
         logger.info(f"[list_skills] Listed {len(filtered_skills)}/{len(all_skills)} skills")
@@ -109,7 +144,7 @@ def list_skills(filter_category: Optional[str] = None, filter_tags: Optional[Lis
         }
     
     except Exception as e:
-        logger.error(f"[list_skills] Failed to list skills: {e}")
+        logger.error(f"[list_skills] Failed to list skills: {e}", exc_info=True)
         return {
             "success": False,
             "skills": [],
@@ -130,7 +165,7 @@ LIST_SKILLS_SCHEMA = {
             "properties": {
                 "filter_category": {
                     "type": "string",
-                    "description": "按分类过滤（可选），如 'business_analysis', 'decision_making', 'problem_solving'"
+                    "description": "按分类过滤（可选），如 'business_analysis', 'technical', 'legal', 'financial'"
                 },
                 "filter_tags": {
                     "type": "array",
@@ -148,63 +183,66 @@ LIST_SKILLS_SCHEMA = {
 
 def use_skill(skill_name: str) -> Dict[str, Any]:
     """
-    获取指定Skill的完整内容（框架、模板、质量标准等）
+    加载并使用指定的Skill
     
     Args:
-        skill_name: Skill的name字段（如 "cost_benefit"）
+        skill_name: Skill名称（name字段）
     
     Returns:
         字典包含：
         - success: bool, 操作是否成功
         - skill_name: str, Skill名称
-        - skill_content: str, 完整Skill内容（Markdown格式）
+        - skill_content: str, Skill完整内容
         - metadata: Dict, Skill元数据
         - error: Optional[str], 错误信息（如有）
     """
     try:
-        all_skills = _load_all_skills()
+        # 获取当前租户ID
+        ctx = get_execution_context()
+        tenant_id = ctx.get("tenant_id")
         
-        # 查找指定Skill
-        target_skill = None
-        for skill in all_skills:
-            if skill.name == skill_name:
-                target_skill = skill
-                break
-        
-        if target_skill is None:
-            available_names = [s.name for s in all_skills]
+        if not tenant_id:
             return {
                 "success": False,
-                "error": f"Skill '{skill_name}' 不存在。可用Skills: {', '.join(available_names)}"
+                "error": "No tenant_id in execution context"
             }
         
-        # 返回完整内容
-        logger.info(f"[use_skill] Returning full content for skill: {skill_name} ({len(target_skill.content)} chars)")
+        # 从数据库加载完整Skill
+        from src.repositories.skill_repository import SkillRepository
+        
+        skill = SkillRepository.get_skill_by_name(name=skill_name, tenant_id=tenant_id)
+        
+        if not skill:
+            return {
+                "success": False,
+                "error": f"Skill '{skill_name}' not found for tenant {tenant_id}"
+            }
+        
+        skill_dict = skill.to_dict(include_content=True)
+        
+        logger.info(f"[use_skill] Loaded skill '{skill_name}' for tenant {tenant_id}")
         
         return {
             "success": True,
-            "skill_name": target_skill.name,
-            "skill_content": target_skill.content,
+            "skill_name": skill_dict["name"],
+            "skill_content": skill_dict["content"],
             "metadata": {
-                "display_name": target_skill.display_name,
-                "version": target_skill.version,
-                "category": target_skill.category,
-                "tags": target_skill.tags,
-                "description": target_skill.description,
-                "applicable_roles": target_skill.applicable_roles,
-                "requirements": target_skill.requirements,
-                "author": target_skill.author,
-                "created": target_skill.created,
-                "updated": target_skill.updated
+                "display_name": skill_dict["display_name"],
+                "category": skill_dict["category"],
+                "tags": skill_dict["tags"],
+                "version": skill_dict["version"],
+                "applicable_roles": skill_dict["applicable_roles"],
+                "author": skill_dict["author"],
+                "description": skill_dict["description"]
             },
-            "message": f"已加载Skill '{target_skill.display_name}' 的完整内容"
+            "message": f"成功加载Skill: {skill_dict['display_name']}"
         }
     
     except Exception as e:
-        logger.error(f"[use_skill] Failed to retrieve skill '{skill_name}': {e}")
+        logger.error(f"[use_skill] Failed to load skill '{skill_name}': {e}", exc_info=True)
         return {
             "success": False,
-            "error": f"获取Skill失败: {str(e)}"
+            "error": f"加载Skill失败: {str(e)}"
         }
 
 
@@ -213,13 +251,13 @@ USE_SKILL_SCHEMA = {
     "type": "function",
     "function": {
         "name": "use_skill",
-        "description": "获取指定专业技能(Skill)的完整内容，包括分析框架、操作步骤、模板、质量标准等。先用list_skills找到需要的Skill名称，再调用此工具获取详细内容。",
+        "description": "加载并使用指定的Skill，获取其完整内容（框架、方法论、模板等）。在需要应用特定专业知识时调用。",
         "parameters": {
             "type": "object",
             "properties": {
                 "skill_name": {
                     "type": "string",
-                    "description": "Skill的标识符（name字段），如 'cost_benefit', 'swot_analysis', 'risk_assessment'"
+                    "description": "Skill的名称（name字段），可通过list_skills获取"
                 }
             },
             "required": ["skill_name"]
@@ -228,28 +266,23 @@ USE_SKILL_SCHEMA = {
 }
 
 
-# ========== 工具注册与执行 ==========
+# ========== 工具注册表 ==========
 
-# 所有Skills相关工具的schema列表
-SKILL_TOOL_SCHEMAS = [
-    LIST_SKILLS_SCHEMA,
-    USE_SKILL_SCHEMA
-]
-
-# 工具名称到执行函数的映射
 SKILL_TOOL_EXECUTORS = {
     "list_skills": list_skills,
     "use_skill": use_skill
 }
 
+SKILL_TOOL_SCHEMAS = [
+    LIST_SKILLS_SCHEMA,
+    USE_SKILL_SCHEMA
+]
+
+
+# ========== 导出函数 ==========
 
 def get_skill_tool_schemas() -> List[Dict]:
-    """
-    获取所有Skills工具的OpenAI Function Calling schemas
-    
-    Returns:
-        工具schema列表
-    """
+    """获取所有Skills工具的OpenAI Function Calling schemas"""
     return SKILL_TOOL_SCHEMAS
 
 
@@ -277,7 +310,6 @@ def execute_skill_tool(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, A
         return result
     
     except TypeError as e:
-        # 参数错误
         logger.error(f"[execute_skill_tool] Invalid arguments for '{tool_name}': {e}")
         return {
             "success": False,
@@ -285,8 +317,7 @@ def execute_skill_tool(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, A
         }
     
     except Exception as e:
-        # 执行异常
-        logger.error(f"[execute_skill_tool] Tool '{tool_name}' execution failed: {e}")
+        logger.error(f"[execute_skill_tool] Tool '{tool_name}' execution failed: {e}", exc_info=True)
         return {
             "success": False,
             "error": f"工具执行异常: {str(e)}"
@@ -335,50 +366,32 @@ def format_skill_tool_result_for_llm(tool_name: str, result: Dict[str, Any]) -> 
 # ========== 测试代码 ==========
 
 if __name__ == "__main__":
-    print("=== Skills Tool System Test ===\n")
+    print("=== Skills Tool System Test (Database Version) ===\n")
     
-    # 测试1: list_skills
-    print("【测试1】list_skills()")
-    result = list_skills()
-    print(f"Success: {result['success']}")
-    print(f"Total count: {result['total_count']}")
-    if result['success']:
-        for skill in result['skills'][:3]:
-            print(f"  - {skill['display_name']} ({skill['name']}): {skill['description'][:60]}...")
-    print()
+    # 需要Flask app context
+    from src.web.app import app
     
-    # 测试2: list_skills with filter
-    print("【测试2】list_skills(filter_category='business_analysis')")
-    result = list_skills(filter_category="business_analysis")
-    print(f"Filtered count: {result['filtered_count']}")
-    print()
-    
-    # 测试3: use_skill
-    print("【测试3】use_skill('cost_benefit')")
-    result = use_skill("cost_benefit")
-    print(f"Success: {result['success']}")
-    if result['success']:
-        print(f"Skill name: {result['skill_name']}")
-        print(f"Content length: {len(result['skill_content'])} chars")
-        print(f"Metadata: {result['metadata']['display_name']}")
-    print()
-    
-    # 测试4: get_skill_tool_schemas
-    print("【测试4】get_skill_tool_schemas()")
-    schemas = get_skill_tool_schemas()
-    print(f"Total schemas: {len(schemas)}")
-    for schema in schemas:
-        print(f"  - {schema['function']['name']}: {schema['function']['description'][:80]}...")
-    print()
-    
-    # 测试5: execute_skill_tool
-    print("【测试5】execute_skill_tool('list_skills', {})")
-    result = execute_skill_tool("list_skills", {})
-    print(f"Success: {result['success']}")
-    print()
-    
-    # 测试6: format_skill_tool_result_for_llm
-    print("【测试6】format_skill_tool_result_for_llm('use_skill', ...)")
-    result = use_skill("cost_benefit")
-    formatted = format_skill_tool_result_for_llm("use_skill", result)
-    print(formatted[:500] + "..." if len(formatted) > 500 else formatted)
+    with app.app_context():
+        # 需要先设置执行上下文
+        set_execution_context(tenant_id=1)  # 使用admin的租户
+        
+        # 测试1: list_skills
+        print("【测试1】list_skills()")
+        result = list_skills()
+        print(f"Success: {result['success']}")
+        print(f"Total count: {result['total_count']}")
+        if result['success']:
+            for skill in result['skills']:
+                print(f"  - {skill['display_name']} ({skill['name']}): {skill['description'][:60]}...")
+        print()
+        
+        # 测试2: use_skill
+        if result['total_count'] > 0:
+            print("【测试2】use_skill()")
+            first_skill_name = result['skills'][0]['name']
+            skill_result = use_skill(first_skill_name)
+            print(f"Success: {skill_result['success']}")
+            if skill_result['success']:
+                print(f"Skill: {skill_result['metadata']['display_name']}")
+                print(f"Content length: {len(skill_result['skill_content'])} chars")
+                print(f"First 200 chars: {skill_result['skill_content'][:200]}...")
