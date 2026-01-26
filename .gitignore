@@ -32,4 +32,5 @@ __pycache__/
 *.pyc
 workspaces/
 reports/
-data/users.db
+data/users.dbdata/users.db-shm
+data/users.db-wal
