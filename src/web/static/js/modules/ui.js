@@ -19,7 +19,7 @@ import {
     deleteRole as apiDeleteRole
 } from '../core/api.js';
 import * as State from '../core/state.js';
-import { t } from '../core/i18n.js';
+import { t, getCurrentLang } from '../core/i18n.js';
 
 /**
  * 显示提示气泡
@@ -50,8 +50,8 @@ export function toggleOrchestratorMode() {
     
     // 显示提示
     const modeText = isOrchestratorMode 
-        ? (State.getCurrentLang() === 'zh' ? '智能编排模式已启用' : 'Orchestrator Mode Enabled')
-        : (State.getCurrentLang() === 'zh' ? '传统模式已启用' : 'Traditional Mode Enabled');
+        ? (getCurrentLang() === 'zh' ? '智能编排模式已启用' : 'Orchestrator Mode Enabled')
+        : (getCurrentLang() === 'zh' ? '传统模式已启用' : 'Traditional Mode Enabled');
     
     console.log(modeText, isOrchestratorMode);
     showToast(modeText);

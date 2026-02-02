@@ -338,6 +338,9 @@ def run_backend(issue, backend, model, rounds, planners, auditors, agent_configs
             if use_meta_orchestrator:
                 cmd.append("--use-meta-orchestrator")
             
+            if user_id:
+                cmd.extend(["--user_id", str(user_id)])
+            
             current_process = subprocess.Popen(
                 cmd,
                 text=True,

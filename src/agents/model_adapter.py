@@ -747,9 +747,15 @@ def call_model_with_tools(agent_id: str, messages: list, model_config: dict = No
                         from src.agents.langchain_agents import send_web_event
                         import uuid
                         
-                        # 格式化工具参数显示（简洁模式）
+                        # 格式化工具参数显示（扩展模式，显示更完整的参数）
                         if tool_args:
-                            args_brief = ", ".join([f"{k}={str(v)[:30]}" for k, v in tool_args.items()][:3])
+                            args_parts = []
+                            for k, v in list(tool_args.items())[:5]:  # 最多显示5个参数
+                                v_str = str(v)
+                                if len(v_str) > 120:
+                                    v_str = v_str[:77] + "..."
+                                args_parts.append(f"{k}={v_str}")
+                            args_brief = ", ".join(args_parts)
                         else:
                             args_brief = "(无参数)"
                         

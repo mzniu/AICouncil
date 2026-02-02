@@ -297,6 +297,7 @@ def parse_args():
     p.add_argument('--reasoning', type=str, help='JSON string of reasoning configuration')
     p.add_argument('--use-meta-orchestrator', action='store_true', 
                    help='使用议事编排官进行智能规划和框架执行（新流程）')
+    p.add_argument('--user_id', type=int, default=None, help='User ID for database session tracking')
     return p.parse_args()
 
 
@@ -374,7 +375,8 @@ def run_demo():
             max_rounds=args.rounds,
             num_planners=args.planners,
             num_auditors=args.auditors,
-            agent_configs=agent_configs
+            agent_configs=agent_configs,
+            user_id=args.user_id
         )
     
     logger.info(f"[demo] 完成流程，结果摘要:\n" + json.dumps(result, indent=2, ensure_ascii=False))
