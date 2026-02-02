@@ -28,6 +28,7 @@ from src.utils import md_exporter
 from src.utils.path_manager import get_workspace_dir, get_config_path, is_frozen
 from src.utils.logger import logger
 import logging
+from src.skills.skill_importer import SkillImporter, get_preset_skills
 
 # 导入SessionRepository（可选，用于数据库功能）
 try:
@@ -188,6 +189,12 @@ def admin_page():
         return redirect('/')
     return render_template('admin.html', version=__version__)
 
+@app.route('/skills')
+@login_required
+def skills_page():
+    """技能管理页面"""
+    return render_template('skills.html', version=__version__)
+
 @app.route('/mfa-setup')
 def mfa_setup_page():
     """MFA设置页面"""
@@ -200,7 +207,6 @@ def mfa_verify_page():
     return render_template('mfa_verify.html')
 
 @app.route('/api/start', methods=['POST'])
-@login_required  # 需要登录才能创建讨论
 def start_discussion():
     global is_running, discussion_events, backend_logs, final_report, current_config
     if is_running:
@@ -247,19 +253,58 @@ def start_discussion():
     }
 
     is_running = True
-    # 获取当前用户ID（如果已登录）
+    # 获取当前用户ID和tenant_id（如果已登录）
     user_id = current_user.id if current_user.is_authenticated else None
-    logger.info(f"[start_discussion] 当前用户: authenticated={current_user.is_authenticated}, user_id={user_id}")
+    tenant_id = current_user.tenant_id if current_user.is_authenticated else None
+    logger.info(f"[start_discussion] 当前用户: authenticated={current_user.is_authenticated}, user_id={user_id}, tenant_id={tenant_id}")
+    
+    # ===【改进】在启动线程前立即创建数据库记录===
+    session_id = None
+    if DB_AVAILABLE and user_id:
+        from datetime import datetime
+        import uuid
+        session_id = datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + str(uuid.uuid4())[:8]
+        
+        config_data = {
+            "backend": backend,
+            "model": model,
+            "rounds": rounds,
+            "planners": planners,
+            "auditors": auditors,
+            "reasoning": reasoning,
+            "agent_configs": agent_configs,
+            "use_meta_orchestrator": use_meta_orchestrator
+        }
+        
+        try:
+            db_session = SessionRepository.create_session(
+                user_id=user_id,
+                session_id=session_id,
+                issue=issue,
+                config=config_data,
+                tenant_id=tenant_id
+            )
+            if db_session:
+                logger.info(f"[start_discussion] ✅ 会话记录已创建: {session_id}")
+            else:
+                logger.warning(f"[start_discussion] ⚠️ 会话记录创建失败: {session_id}")
+        except Exception as e:
+            logger.error(f"[start_discussion] ❌ 创建会话记录时出错: {e}")
+            session_id = None  # 创建失败，清空session_id
     
     # 在后台线程启动 demo_runner.py，设置为 daemon 确保主进程退出时线程也退出
-    thread = threading.Thread(target=run_backend, args=(issue, backend, model, rounds, planners, auditors, agent_configs, reasoning, use_meta_orchestrator, user_id))
+    thread = threading.Thread(target=run_backend, args=(issue, backend, model, rounds, planners, auditors, agent_configs, reasoning, use_meta_orchestrator, user_id, tenant_id, session_id))
     thread.daemon = True
     thread.start()
     
-    return jsonify({"status": "ok"})
+    return jsonify({"status": "ok", "session_id": session_id})
 
-def run_backend(issue, backend, model, rounds, planners, auditors, agent_configs=None, reasoning=None, use_meta_orchestrator=False, user_id=None):
-    global is_running, current_process
+def run_backend(issue, backend, model, rounds, planners, auditors, agent_configs=None, reasoning=None, use_meta_orchestrator=False, user_id=None, tenant_id=None, session_id=None):
+    global is_running, current_process, current_session_id
+    
+    # 保存session_id到全局变量（用于异常处理时更新状态）
+    current_session_id = session_id
+    
     try:
         # 确保参数为整数（前端传递的可能是字符串）
         rounds = int(rounds)
@@ -295,7 +340,9 @@ def run_backend(issue, backend, model, rounds, planners, auditors, agent_configs
                     issue_text=issue,
                     model_config=model_cfg,
                     agent_configs=agent_configs,
-                    user_id=user_id
+                    user_id=user_id,
+                    tenant_id=tenant_id,
+                    session_id=session_id  # 传递预创建的session_id
                 )
             else:
                 # 传统模式：直接调用核心函数
@@ -306,7 +353,9 @@ def run_backend(issue, backend, model, rounds, planners, auditors, agent_configs
                     num_planners=planners,
                     num_auditors=auditors,
                     agent_configs=agent_configs,
-                    user_id=user_id  # 传递user_id到run_full_cycle
+                    user_id=user_id,
+                    tenant_id=tenant_id,
+                    session_id=session_id  # 传递预创建的session_id
                 )
             
             logger.info(f"[app] 完成 {rounds} 轮流程")
@@ -352,6 +401,14 @@ def run_backend(issue, backend, model, rounds, planners, auditors, agent_configs
     except Exception as e:
         logger.error(f"[app] 启动后端失败: {e}")
         traceback.print_exc()
+        
+        # 更新数据库会话状态为failed
+        if DB_AVAILABLE and user_id and current_session_id:
+            try:
+                SessionRepository.update_status(current_session_id, 'failed')
+                logger.info(f"[app] 会话状态已更新为failed: {current_session_id}")
+            except Exception as db_err:
+                logger.error(f"[app] 更新失败状态时出错: {db_err}")
     finally:
         is_running = False
         current_process = None
@@ -770,7 +827,6 @@ def rereport():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/workspaces', methods=['GET'])
-@login_required  # 需要登录才能查看会话列表
 def list_workspaces():
     """获取用户会话列表（优先从数据库查询，回退到文件系统）"""
     try:
@@ -779,17 +835,23 @@ def list_workspaces():
         per_page = request.args.get('per_page', 20, type=int)
         status_filter = request.args.get('status', None)  # running/completed/failed/stopped
         
-        # 方式1：从数据库查询（如果可用且用户已登录）
-        if DB_AVAILABLE and current_user.is_authenticated:
+        # 方式1：从数据库查询（如果可用）
+        if DB_AVAILABLE:
+            # 支持匿名用户：如果未登录则user_id=None
+            user_id = current_user.id if current_user.is_authenticated else None
+            tenant_id = current_user.tenant_id if current_user.is_authenticated else None
+            
             sessions = SessionRepository.get_user_sessions(
-                user_id=current_user.id,
+                user_id=user_id,
                 page=page,
                 per_page=per_page,
-                status_filter=status_filter
+                status_filter=status_filter,
+                tenant_id=tenant_id
             )
             total_count = SessionRepository.get_session_count(
-                user_id=current_user.id,
-                status_filter=status_filter
+                user_id=user_id,
+                status_filter=status_filter,
+                tenant_id=tenant_id
             )
             
             workspaces = []
@@ -888,12 +950,24 @@ def load_workspace(session_id):
                 "message": "数据库功能未启用"
             }), 503
         
-        # 权限检查
-        if not SessionRepository.check_user_permission(current_user.id, session_id):
+        # 权限检查：验证用户和租户权限
+        session = SessionRepository.get_session_by_id(session_id)
+        if not session:
+            return jsonify({"status": "error", "message": "会话不存在"}), 404
+        
+        if session.user_id != current_user.id:
             logger.warning(f"[load_workspace] 用户{current_user.id}尝试访问无权限的会话{session_id}")
             return jsonify({
                 "status": "error",
                 "message": "您没有权限访问此会话"
+            }), 403
+        
+        # 多租户验证：确保用户和会话属于同一租户
+        if current_user.tenant_id and session.tenant_id and current_user.tenant_id != session.tenant_id:
+            logger.warning(f"[load_workspace] 用户{current_user.id}(租户{current_user.tenant_id})尝试访问其他租户{session.tenant_id}的会话{session_id}")
+            return jsonify({
+                "status": "error",
+                "message": "您没有权限访问此会话（租户隔离）"
             }), 403
         
         # 获取会话数据
@@ -2479,6 +2553,505 @@ def get_report_edit_history(workspace_id):
     except Exception as e:
         logger.error(f"[editor] Get edit history error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# ============================================================
+# Skills Management API
+# ============================================================
+
+from src.repositories.skill_repository import SkillRepository
+from src.skills.loader_v2 import SkillLoaderV2
+from src.skills.security_scanner import scan_skill_content
+
+@app.route('/api/skills', methods=['GET'])
+@login_required
+def list_skills():
+    """获取技能列表（支持分页、分类过滤、搜索）"""
+    try:
+        tenant_id = current_user.tenant_id
+        category = request.args.get('category')
+        search = request.args.get('search')
+        page = int(request.args.get('page', 1))
+        page_size = int(request.args.get('page_size', 20))
+        include_content = request.args.get('include_content', 'false').lower() == 'true'
+        
+        if search:
+            # 搜索模式
+            skills = SkillRepository.search_skills(tenant_id, search)
+            result = {
+                'items': [s.to_dict(include_content=include_content) for s in skills],
+                'total': len(skills),
+                'page': 1,
+                'page_size': len(skills)
+            }
+        else:
+            # 分页列表模式（get_tenant_skills已经返回字典格式）
+            result = SkillRepository.get_tenant_skills(
+                tenant_id=tenant_id,
+                category=category,
+                include_content=include_content,  # 传递include_content参数
+                page=page,
+                page_size=page_size
+            )
+            # result['items'] 已经是字典列表，无需再次调用to_dict()
+        
+        return jsonify({
+            'status': 'success',
+            'data': result
+        })
+        
+    except Exception as e:
+        logger.error(f"[skills_api] List skills error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/skills/<int:skill_id>', methods=['GET'])
+@login_required
+def get_skill(skill_id):
+    """获取单个技能详情"""
+    try:
+        tenant_id = current_user.tenant_id
+        skill = SkillRepository.get_skill_by_id(skill_id, tenant_id)
+        
+        if not skill:
+            return jsonify({'status': 'error', 'message': 'Skill not found'}), 404
+        
+        return jsonify({
+            'status': 'success',
+            'data': skill.to_dict(include_content=True)
+        })
+        
+    except Exception as e:
+        logger.error(f"[skills_api] Get skill error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/skills', methods=['POST'])
+@login_required
+def create_skill():
+    """创建自定义技能"""
+    try:
+        tenant_id = current_user.tenant_id
+        data = request.get_json()
+        
+        if not data or not data.get('name') or not data.get('content'):
+            return jsonify({'status': 'error', 'message': 'Name and content are required'}), 400
+        
+        # 安全扫描
+        scan_result = scan_skill_content(data['content'], strict_mode=False)
+        if not scan_result.is_safe:
+            logger.warning(f"[skills_api] Unsafe content detected for skill {data['name']}: score={scan_result.security_score}")
+            return jsonify({
+                'status': 'error',
+                'message': 'Content failed security check',
+                'security_issues': scan_result.to_dict()
+            }), 400
+        
+        # 创建技能
+        skill = SkillRepository.create_skill(
+            tenant_id=tenant_id,
+            name=data['name'],
+            display_name=data.get('display_name', data['name']),
+            content=data['content'],
+            version=data.get('version', '1.0.0'),
+            category=data.get('category', 'custom'),
+            tags=data.get('tags', []),
+            description=data.get('description', ''),
+            applicable_roles=data.get('applicable_roles', []),
+            author=data.get('author', current_user.username),
+            requirements=data.get('requirements'),
+            is_builtin=False  # 用户创建的技能不是内置的
+        )
+        
+        if not skill:
+            return jsonify({'status': 'error', 'message': 'Failed to create skill (duplicate name?)'}), 400
+        
+        logger.info(f"[skills_api] Created skill {skill.name} for tenant {tenant_id} (security_score={scan_result.security_score})")
+        
+        return jsonify({
+            'status': 'success',
+            'data': skill.to_dict(include_content=False),
+            'security_score': scan_result.security_score
+        }), 201
+        
+    except Exception as e:
+        logger.error(f"[skills_api] Create skill error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/skills/<int:skill_id>', methods=['PUT'])
+@login_required
+def update_skill(skill_id):
+    """更新技能"""
+    try:
+        tenant_id = current_user.tenant_id
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'status': 'error', 'message': 'Request data is required'}), 400
+        
+        # 更新技能
+        skill = SkillRepository.update_skill(
+            skill_id=skill_id,
+            tenant_id=tenant_id,
+            display_name=data.get('display_name'),
+            content=data.get('content'),
+            version=data.get('version'),
+            category=data.get('category'),
+            tags=data.get('tags'),
+            description=data.get('description'),
+            applicable_roles=data.get('applicable_roles'),
+            requirements=data.get('requirements')
+        )
+        
+        if not skill:
+            return jsonify({'status': 'error', 'message': 'Skill not found or update failed'}), 404
+        
+        logger.info(f"[skills_api] Updated skill {skill_id} for tenant {tenant_id}")
+        
+        return jsonify({
+            'status': 'success',
+            'data': skill.to_dict(include_content=False)
+        })
+        
+    except Exception as e:
+        logger.error(f"[skills_api] Update skill error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/skills/<int:skill_id>', methods=['DELETE'])
+@login_required
+def delete_skill(skill_id):
+    """删除技能"""
+    try:
+        tenant_id = current_user.tenant_id
+        
+        success = SkillRepository.delete_skill(skill_id, tenant_id)
+        
+        if not success:
+            return jsonify({'status': 'error', 'message': 'Skill not found or delete failed'}), 404
+        
+        logger.info(f"[skills_api] Deleted skill {skill_id} for tenant {tenant_id}")
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Skill deleted successfully'
+        })
+        
+    except Exception as e:
+        logger.error(f"[skills_api] Delete skill error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/skills/<int:skill_id>/subscribe', methods=['POST'])
+@login_required
+def subscribe_skill(skill_id):
+    """订阅技能"""
+    try:
+        tenant_id = current_user.tenant_id
+        data = request.get_json() or {}
+        
+        subscription = SkillRepository.subscribe_skill(
+            tenant_id=tenant_id,
+            skill_id=skill_id,
+            custom_config=data.get('custom_config')
+        )
+        
+        if not subscription:
+            return jsonify({'status': 'error', 'message': 'Subscription failed'}), 400
+        
+        logger.info(f"[skills_api] Subscribed skill {skill_id} for tenant {tenant_id}")
+        
+        return jsonify({
+            'status': 'success',
+            'data': subscription.to_dict()
+        })
+        
+    except Exception as e:
+        logger.error(f"[skills_api] Subscribe skill error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/skills/<int:skill_id>/unsubscribe', methods=['POST'])
+@login_required
+def unsubscribe_skill(skill_id):
+    """取消订阅技能"""
+    try:
+        tenant_id = current_user.tenant_id
+        
+        success = SkillRepository.unsubscribe_skill(tenant_id, skill_id)
+        
+        if not success:
+            return jsonify({'status': 'error', 'message': 'Unsubscription failed'}), 400
+        
+        logger.info(f"[skills_api] Unsubscribed skill {skill_id} for tenant {tenant_id}")
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Unsubscribed successfully'
+        })
+        
+    except Exception as e:
+        logger.error(f"[skills_api] Unsubscribe skill error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/skills/subscriptions', methods=['GET'])
+@login_required
+def list_subscriptions():
+    """获取当前租户的订阅列表"""
+    try:
+        tenant_id = current_user.tenant_id
+        category = request.args.get('category')
+        
+        # 获取已订阅的技能
+        skills = SkillRepository.get_subscribed_skills(tenant_id, category)
+        
+        return jsonify({
+            'status': 'success',
+            'data': [s.to_dict(include_content=False) for s in skills]
+        })
+        
+    except Exception as e:
+        logger.error(f"[skills_api] List subscriptions error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/skills/stats', methods=['GET'])
+@login_required
+def get_skills_stats():
+    """获取技能使用统计"""
+    try:
+        tenant_id = current_user.tenant_id
+        stat_type = request.args.get('type', 'summary')  # summary | top | detail
+        
+        if stat_type == 'summary':
+            # 租户整体统计
+            summary = SkillRepository.get_tenant_usage_summary(tenant_id)
+            return jsonify({
+                'status': 'success',
+                'data': summary
+            })
+            
+        elif stat_type == 'top':
+            # Top技能排行
+            order_by = request.args.get('order_by', 'usage_count')
+            limit = int(request.args.get('limit', 10))
+            
+            top_skills = SkillRepository.get_top_skills(tenant_id, limit, order_by)
+            
+            return jsonify({
+                'status': 'success',
+                'data': [s.to_dict() for s in top_skills]
+            })
+            
+        elif stat_type == 'detail':
+            # 单个技能详细统计
+            skill_id = request.args.get('skill_id', type=int)
+            if not skill_id:
+                return jsonify({'status': 'error', 'message': 'skill_id is required'}), 400
+            
+            stats = SkillRepository.get_skill_stats(tenant_id, skill_id)
+            if not stats:
+                return jsonify({'status': 'error', 'message': 'Stats not found'}), 404
+            
+            return jsonify({
+                'status': 'success',
+                'data': stats
+            })
+            
+        else:
+            return jsonify({'status': 'error', 'message': 'Invalid stat type'}), 400
+        
+    except Exception as e:
+        logger.error(f"[skills_api] Get stats error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/skills/merged', methods=['GET'])
+@login_required
+def get_merged_skills():
+    """获取合并后的技能列表（builtin + custom）"""
+    try:
+        tenant_id = current_user.tenant_id
+        category = request.args.get('category')
+        role = request.args.get('role')
+        include_unsubscribed = request.args.get('include_unsubscribed', 'false').lower() == 'true'
+        
+        loader = SkillLoaderV2()
+        skills = loader.load_all_skills(
+            tenant_id=tenant_id,
+            category=category,
+            role=role,
+            include_unsubscribed_builtin=include_unsubscribed
+        )
+        
+        return jsonify({
+            'status': 'success',
+            'data': [s.to_dict(include_content=False) for s in skills]
+        })
+        
+    except Exception as e:
+        logger.error(f"[skills_api] Get merged skills error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/skills/import/presets', methods=['GET'])
+@login_required
+def get_import_presets():
+    """获取预设Skills列表（Anthropic官方库等）"""
+    try:
+        presets = get_preset_skills()
+        return jsonify({
+            'status': 'success',
+            'data': presets
+        })
+    except Exception as e:
+        logger.error(f"[skills_import] Get presets error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/skills/import/url', methods=['POST'])
+@login_required
+def import_skill_from_url():
+    """从URL导入单个Skill"""
+    try:
+        data = request.get_json()
+        if not data or 'url' not in data:
+            return jsonify({'status': 'error', 'message': 'Missing url parameter'}), 400
+        
+        url = data['url']
+        strict_security = data.get('strict_security', False)
+        
+        # 执行导入
+        importer = SkillImporter()
+        result = importer.import_from_url(url, strict_security)
+        
+        if not result.success:
+            return jsonify({
+                'status': 'error',
+                'message': result.error,
+                'security_issues': result.security_issues
+            }), 400
+        
+        # 创建Skill到数据库
+        tenant_id = current_user.tenant_id
+        skill_repo = SkillRepository()
+        
+        skill = skill_repo.create_skill(
+            tenant_id=tenant_id,
+            name=result.skill_data['name'],
+            description=result.skill_data['description'],
+            content=result.skill_data['content'],
+            category=result.skill_data.get('category', 'custom'),
+            is_builtin=False
+        )
+        
+        logger.info(f"[skills_import] Imported skill '{skill.name}' from {url} (score={result.security_score})")
+        
+        return jsonify({
+            'status': 'success',
+            'data': skill.to_dict(include_content=False),
+            'security_score': result.security_score
+        }), 201
+        
+    except Exception as e:
+        logger.error(f"[skills_import] Import from URL error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/skills/import/batch', methods=['POST'])
+@login_required
+def import_skills_batch():
+    """批量导入Skills"""
+    try:
+        data = request.get_json()
+        if not data or 'urls' not in data:
+            return jsonify({'status': 'error', 'message': 'Missing urls parameter'}), 400
+        
+        urls = data['urls']
+        if not isinstance(urls, list) or len(urls) == 0:
+            return jsonify({'status': 'error', 'message': 'urls must be a non-empty array'}), 400
+        
+        strict_security = data.get('strict_security', False)
+        
+        # 批量导入
+        importer = SkillImporter()
+        results = importer.import_batch(urls, strict_security)
+        
+        # 创建成功的Skills到数据库
+        tenant_id = current_user.tenant_id
+        skill_repo = SkillRepository()
+        created_skills = []
+        errors = []
+        
+        for i, result in enumerate(results):
+            if result.success:
+                try:
+                    skill = skill_repo.create_skill(
+                        tenant_id=tenant_id,
+                        name=result.skill_data['name'],
+                        description=result.skill_data['description'],
+                        content=result.skill_data['content'],
+                        category=result.skill_data.get('category', 'custom'),
+                        is_builtin=False
+                    )
+                    created_skills.append({
+                        'url': urls[i],
+                        'skill': skill.to_dict(include_content=False),
+                        'security_score': result.security_score
+                    })
+                except Exception as e:
+                    errors.append({'url': urls[i], 'error': f"Database error: {str(e)}"})
+            else:
+                errors.append({
+                    'url': urls[i],
+                    'error': result.error,
+                    'security_issues': result.security_issues
+                })
+        
+        logger.info(f"[skills_import] Batch import complete: {len(created_skills)}/{len(urls)} succeeded")
+        
+        return jsonify({
+            'status': 'success',
+            'data': {
+                'created': created_skills,
+                'errors': errors,
+                'summary': {
+                    'total': len(urls),
+                    'succeeded': len(created_skills),
+                    'failed': len(errors)
+                }
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"[skills_import] Batch import error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/user/profile', methods=['GET'])
+@login_required
+def get_user_profile():
+    """获取当前登录用户信息"""
+    try:
+        user_data = {
+            'id': current_user.id,
+            'username': current_user.username,
+            'email': current_user.email,
+            'is_admin': current_user.is_admin,
+            'mfa_enabled': current_user.mfa_enabled,
+            'tenant_id': current_user.tenant_id
+        }
+        
+        return jsonify({
+            'status': 'success',
+            'user': user_data
+        })
+    except Exception as e:
+        logger.error(f"[user_api] Get profile error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 
 # ============================================================
 

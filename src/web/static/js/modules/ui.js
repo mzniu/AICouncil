@@ -1140,6 +1140,42 @@ export function designerGoBack() {
 }
 
 /**
+ * 安全地将值转换为可显示的字符串
+ * @param {any} value - 要转换的值
+ * @returns {string} - 可显示的字符串
+ */
+function safeStringify(value) {
+    if (value === null || value === undefined) {
+        return '';
+    }
+    if (typeof value === 'string') {
+        return value;
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') {
+        return String(value);
+    }
+    if (Array.isArray(value)) {
+        // 如果是数组，递归处理每个元素
+        return value.map(item => safeStringify(item)).join(', ');
+    }
+    if (typeof value === 'object') {
+        // 如果是对象，尝试提取关键信息或序列化为JSON
+        // 优先查找常见的"名称"字段
+        if (value.name) return value.name;
+        if (value.title) return value.title;
+        if (value.label) return value.label;
+        if (value.description) return value.description;
+        // 否则返回JSON字符串
+        try {
+            return JSON.stringify(value);
+        } catch (e) {
+            return '[复杂对象]';
+        }
+    }
+    return String(value);
+}
+
+/**
  * 渲染角色预览
  */
 export function renderRolePreview(design) {
@@ -1169,7 +1205,7 @@ export function renderRolePreview(design) {
                 <div class="text-sm text-slate-600">
                     <strong>职责:</strong>
                     <ul class="list-disc list-inside mt-1 space-y-1">
-                        ${stage.responsibilities.map(r => `<li>${r}</li>`).join('')}
+                        ${stage.responsibilities.map(r => `<li>${safeStringify(r)}</li>`).join('')}
                     </ul>
                 </div>
                 <p class="text-xs text-slate-500 mt-2"><strong>输出格式:</strong> ${stage.output_format}</p>
@@ -1193,7 +1229,7 @@ export function renderRolePreview(design) {
                         <h5 class="font-bold text-slate-700 mb-1">${persona.name}</h5>
                         <p class="text-sm text-slate-600 mb-2">${persona.reason}</p>
                         <div class="flex flex-wrap gap-1">
-                            ${persona.traits.map(t => `<span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">${t}</span>`).join('')}
+                            ${persona.traits.map(t => `<span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">${safeStringify(t)}</span>`).join('')}
                         </div>
                     </div>
                 `;

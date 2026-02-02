@@ -366,22 +366,93 @@ SELECT_FRAMEWORK_SCHEMA = {
 
 # ========== 工具注册表 ==========
 
-# 所有可用工具的映射
+# 导入Skills工具
+from src.skills.skill_tools import (
+    get_skill_tool_schemas,
+    execute_skill_tool,
+    format_skill_tool_result_for_llm,
+    SKILL_TOOL_EXECUTORS
+)
+
+# 导入Search工具
+from src.utils.search_tools import (
+    get_search_tool_schemas,
+    execute_search_tool,
+    format_search_tool_result_for_llm,
+    SEARCH_TOOL_EXECUTORS
+)
+
+# 所有可用工具的映射（Meta + Skills + Search）
 AVAILABLE_TOOLS = {
     "list_roles": list_roles,
     "create_role": create_role,
     "select_framework": select_framework,
+    **SKILL_TOOL_EXECUTORS,  # 动态注入Skills工具
+    **SEARCH_TOOL_EXECUTORS  # 动态注入Search工具
 }
 
-# 所有工具的OpenAI Function Calling schemas
-TOOL_SCHEMAS = [
+# 工具分类定义
+_META_TOOL_SCHEMAS = [
     LIST_ROLES_SCHEMA,
     CREATE_ROLE_SCHEMA,
     SELECT_FRAMEWORK_SCHEMA,
 ]
 
+_SKILL_TOOL_SCHEMAS = get_skill_tool_schemas()
+_SEARCH_TOOL_SCHEMAS = get_search_tool_schemas()
 
-# ========== 工具调用执行器 ==========
+# 所有工具schemas（默认包含所有工具，用于Meta-Orchestrator）
+TOOL_SCHEMAS = _META_TOOL_SCHEMAS + _SKILL_TOOL_SCHEMAS + _SEARCH_TOOL_SCHEMAS
+
+
+# ========== 按角色分配工具 ==========
+
+def get_tools_for_role(role_type: str) -> tuple:
+    """
+    根据角色类型返回该角色可用的工具集
+    
+    Args:
+        role_type: 角色类型，可选值：
+            - "meta": Meta-Orchestrator（元协调者）
+            - "leader": Leader（议长）
+            - "planner": Planner（策论家）
+            - "auditor": Auditor（监察官）
+            - "reporter": Reporter（记录员）
+            - "report_auditor": Report Auditor（报告审核官）
+    
+    Returns:
+        (tool_executors: dict, tool_schemas: list)
+        - tool_executors: 该角色可用的工具执行器字典
+        - tool_schemas: 该角色可用的工具schemas列表
+    """
+    role_type = role_type.lower()
+    
+    if role_type == "meta":
+        # Meta-Orchestrator拥有所有工具
+        return AVAILABLE_TOOLS, TOOL_SCHEMAS
+    
+    elif role_type in ["leader", "planner", "auditor"]:
+        # 核心讨论角色：Skills + Search工具
+        executors = {
+            **SKILL_TOOL_EXECUTORS,
+            **SEARCH_TOOL_EXECUTORS
+        }
+        schemas = _SKILL_TOOL_SCHEMAS + _SEARCH_TOOL_SCHEMAS
+        return executors, schemas
+    
+    elif role_type in ["reporter", "report_auditor"]:
+        # 报告角色：仅Search工具（用于事实核查）
+        executors = {**SEARCH_TOOL_EXECUTORS}
+        schemas = _SEARCH_TOOL_SCHEMAS
+        return executors, schemas
+    
+    else:
+        # 未知角色类型，返回空工具集
+        logger.warning(f"Unknown role_type: {role_type}, returning empty tools")
+        return {}, []
+
+
+# ========== 工具调用执行器 ==========# ========== 工具调用执行器 ==========
 
 def execute_tool(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -446,6 +517,15 @@ def format_tool_result_for_llm(tool_name: str, result: Dict[str, Any]) -> str:
     if not result.get("success"):
         return f"❌ 工具 {tool_name} 执行失败: {result.get('error', '未知错误')}"
     
+    # Skills工具特殊处理（委托给skill_tools的formatter）
+    if tool_name in ["list_skills", "use_skill"]:
+        return format_skill_tool_result_for_llm(tool_name, result)
+    
+    # Search工具特殊处理（委托给search_tools的formatter）
+    if tool_name in ["web_search"]:
+        return format_search_tool_result_for_llm(tool_name, result)
+    
+    # Meta工具格式化
     if tool_name == "list_roles":
         roles_count = result.get("total_count", 0)
         roles_summary = "\n".join([
