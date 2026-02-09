@@ -35,53 +35,54 @@ MARKETPLACE_CATEGORIES = [
 ]
 
 # 精选 GitHub 上高质量的 SKILL.md 列表（fallback 数据源）
+# 注意：anthropics/skills 仓库的实际路径是 skills/{name}/SKILL.md
 CURATED_SKILLS = [
     {
-        "name": "code-review",
-        "displayName": "Code Review Assistant",
-        "description": "Systematic code review with security, performance, and maintainability checks",
+        "name": "webapp-testing",
+        "displayName": "Web App Testing",
+        "description": "Comprehensive web application testing with automated browser testing and validation",
         "category": "development",
-        "github_url": "https://raw.githubusercontent.com/anthropics/skills/main/code-review/SKILL.md",
+        "github_url": "https://raw.githubusercontent.com/anthropics/skills/main/skills/webapp-testing/SKILL.md",
         "source": "anthropic"
     },
     {
-        "name": "python-best-practices",
-        "displayName": "Python Best Practices",
-        "description": "Python development best practices including testing, typing, and project structure",
-        "category": "development",
-        "github_url": "https://raw.githubusercontent.com/anthropics/skills/main/python-best-practices/SKILL.md",
+        "name": "frontend-design",
+        "displayName": "Frontend Design",
+        "description": "Create polished frontend designs with modern UI/UX patterns and responsive layouts",
+        "category": "design",
+        "github_url": "https://raw.githubusercontent.com/anthropics/skills/main/skills/frontend-design/SKILL.md",
         "source": "anthropic"
     },
     {
-        "name": "technical-writing",
-        "displayName": "Technical Writing",
-        "description": "Create clear, well-structured technical documentation",
+        "name": "brand-guidelines",
+        "displayName": "Brand Guidelines",
+        "description": "Create and maintain brand guidelines ensuring consistent visual identity",
+        "category": "business",
+        "github_url": "https://raw.githubusercontent.com/anthropics/skills/main/skills/brand-guidelines/SKILL.md",
+        "source": "anthropic"
+    },
+    {
+        "name": "internal-comms",
+        "displayName": "Internal Communications",
+        "description": "Draft professional internal communications, memos, and announcements",
         "category": "writing",
-        "github_url": "https://raw.githubusercontent.com/anthropics/skills/main/technical-writing/SKILL.md",
+        "github_url": "https://raw.githubusercontent.com/anthropics/skills/main/skills/internal-comms/SKILL.md",
         "source": "anthropic"
     },
     {
-        "name": "api-design",
-        "displayName": "API Design",
-        "description": "Design RESTful APIs following best practices and OpenAPI specification",
+        "name": "mcp-builder",
+        "displayName": "MCP Server Builder",
+        "description": "Build Model Context Protocol servers for tool integration and AI agent capabilities",
         "category": "development",
-        "github_url": "https://raw.githubusercontent.com/anthropics/skills/main/api-design/SKILL.md",
+        "github_url": "https://raw.githubusercontent.com/anthropics/skills/main/skills/mcp-builder/SKILL.md",
         "source": "anthropic"
     },
     {
-        "name": "data-analysis",
-        "displayName": "Data Analysis",
-        "description": "Structured data analysis framework with statistical methods and visualization",
-        "category": "data-ai",
-        "github_url": "https://raw.githubusercontent.com/anthropics/skills/main/data-analysis/SKILL.md",
-        "source": "anthropic"
-    },
-    {
-        "name": "security-audit",
-        "displayName": "Security Audit",
-        "description": "Security vulnerability assessment and remediation planning",
-        "category": "devops",
-        "github_url": "https://raw.githubusercontent.com/anthropics/skills/main/security-audit/SKILL.md",
+        "name": "skill-creator",
+        "displayName": "Skill Creator",
+        "description": "Create new Agent Skills with proper structure, metadata, and best practices",
+        "category": "tools",
+        "github_url": "https://raw.githubusercontent.com/anthropics/skills/main/skills/skill-creator/SKILL.md",
         "source": "anthropic"
     },
 ]

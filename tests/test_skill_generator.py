@@ -169,11 +169,11 @@ class TestMarketplaceClient:
         from src.skills.marketplace_client import MarketplaceClient
         client = MarketplaceClient()
 
-        result = client._search_curated('code', '', 1, 20)
+        result = client._search_curated('frontend', '', 1, 20)
         assert len(result['items']) > 0
-        # 应该包含 code-review
+        # 应该包含 frontend-design
         names = [i['name'] for i in result['items']]
-        assert 'code-review' in names
+        assert 'frontend-design' in names
 
     def test_search_curated_by_category(self):
         """测试精选列表搜索 - 分类"""
@@ -190,11 +190,11 @@ class TestMarketplaceClient:
         client = MarketplaceClient()
 
         # 已经是 raw URL
-        raw = "https://raw.githubusercontent.com/anthropics/skills/main/code-review/SKILL.md"
+        raw = "https://raw.githubusercontent.com/anthropics/skills/main/skills/webapp-testing/SKILL.md"
         assert client._to_raw_url(raw) == raw
 
         # blob URL
-        blob = "https://github.com/anthropics/skills/blob/main/code-review/SKILL.md"
+        blob = "https://github.com/anthropics/skills/blob/main/skills/webapp-testing/SKILL.md"
         result = client._to_raw_url(blob)
         assert 'raw.githubusercontent.com' in result
         assert '/blob/' not in result
@@ -232,8 +232,8 @@ Body content here
         from src.skills.marketplace_client import MarketplaceClient
         client = MarketplaceClient()
 
-        name = client._name_from_url("https://raw.githubusercontent.com/anthropics/skills/main/code-review/SKILL.md")
-        assert name == "code-review"
+        name = client._name_from_url("https://raw.githubusercontent.com/anthropics/skills/main/skills/webapp-testing/SKILL.md")
+        assert name == "webapp-testing"
 
         name = client._name_from_url("https://github.com/user/repo/blob/main/my-skill/SKILL.md")
         assert name == "my-skill"
