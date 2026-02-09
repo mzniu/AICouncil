@@ -114,6 +114,18 @@
                     </svg>
                     导入技能
                 </button>
+                <button onclick="switchTab('generate')" id="tab-generate" class="flex-1 py-4 px-6 text-center transition tab-inactive">
+                    <svg class="w-5 h-5 inline-block mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+                    </svg>
+                    AI 生成
+                </button>
+                <button onclick="switchTab('marketplace')" id="tab-marketplace" class="flex-1 py-4 px-6 text-center transition tab-inactive">
+                    <svg class="w-5 h-5 inline-block mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 2a4 4 0 00-4 4v1H5a1 1 0 00-.994.89l-1 9A1 1 0 004 18h12a1 1 0 00.994-1.11l-1-9A1 1 0 0015 7h-1V6a4 4 0 00-4-4zm2 5V6a2 2 0 10-4 0v1h4zm-6 3a1 1 0 112 0 1 1 0 01-2 0zm7-1a1 1 0 100 2 1 1 0 000-2z" clip-rule="evenodd"/>
+                    </svg>
+                    技能市场
+                </button>
             </div>
         </div>
 
@@ -354,6 +366,156 @@
             </div>
         </div>
 
+        <!-- AI生成技能Tab -->
+        <div id="panel-generate" class="tab-panel hidden">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-2">
+                    <svg class="w-6 h-6 inline-block mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+                    </svg>
+                    AI 生成技能
+                </h2>
+                <p class="text-gray-500 text-sm mb-6">描述你需要的分析框架，AI 将自动生成高质量的 SKILL.md</p>
+
+                <!-- 生成表单 -->
+                <div id="generate-form-panel">
+                    <form id="generate-skill-form" class="space-y-5">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">技能主题 *</label>
+                            <input type="text" id="gen-topic" required maxlength="100" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent" placeholder="例如：供应链风险评估、ESG合规分析、竞品技术对比...">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">详细描述 *</label>
+                            <textarea id="gen-description" required rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent" placeholder="描述该技能的分析维度、适用场景和期望输出..."></textarea>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">分类</label>
+                                <select id="gen-category" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                                    <option value="analysis">分析框架</option>
+                                    <option value="policy">政策分析</option>
+                                    <option value="technology">技术评估</option>
+                                    <option value="risk">风险评估</option>
+                                    <option value="finance">财务分析</option>
+                                    <option value="stakeholder">利益相关方</option>
+                                    <option value="other">其他</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">适用角色</label>
+                                <div class="flex flex-wrap gap-3 pt-1">
+                                    <label class="flex items-center"><input type="checkbox" value="策论家" class="gen-role-checkbox w-4 h-4 text-purple-600" checked><span class="ml-2 text-sm">策论家</span></label>
+                                    <label class="flex items-center"><input type="checkbox" value="监察官" class="gen-role-checkbox w-4 h-4 text-purple-600" checked><span class="ml-2 text-sm">监察官</span></label>
+                                    <label class="flex items-center"><input type="checkbox" value="议长" class="gen-role-checkbox w-4 h-4 text-purple-600"><span class="ml-2 text-sm">议长</span></label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end">
+                            <button type="submit" id="gen-submit-btn" class="px-8 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition font-medium">
+                                <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                </svg>
+                                开始生成
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- 生成进度 -->
+                <div id="generate-progress" class="hidden text-center py-12">
+                    <div class="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600"></div>
+                    <p class="text-gray-600 mt-4 text-lg">AI 正在生成技能，请稍候...</p>
+                    <p class="text-gray-400 text-sm mt-2">通常需要 15-30 秒</p>
+                </div>
+
+                <!-- 生成预览 -->
+                <div id="generate-preview" class="hidden">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold text-gray-800">生成预览</h3>
+                        <div class="flex items-center space-x-3">
+                            <span id="gen-security-badge" class="text-sm px-3 py-1 rounded-full bg-green-100 text-green-700"></span>
+                            <span id="gen-time-badge" class="text-sm text-gray-500"></span>
+                        </div>
+                    </div>
+
+                    <!-- 编辑/预览切换 -->
+                    <div class="flex border-b border-gray-200 mb-4">
+                        <button onclick="switchGenView('edit')" id="gen-view-edit" class="px-4 py-2 font-medium text-purple-600 border-b-2 border-purple-600">编辑</button>
+                        <button onclick="switchGenView('preview')" id="gen-view-preview" class="px-4 py-2 font-medium text-gray-500 hover:text-gray-700">预览</button>
+                    </div>
+
+                    <div id="gen-edit-panel">
+                        <textarea id="gen-skill-md" rows="20" class="w-full px-4 py-3 border border-gray-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-purple-600 focus:border-transparent"></textarea>
+                    </div>
+                    <div id="gen-preview-panel" class="hidden">
+                        <div id="gen-preview-content" class="markdown-preview border border-gray-300 rounded-lg p-6 bg-gray-50 min-h-[300px]"></div>
+                    </div>
+
+                    <div class="mt-6 flex justify-between">
+                        <button onclick="resetGenerate()" class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition">
+                            重新生成
+                        </button>
+                        <button onclick="confirmGeneratedSkill()" id="gen-confirm-btn" class="px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium">
+                            <svg class="w-5 h-5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            确认保存
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 技能市场Tab -->
+        <div id="panel-marketplace" class="tab-panel hidden">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-2">
+                    <svg class="w-6 h-6 inline-block mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 2a4 4 0 00-4 4v1H5a1 1 0 00-.994.89l-1 9A1 1 0 004 18h12a1 1 0 00.994-1.11l-1-9A1 1 0 0015 7h-1V6a4 4 0 00-4-4zm2 5V6a2 2 0 10-4 0v1h4zm-6 3a1 1 0 112 0 1 1 0 01-2 0zm7-1a1 1 0 100 2 1 1 0 000-2z" clip-rule="evenodd"/>
+                    </svg>
+                    技能市场
+                </h2>
+                <p class="text-gray-500 text-sm mb-6">从 GitHub 开源社区浏览和导入高质量的 Agent Skills</p>
+
+                <!-- 搜索栏 -->
+                <div class="mb-6 flex flex-col md:flex-row gap-4">
+                    <div class="flex-1">
+                        <input type="text" id="mp-search" placeholder="搜索技能..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                    </div>
+                    <select id="mp-category" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                        <option value="">全部分类</option>
+                    </select>
+                    <button onclick="searchMarketplace()" class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                        搜索
+                    </button>
+                </div>
+
+                <!-- 加载状态 -->
+                <div id="mp-loading" class="hidden text-center py-12">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                    <p class="text-gray-600 mt-4">搜索中...</p>
+                </div>
+
+                <!-- 结果列表 -->
+                <div id="mp-results" class="space-y-4">
+                    <!-- 初始提示 -->
+                    <div id="mp-initial" class="text-center py-12 text-gray-400">
+                        <svg class="w-16 h-16 mx-auto mb-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/>
+                        </svg>
+                        <p>输入关键词搜索社区技能，或选择分类浏览</p>
+                    </div>
+                </div>
+
+                <!-- 分页 -->
+                <div id="mp-pagination" class="hidden mt-6 flex justify-center items-center space-x-2">
+                </div>
+            </div>
+        </div>
+
         <!-- 导入技能Tab -->
         <div id="panel-import" class="tab-panel hidden">
             <div class="bg-white rounded-lg shadow-md p-6">
@@ -574,6 +736,8 @@
                 loadStats();
             } else if (tabName === 'import') {
                 loadImportPresets();
+            } else if (tabName === 'marketplace') {
+                loadMarketplaceCategories();
             }
         }
 
@@ -1421,6 +1585,273 @@
             list.appendChild(summary);
 
             results.classList.remove('hidden');
+        }
+
+        // ====== AI 生成技能 ======
+
+        document.getElementById('generate-skill-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            generateSkill();
+        });
+
+        async function generateSkill() {
+            const topic = document.getElementById('gen-topic').value.trim();
+            const description = document.getElementById('gen-description').value.trim();
+            const category = document.getElementById('gen-category').value;
+            const roles = Array.from(document.querySelectorAll('.gen-role-checkbox:checked')).map(cb => cb.value);
+
+            if (!topic || !description) {
+                showError('请填写主题和描述');
+                return;
+            }
+
+            // 显示进度
+            document.getElementById('generate-form-panel').classList.add('hidden');
+            document.getElementById('generate-progress').classList.remove('hidden');
+            document.getElementById('generate-preview').classList.add('hidden');
+
+            try {
+                const resp = await fetch('/api/skills/generate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        topic, description, category,
+                        applicable_roles: roles
+                    })
+                });
+                const data = await resp.json();
+
+                document.getElementById('generate-progress').classList.add('hidden');
+
+                if (data.status === 'success') {
+                    // 显示预览
+                    document.getElementById('gen-skill-md').value = data.data.skill_md;
+                    document.getElementById('gen-security-badge').textContent =
+                        `安全: ${data.data.security_score}/100`;
+                    document.getElementById('gen-time-badge').textContent =
+                        `耗时: ${data.data.generation_time.toFixed(1)}s`;
+                    document.getElementById('generate-preview').classList.remove('hidden');
+                    switchGenView('edit');
+                } else {
+                    showError('生成失败: ' + (data.message || '未知错误'));
+                    document.getElementById('generate-form-panel').classList.remove('hidden');
+                }
+            } catch (err) {
+                document.getElementById('generate-progress').classList.add('hidden');
+                document.getElementById('generate-form-panel').classList.remove('hidden');
+                showError('网络错误: ' + err.message);
+            }
+        }
+
+        function switchGenView(view) {
+            if (view === 'edit') {
+                document.getElementById('gen-edit-panel').classList.remove('hidden');
+                document.getElementById('gen-preview-panel').classList.add('hidden');
+                document.getElementById('gen-view-edit').className = 'px-4 py-2 font-medium text-purple-600 border-b-2 border-purple-600';
+                document.getElementById('gen-view-preview').className = 'px-4 py-2 font-medium text-gray-500 hover:text-gray-700';
+            } else {
+                const md = document.getElementById('gen-skill-md').value;
+                document.getElementById('gen-preview-content').innerHTML = marked.parse(md);
+                document.getElementById('gen-edit-panel').classList.add('hidden');
+                document.getElementById('gen-preview-panel').classList.remove('hidden');
+                document.getElementById('gen-view-edit').className = 'px-4 py-2 font-medium text-gray-500 hover:text-gray-700';
+                document.getElementById('gen-view-preview').className = 'px-4 py-2 font-medium text-purple-600 border-b-2 border-purple-600';
+            }
+        }
+
+        function resetGenerate() {
+            document.getElementById('generate-preview').classList.add('hidden');
+            document.getElementById('generate-form-panel').classList.remove('hidden');
+        }
+
+        async function confirmGeneratedSkill() {
+            const skillMd = document.getElementById('gen-skill-md').value.trim();
+            if (!skillMd) {
+                showError('内容为空');
+                return;
+            }
+
+            const btn = document.getElementById('gen-confirm-btn');
+            btn.disabled = true;
+            btn.textContent = '保存中...';
+
+            try {
+                const resp = await fetch('/api/skills/generate/confirm', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({skill_md: skillMd})
+                });
+                const data = await resp.json();
+
+                if (data.status === 'success') {
+                    showSuccess('技能已保存！');
+                    // 重置并跳转到技能库
+                    document.getElementById('gen-topic').value = '';
+                    document.getElementById('gen-description').value = '';
+                    document.getElementById('generate-preview').classList.add('hidden');
+                    document.getElementById('generate-form-panel').classList.remove('hidden');
+                    switchTab('browse');
+                } else {
+                    showError('保存失败: ' + (data.message || '未知错误'));
+                }
+            } catch (err) {
+                showError('网络错误: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<svg class="w-5 h-5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> 确认保存';
+            }
+        }
+
+        // ====== 技能市场 ======
+
+        let mpCategoriesLoaded = false;
+
+        function loadMarketplaceCategories() {
+            if (mpCategoriesLoaded) return;
+            fetch('/api/skills/marketplace/categories')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        const select = document.getElementById('mp-category');
+                        data.data.forEach(cat => {
+                            const opt = document.createElement('option');
+                            opt.value = cat.id;
+                            opt.textContent = `${cat.name} (${cat.count ? cat.count.toLocaleString() : ''})`;
+                            select.appendChild(opt);
+                        });
+                        mpCategoriesLoaded = true;
+                    }
+                })
+                .catch(() => {});
+        }
+
+        // 搜索框回车
+        document.getElementById('mp-search').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') searchMarketplace();
+        });
+
+        async function searchMarketplace(page = 1) {
+            const query = document.getElementById('mp-search').value.trim();
+            const category = document.getElementById('mp-category').value;
+
+            if (!query && !category) {
+                showError('请输入搜索关键词或选择分类');
+                return;
+            }
+
+            document.getElementById('mp-initial').classList.add('hidden');
+            document.getElementById('mp-loading').classList.remove('hidden');
+            document.getElementById('mp-pagination').classList.add('hidden');
+
+            // 移除已有的结果卡片
+            document.querySelectorAll('#mp-results .mp-result-card').forEach(el => el.remove());
+
+            try {
+                const params = new URLSearchParams({page, page_size: 12});
+                if (query) params.append('q', query);
+                if (category) params.append('category', category);
+
+                const resp = await fetch(`/api/skills/marketplace/search?${params}`);
+                const data = await resp.json();
+                document.getElementById('mp-loading').classList.add('hidden');
+
+                if (data.status === 'success' && data.data.items.length > 0) {
+                    displayMarketplaceResults(data.data);
+                } else if (data.status === 'success') {
+                    document.getElementById('mp-initial').classList.remove('hidden');
+                    document.getElementById('mp-initial').querySelector('p').textContent = '未找到相关技能';
+                } else {
+                    showError('搜索失败: ' + (data.message || ''));
+                }
+            } catch (err) {
+                document.getElementById('mp-loading').classList.add('hidden');
+                showError('网络错误: ' + err.message);
+            }
+        }
+
+        function displayMarketplaceResults(data) {
+            const container = document.getElementById('mp-results');
+            const items = data.items || [];
+            const source = data.source;
+
+            items.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'mp-result-card flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:shadow-md transition';
+                card.innerHTML = `
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
+                            <h4 class="font-medium text-gray-900 truncate">${escapeHtml(item.displayName || item.name)}</h4>
+                            <span class="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">${escapeHtml(source)}</span>
+                            ${item.stars ? `<span class="text-xs text-yellow-600">★ ${item.stars}</span>` : ''}
+                        </div>
+                        <p class="text-sm text-gray-500 mt-1 truncate">${escapeHtml(item.description || '')}</p>
+                        ${item.category ? `<span class="text-xs text-purple-600 mt-1 inline-block">${escapeHtml(item.category)}</span>` : ''}
+                    </div>
+                    <button onclick="importFromMarketplace('${escapeHtml(item.github_url || '')}', '${escapeHtml(item.slug || '')}')"
+                        class="ml-4 px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition whitespace-nowrap">
+                        导入
+                    </button>
+                `;
+                container.appendChild(card);
+            });
+
+            // 分页
+            if (data.total > data.page_size) {
+                const totalPages = Math.ceil(data.total / data.page_size);
+                const pag = document.getElementById('mp-pagination');
+                pag.innerHTML = '';
+                for (let i = 1; i <= Math.min(totalPages, 10); i++) {
+                    const btn = document.createElement('button');
+                    btn.textContent = i;
+                    btn.className = `px-3 py-1 rounded ${i === data.page ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`;
+                    btn.onclick = () => searchMarketplace(i);
+                    pag.appendChild(btn);
+                }
+                pag.classList.remove('hidden');
+            }
+        }
+
+        async function importFromMarketplace(githubUrl, slug) {
+            if (!githubUrl && !slug) {
+                showError('无法获取技能的下载地址');
+                return;
+            }
+
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = '导入中...';
+
+            try {
+                const resp = await fetch('/api/skills/marketplace/import', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({github_url: githubUrl, slug: slug})
+                });
+                const data = await resp.json();
+
+                if (data.status === 'success') {
+                    btn.textContent = '✓ 已导入';
+                    btn.className = btn.className.replace('bg-purple-600', 'bg-green-600').replace('hover:bg-purple-700', '');
+                    showSuccess(`已导入技能: ${data.data.name || ''}`);
+                } else {
+                    showError('导入失败: ' + (data.message || ''));
+                    btn.disabled = false;
+                    btn.textContent = '导入';
+                }
+            } catch (err) {
+                showError('网络错误: ' + err.message);
+                btn.disabled = false;
+                btn.textContent = '导入';
+            }
+        }
+
+        function showSuccess(msg) {
+            // 复用showError的逻辑但用绿色
+            const toast = document.createElement('div');
+            toast.className = 'fixed top-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 transition-opacity';
+            toast.textContent = msg;
+            document.body.appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
         }
     </script>
 </body>

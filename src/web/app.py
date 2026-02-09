@@ -3030,6 +3030,261 @@ def import_skills_batch():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
+# ====== AI Skill Generator ======
+
+@app.route('/api/skills/generate', methods=['POST'])
+@login_required
+def generate_skill():
+    """AI生成Skill - 返回预览内容，不自动保存"""
+    try:
+        data = request.get_json()
+        if not data or not data.get('topic') or not data.get('description'):
+            return jsonify({'status': 'error', 'message': 'topic and description are required'}), 400
+
+        topic = data['topic'].strip()
+        description = data['description'].strip()
+        category = data.get('category', 'analysis')
+        applicable_roles = data.get('applicable_roles', ['策论家', '监察官'])
+        backend = data.get('backend')  # 可选覆盖后端
+        model = data.get('model')      # 可选覆盖模型
+
+        # 获取参考skill（可选）
+        reference_skills = []
+        ref_ids = data.get('reference_skill_ids', [])
+        if ref_ids:
+            tenant_id = current_user.tenant_id
+            for sid in ref_ids[:2]:
+                try:
+                    skill = SkillRepository.get_skill_by_id(sid, tenant_id)
+                    if skill:
+                        reference_skills.append({
+                            'name': skill.display_name or skill.name,
+                            'content': skill.content
+                        })
+                except Exception:
+                    pass
+
+        from src.skills.skill_generator import SkillGenerator
+        generator = SkillGenerator(
+            backend=backend or getattr(config, 'DEFAULT_BACKEND', 'deepseek'),
+            model=model,
+            timeout=120
+        )
+        result = generator.generate(
+            topic=topic,
+            description=description,
+            category=category,
+            applicable_roles=applicable_roles,
+            reference_skills=reference_skills if reference_skills else None
+        )
+
+        if not result.success:
+            return jsonify({
+                'status': 'error',
+                'message': result.error,
+                'skill_md': result.skill_md  # 可能有部分内容供调试
+            }), 400
+
+        logger.info(f"[skills_generate] Generated skill for topic='{topic}', "
+                    f"security={result.security_score}, time={result.generation_time:.1f}s")
+
+        return jsonify({
+            'status': 'success',
+            'data': {
+                'skill_md': result.skill_md,
+                'skill_data': result.skill_data,
+                'security_score': result.security_score,
+                'generation_time': result.generation_time
+            }
+        }), 200
+
+    except Exception as e:
+        logger.error(f"[skills_generate] Error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/skills/generate/confirm', methods=['POST'])
+@login_required
+def confirm_generated_skill():
+    """确认保存AI生成的Skill到数据库（用户可能已编辑过skill_md）"""
+    try:
+        tenant_id = current_user.tenant_id
+        data = request.get_json()
+
+        skill_md = data.get('skill_md', '').strip()
+        if not skill_md:
+            return jsonify({'status': 'error', 'message': 'skill_md is required'}), 400
+
+        # 安全扫描
+        scan_result = scan_skill_content(skill_md, strict_mode=False)
+        if not scan_result.is_safe:
+            return jsonify({
+                'status': 'error',
+                'message': 'Content failed security check',
+                'security_issues': scan_result.to_dict()
+            }), 400
+
+        # 解析frontmatter
+        from src.skills.skill_generator import SkillGenerator
+        generator = SkillGenerator()
+        skill_data = generator._parse_frontmatter(skill_md)
+
+        name = skill_data.get('name', '')
+        if not name:
+            return jsonify({'status': 'error', 'message': 'Skill name not found in frontmatter'}), 400
+
+        # 提取body作为content
+        body = skill_data.get('content', '')
+
+        # 创建到数据库
+        skill = SkillRepository.create_skill(
+            tenant_id=tenant_id,
+            name=name,
+            display_name=skill_data.get('displayName', name),
+            content=skill_md,
+            version=skill_data.get('version', '1.0.0'),
+            category=skill_data.get('category', 'custom'),
+            tags=skill_data.get('tags', []) if isinstance(skill_data.get('tags'), list) else [],
+            description=skill_data.get('description', ''),
+            applicable_roles=skill_data.get('applicable_roles', []) if isinstance(skill_data.get('applicable_roles'), list) else [],
+            author=skill_data.get('author', current_user.username),
+            requirements=skill_data.get('requirements') if isinstance(skill_data.get('requirements'), dict) else None,
+            is_builtin=False
+        )
+
+        if not skill:
+            return jsonify({'status': 'error', 'message': 'Failed to save skill (duplicate name?)'}), 400
+
+        logger.info(f"[skills_generate] Confirmed and saved skill '{name}' for tenant {tenant_id}")
+
+        return jsonify({
+            'status': 'success',
+            'data': skill.to_dict(include_content=False),
+            'security_score': scan_result.security_score
+        }), 201
+
+    except Exception as e:
+        logger.error(f"[skills_generate] Confirm error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+# ====== Skill Marketplace ======
+
+@app.route('/api/skills/marketplace/search', methods=['GET'])
+@login_required
+def marketplace_search():
+    """搜索Skill Marketplace"""
+    try:
+        query = request.args.get('q', '').strip()
+        category = request.args.get('category', '')
+        page = int(request.args.get('page', 1))
+        page_size = min(int(request.args.get('page_size', 20)), 50)
+
+        if not query and not category:
+            return jsonify({'status': 'error', 'message': 'Query or category is required'}), 400
+
+        from src.skills.marketplace_client import MarketplaceClient
+        client = MarketplaceClient()
+        results = client.search(query=query, category=category, page=page, page_size=page_size)
+
+        return jsonify({
+            'status': 'success',
+            'data': results
+        }), 200
+
+    except Exception as e:
+        logger.error(f"[marketplace] Search error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/skills/marketplace/import', methods=['POST'])
+@login_required
+def marketplace_import():
+    """从Marketplace导入Skill"""
+    try:
+        tenant_id = current_user.tenant_id
+        data = request.get_json()
+
+        github_url = data.get('github_url', '').strip()
+        slug = data.get('slug', '').strip()
+
+        if not github_url and not slug:
+            return jsonify({'status': 'error', 'message': 'github_url or slug is required'}), 400
+
+        from src.skills.marketplace_client import MarketplaceClient
+        client = MarketplaceClient()
+
+        # 通过slug重建GitHub URL或直接用提供的URL
+        if not github_url and slug:
+            github_url = client.reconstruct_github_url(slug)
+            if not github_url:
+                return jsonify({'status': 'error', 'message': f'Cannot reconstruct URL from slug: {slug}'}), 400
+
+        # 下载并解析
+        result = client.import_skill(github_url)
+        if not result.get('success'):
+            return jsonify({'status': 'error', 'message': result.get('error', 'Import failed')}), 400
+
+        skill_md = result['skill_md']
+        skill_data = result['skill_data']
+
+        # 安全扫描
+        scan_result = scan_skill_content(skill_md, strict_mode=False)
+        if not scan_result.is_safe:
+            return jsonify({
+                'status': 'error',
+                'message': 'Content failed security check',
+                'security_issues': scan_result.to_dict(),
+                'skill_md': skill_md  # 仍返回内容供用户查看
+            }), 400
+
+        # 保存到数据库
+        skill = SkillRepository.create_skill(
+            tenant_id=tenant_id,
+            name=skill_data.get('name', ''),
+            display_name=skill_data.get('displayName', skill_data.get('name', '')),
+            content=skill_md,
+            version=skill_data.get('version', '1.0.0'),
+            category=skill_data.get('category', 'custom'),
+            tags=skill_data.get('tags', []) if isinstance(skill_data.get('tags'), list) else [],
+            description=skill_data.get('description', ''),
+            applicable_roles=skill_data.get('applicable_roles', []) if isinstance(skill_data.get('applicable_roles'), list) else [],
+            author=skill_data.get('author', 'marketplace'),
+            requirements=skill_data.get('requirements') if isinstance(skill_data.get('requirements'), dict) else None,
+            is_builtin=False
+        )
+
+        if not skill:
+            return jsonify({'status': 'error', 'message': 'Failed to save skill (duplicate name?)'}), 400
+
+        logger.info(f"[marketplace] Imported skill '{skill_data.get('name')}' from {github_url}")
+
+        return jsonify({
+            'status': 'success',
+            'data': skill.to_dict(include_content=False),
+            'security_score': scan_result.security_score,
+            'source_url': github_url
+        }), 201
+
+    except Exception as e:
+        logger.error(f"[marketplace] Import error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/skills/marketplace/categories', methods=['GET'])
+@login_required
+def marketplace_categories():
+    """获取Marketplace技能分类"""
+    try:
+        from src.skills.marketplace_client import MarketplaceClient
+        client = MarketplaceClient()
+        categories = client.get_categories()
+        return jsonify({'status': 'success', 'data': categories}), 200
+    except Exception as e:
+        logger.error(f"[marketplace] Categories error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
 @app.route('/api/user/profile', methods=['GET'])
 @login_required
 def get_user_profile():
