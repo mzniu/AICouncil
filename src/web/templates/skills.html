@@ -488,6 +488,15 @@
                     <select id="mp-category" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
                         <option value="">全部分类</option>
                     </select>
+                    <!-- 搜索模式切换 -->
+                    <div class="flex rounded-lg border border-gray-300 overflow-hidden">
+                        <button id="mp-mode-keyword" onclick="setSearchMode('keyword')" class="px-4 py-2 text-sm font-medium bg-purple-600 text-white transition">
+                            🔍 关键词
+                        </button>
+                        <button id="mp-mode-ai" onclick="setSearchMode('ai')" class="px-4 py-2 text-sm font-medium bg-white text-gray-600 hover:bg-gray-50 transition">
+                            🤖 智能搜索
+                        </button>
+                    </div>
                     <button onclick="searchMarketplace()" class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
                         搜索
                     </button>
@@ -533,6 +542,12 @@
                     </button>
                     <button onclick="switchImportMode('custom')" id="import-mode-custom" class="px-6 py-3 font-medium text-gray-500 hover:text-gray-700">
                         自定义URL导入
+                    </button>
+                    <button onclick="switchImportMode('pdf')" id="import-mode-pdf" class="px-6 py-3 font-medium text-gray-500 hover:text-gray-700">
+                        <svg class="w-4 h-4 inline-block mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/>
+                        </svg>
+                        PDF 上传
                     </button>
                 </div>
 
@@ -607,6 +622,130 @@
                         <button onclick="importFromBatchUrls()" class="mt-3 w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium">
                             批量导入
                         </button>
+                    </div>
+                </div>
+
+                <!-- PDF上传导入 -->
+                <div id="import-pdf-panel" class="hidden">
+                    <p class="text-gray-600 mb-4">
+                        上传专业文档、论文、技术手册等 PDF 文件，AI 将自动提取知识并生成结构化的分析框架技能
+                    </p>
+
+                    <!-- PDF上传表单 -->
+                    <div id="pdf-upload-form">
+                        <!-- 拖拽上传区域 -->
+                        <div id="pdf-drop-zone" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-purple-400 transition cursor-pointer mb-5"
+                             onclick="document.getElementById('pdf-file-input').click()"
+                             ondragover="event.preventDefault(); this.classList.add('border-purple-500', 'bg-purple-50');"
+                             ondragleave="this.classList.remove('border-purple-500', 'bg-purple-50');"
+                             ondrop="handlePdfDrop(event)">
+                            <svg class="w-12 h-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                            </svg>
+                            <p class="text-gray-600 text-lg" id="pdf-file-label">拖拽文件到此处，或 <span class="text-purple-600 font-medium">点击上传</span></p>
+                            <p class="text-gray-400 text-sm mt-1">支持 PDF 格式，最大 20MB</p>
+                            <input type="file" id="pdf-file-input" accept=".pdf" class="hidden" onchange="handlePdfFileSelect(this)">
+                        </div>
+
+                        <!-- 选中文件信息 -->
+                        <div id="pdf-file-info" class="hidden mb-5 p-3 bg-gray-50 rounded-lg flex items-center justify-between">
+                            <div class="flex items-center">
+                                <svg class="w-8 h-8 text-red-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/>
+                                </svg>
+                                <div>
+                                    <p id="pdf-file-name" class="font-medium text-gray-800"></p>
+                                    <p id="pdf-file-size" class="text-sm text-gray-500"></p>
+                                </div>
+                            </div>
+                            <button onclick="clearPdfFile()" class="text-gray-400 hover:text-red-500">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <!-- 配置选项 -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">生成模式</label>
+                                <div class="flex gap-4">
+                                    <label class="flex items-center"><input type="radio" name="pdf-mode" value="auto" checked class="w-4 h-4 text-purple-600"><span class="ml-2 text-sm">自动</span></label>
+                                    <label class="flex items-center"><input type="radio" name="pdf-mode" value="single" class="w-4 h-4 text-purple-600"><span class="ml-2 text-sm">单个技能</span></label>
+                                    <label class="flex items-center"><input type="radio" name="pdf-mode" value="multi" class="w-4 h-4 text-purple-600"><span class="ml-2 text-sm">多个技能</span></label>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">分类</label>
+                                <select id="pdf-category" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent text-sm">
+                                    <option value="analysis">分析框架</option>
+                                    <option value="policy">政策分析</option>
+                                    <option value="technology">技术评估</option>
+                                    <option value="risk">风险评估</option>
+                                    <option value="finance">财务分析</option>
+                                    <option value="other">其他</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">主题提示（可选）</label>
+                                <input type="text" id="pdf-topic-hint" maxlength="100" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent text-sm" placeholder="例如：供应链管理、风险评估...">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">适用角色</label>
+                                <div class="flex flex-wrap gap-3 pt-1">
+                                    <label class="flex items-center"><input type="checkbox" value="策论家" class="pdf-role-checkbox w-4 h-4 text-purple-600" checked><span class="ml-2 text-sm">策论家</span></label>
+                                    <label class="flex items-center"><input type="checkbox" value="监察官" class="pdf-role-checkbox w-4 h-4 text-purple-600" checked><span class="ml-2 text-sm">监察官</span></label>
+                                    <label class="flex items-center"><input type="checkbox" value="议长" class="pdf-role-checkbox w-4 h-4 text-purple-600"><span class="ml-2 text-sm">议长</span></label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button onclick="uploadAndGeneratePdfSkills()" id="pdf-upload-btn" class="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition font-medium disabled:opacity-50" disabled>
+                            <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                            </svg>
+                            上传并生成技能
+                        </button>
+                    </div>
+
+                    <!-- PDF处理进度 -->
+                    <div id="pdf-progress" class="hidden text-center py-10">
+                        <div class="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600"></div>
+                        <p class="text-gray-600 mt-4 text-lg" id="pdf-progress-text">正在提取 PDF 内容...</p>
+                        <p class="text-gray-400 text-sm mt-2">根据文档大小和生成模式，可能需要 30秒 - 2分钟</p>
+                    </div>
+
+                    <!-- PDF生成结果（多技能预览） -->
+                    <div id="pdf-results" class="hidden">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-bold text-gray-800">
+                                生成结果
+                                <span id="pdf-result-count" class="text-sm font-normal text-gray-500 ml-2"></span>
+                            </h3>
+                            <div class="flex items-center space-x-3">
+                                <span id="pdf-info-badge" class="text-sm text-gray-500"></span>
+                                <span id="pdf-time-badge" class="text-sm text-gray-500"></span>
+                            </div>
+                        </div>
+
+                        <div id="pdf-skills-list" class="space-y-4 mb-6">
+                            <!-- 技能卡片由 JS 动态生成 -->
+                        </div>
+
+                        <div class="flex justify-between">
+                            <button onclick="resetPdfUpload()" class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition">
+                                重新上传
+                            </button>
+                            <button onclick="saveAllPdfSkills()" id="pdf-save-all-btn" class="px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium">
+                                <svg class="w-5 h-5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                全部保存
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -1223,30 +1362,38 @@
         let selectedPresets = new Set();
         let currentImportMode = 'presets';
 
-        // 切换导入模式（预设 vs 自定义URL）
+        // 切换导入模式（预设 vs 自定义URL vs PDF上传）
         function switchImportMode(mode) {
             currentImportMode = mode;
             
-            // 更新按钮样式
-            const presetsBtn = document.getElementById('import-mode-presets');
-            const customBtn = document.getElementById('import-mode-custom');
+            // 所有按钮和面板
+            const buttons = {
+                presets: document.getElementById('import-mode-presets'),
+                custom: document.getElementById('import-mode-custom'),
+                pdf: document.getElementById('import-mode-pdf')
+            };
+            const panels = {
+                presets: document.getElementById('import-presets-panel'),
+                custom: document.getElementById('import-custom-panel'),
+                pdf: document.getElementById('import-pdf-panel')
+            };
             
-            if (mode === 'presets') {
-                presetsBtn.classList.add('text-purple-600', 'border-b-2', 'border-purple-600');
-                presetsBtn.classList.remove('text-gray-500');
-                customBtn.classList.remove('text-purple-600', 'border-b-2', 'border-purple-600');
-                customBtn.classList.add('text-gray-500');
-                
-                document.getElementById('import-presets-panel').classList.remove('hidden');
-                document.getElementById('import-custom-panel').classList.add('hidden');
-            } else {
-                customBtn.classList.add('text-purple-600', 'border-b-2', 'border-purple-600');
-                customBtn.classList.remove('text-gray-500');
-                presetsBtn.classList.remove('text-purple-600', 'border-b-2', 'border-purple-600');
-                presetsBtn.classList.add('text-gray-500');
-                
-                document.getElementById('import-custom-panel').classList.remove('hidden');
-                document.getElementById('import-presets-panel').classList.add('hidden');
+            // 更新样式
+            for (const [key, btn] of Object.entries(buttons)) {
+                if (key === mode) {
+                    btn.classList.add('text-purple-600', 'border-b-2', 'border-purple-600');
+                    btn.classList.remove('text-gray-500');
+                } else {
+                    btn.classList.remove('text-purple-600', 'border-b-2', 'border-purple-600');
+                    btn.classList.add('text-gray-500');
+                }
+            }
+            for (const [key, panel] of Object.entries(panels)) {
+                if (key === mode) {
+                    panel.classList.remove('hidden');
+                } else {
+                    panel.classList.add('hidden');
+                }
             }
         }
 
@@ -1730,6 +1877,21 @@
             if (e.key === 'Enter') searchMarketplace();
         });
 
+        let mpSearchMode = 'keyword';  // keyword | ai
+
+        function setSearchMode(mode) {
+            mpSearchMode = mode;
+            const btnKeyword = document.getElementById('mp-mode-keyword');
+            const btnAi = document.getElementById('mp-mode-ai');
+            if (mode === 'ai') {
+                btnAi.className = 'px-4 py-2 text-sm font-medium bg-purple-600 text-white transition';
+                btnKeyword.className = 'px-4 py-2 text-sm font-medium bg-white text-gray-600 hover:bg-gray-50 transition';
+            } else {
+                btnKeyword.className = 'px-4 py-2 text-sm font-medium bg-purple-600 text-white transition';
+                btnAi.className = 'px-4 py-2 text-sm font-medium bg-white text-gray-600 hover:bg-gray-50 transition';
+            }
+        }
+
         async function searchMarketplace(page = 1) {
             const query = document.getElementById('mp-search').value.trim();
             const category = document.getElementById('mp-category').value;
@@ -1747,7 +1909,7 @@
             document.querySelectorAll('#mp-results .mp-result-card').forEach(el => el.remove());
 
             try {
-                const params = new URLSearchParams({page, page_size: 12});
+                const params = new URLSearchParams({page, page_size: 12, mode: mpSearchMode});
                 if (query) params.append('q', query);
                 if (category) params.append('category', category);
 
@@ -1773,19 +1935,45 @@
             const container = document.getElementById('mp-results');
             const items = data.items || [];
             const source = data.source;
+            const isAI = source === 'skillsmp_ai';
 
             items.forEach(item => {
                 const card = document.createElement('div');
                 card.className = 'mp-result-card flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:shadow-md transition';
+
+                // 来源标签颜色
+                const sourceBadge = source === 'skillsmp' ? 'bg-purple-100 text-purple-700'
+                    : source === 'skillsmp_ai' ? 'bg-blue-100 text-blue-700'
+                    : source === 'github' ? 'bg-gray-100 text-gray-600'
+                    : 'bg-green-100 text-green-700';
+                const sourceLabel = source === 'skillsmp_ai' ? 'AI匹配' : escapeHtml(source);
+
+                // 星标
+                const starsHtml = item.stars ? `<span class="text-xs text-yellow-600">★ ${Number(item.stars).toLocaleString()}</span>` : '';
+
+                // AI相关度分数
+                const scoreHtml = isAI && item.score ? `<span class="text-xs px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded-full">相关度 ${(item.score * 100).toFixed(0)}%</span>` : '';
+
+                // 作者
+                const authorHtml = item.author ? `<span class="text-xs text-gray-400">by ${escapeHtml(item.author)}</span>` : '';
+
+                // 更新时间
+                const dateHtml = item.updated_at ? `<span class="text-xs text-gray-400">${new Date(item.updated_at).toLocaleDateString()}</span>` : '';
+
                 card.innerHTML = `
                     <div class="flex-1 min-w-0">
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
                             <h4 class="font-medium text-gray-900 truncate">${escapeHtml(item.displayName || item.name)}</h4>
-                            <span class="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">${escapeHtml(source)}</span>
-                            ${item.stars ? `<span class="text-xs text-yellow-600">★ ${item.stars}</span>` : ''}
+                            <span class="text-xs px-2 py-0.5 ${sourceBadge} rounded">${sourceLabel}</span>
+                            ${starsHtml}
+                            ${scoreHtml}
                         </div>
                         <p class="text-sm text-gray-500 mt-1 truncate">${escapeHtml(item.description || '')}</p>
-                        ${item.category ? `<span class="text-xs text-purple-600 mt-1 inline-block">${escapeHtml(item.category)}</span>` : ''}
+                        <div class="flex items-center gap-3 mt-1">
+                            ${authorHtml}
+                            ${dateHtml}
+                            ${item.category ? `<span class="text-xs text-purple-600">${escapeHtml(item.category)}</span>` : ''}
+                        </div>
                     </div>
                     <button onclick="importFromMarketplace('${escapeHtml(item.github_url || '')}', '${escapeHtml(item.slug || '')}')"
                         class="ml-4 px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition whitespace-nowrap">
@@ -1795,8 +1983,8 @@
                 container.appendChild(card);
             });
 
-            // 分页
-            if (data.total > data.page_size) {
+            // 分页 (AI搜索无分页)
+            if (!isAI && data.total > data.page_size) {
                 const totalPages = Math.ceil(data.total / data.page_size);
                 const pag = document.getElementById('mp-pagination');
                 pag.innerHTML = '';
@@ -1852,6 +2040,268 @@
             toast.textContent = msg;
             document.body.appendChild(toast);
             setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
+        }
+
+        // ====== PDF 上传生成技能 ======
+
+        let selectedPdfFile = null;
+        let pdfGeneratedSkills = [];  // 存储生成的技能数据
+
+        function handlePdfDrop(event) {
+            event.preventDefault();
+            event.currentTarget.classList.remove('border-purple-500', 'bg-purple-50');
+            const files = event.dataTransfer.files;
+            if (files.length > 0 && files[0].name.toLowerCase().endsWith('.pdf')) {
+                setPdfFile(files[0]);
+            } else {
+                showError('请上传 PDF 格式文件');
+            }
+        }
+
+        function handlePdfFileSelect(input) {
+            if (input.files.length > 0) {
+                setPdfFile(input.files[0]);
+            }
+        }
+
+        function setPdfFile(file) {
+            if (file.size > 20 * 1024 * 1024) {
+                showError('文件过大，最大支持 20MB');
+                return;
+            }
+            selectedPdfFile = file;
+
+            // 显示文件信息
+            document.getElementById('pdf-file-name').textContent = file.name;
+            document.getElementById('pdf-file-size').textContent = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+            document.getElementById('pdf-file-info').classList.remove('hidden');
+            document.getElementById('pdf-file-label').textContent = file.name;
+            document.getElementById('pdf-upload-btn').disabled = false;
+        }
+
+        function clearPdfFile() {
+            selectedPdfFile = null;
+            document.getElementById('pdf-file-input').value = '';
+            document.getElementById('pdf-file-info').classList.add('hidden');
+            document.getElementById('pdf-file-label').innerHTML = '拖拽文件到此处，或 <span class="text-purple-600 font-medium">点击上传</span>';
+            document.getElementById('pdf-upload-btn').disabled = true;
+        }
+
+        async function uploadAndGeneratePdfSkills() {
+            if (!selectedPdfFile) {
+                showError('请先选择 PDF 文件');
+                return;
+            }
+
+            const mode = document.querySelector('input[name="pdf-mode"]:checked').value;
+            const category = document.getElementById('pdf-category').value;
+            const topicHint = document.getElementById('pdf-topic-hint').value.trim();
+            const roles = Array.from(document.querySelectorAll('.pdf-role-checkbox:checked')).map(cb => cb.value);
+
+            // 构建 FormData
+            const formData = new FormData();
+            formData.append('file', selectedPdfFile);
+            formData.append('mode', mode);
+            formData.append('category', category);
+            formData.append('topic_hint', topicHint);
+            formData.append('applicable_roles', JSON.stringify(roles));
+
+            // 切换到进度视图
+            document.getElementById('pdf-upload-form').classList.add('hidden');
+            document.getElementById('pdf-progress').classList.remove('hidden');
+            document.getElementById('pdf-results').classList.add('hidden');
+
+            try {
+                const resp = await fetch('/api/skills/import/pdf', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await resp.json();
+
+                document.getElementById('pdf-progress').classList.add('hidden');
+
+                if (data.status === 'success') {
+                    pdfGeneratedSkills = data.data.skills;
+                    displayPdfResults(data.data);
+                } else {
+                    showError('生成失败: ' + (data.message || '未知错误'));
+                    document.getElementById('pdf-upload-form').classList.remove('hidden');
+                }
+            } catch (err) {
+                document.getElementById('pdf-progress').classList.add('hidden');
+                document.getElementById('pdf-upload-form').classList.remove('hidden');
+                showError('网络错误: ' + err.message);
+            }
+        }
+
+        function displayPdfResults(data) {
+            const skills = data.skills || [];
+            const pdfInfo = data.pdf_info || {};
+
+            // 统计信息
+            document.getElementById('pdf-result-count').textContent = `（${skills.length} 个技能）`;
+            document.getElementById('pdf-info-badge').textContent =
+                `${pdfInfo.pages || '?'} 页 / ${((pdfInfo.chars || 0) / 1000).toFixed(1)}K 字符` +
+                (pdfInfo.truncated ? ' (已截断)' : '');
+            document.getElementById('pdf-time-badge').textContent =
+                `耗时: ${(data.generation_time || 0).toFixed(1)}s`;
+
+            // 渲染技能卡片
+            const container = document.getElementById('pdf-skills-list');
+            container.innerHTML = '';
+
+            skills.forEach((skill, index) => {
+                const skillData = skill.skill_data || {};
+                const name = skillData.displayName || skillData.name || skill.topic || `技能 ${index + 1}`;
+                const secScore = skill.security_score;
+                const secBadge = secScore != null
+                    ? `<span class="text-sm px-2 py-0.5 rounded-full ${secScore >= 70 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">安全: ${secScore}</span>`
+                    : '';
+                const warning = skillData.warning
+                    ? `<span class="text-sm text-yellow-600">⚠ ${escapeHtml(skillData.warning)}</span>`
+                    : '';
+
+                const card = document.createElement('div');
+                card.className = 'border border-gray-200 rounded-lg overflow-hidden';
+                card.innerHTML = `
+                    <div class="flex items-center justify-between px-4 py-3 bg-gray-50 cursor-pointer" onclick="togglePdfSkillCard(${index})">
+                        <div class="flex items-center gap-3">
+                            <span class="font-medium text-gray-800">${escapeHtml(name)}</span>
+                            ${secBadge}
+                            ${warning}
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-gray-400">${(skill.skill_md || '').split('\\n').length} 行</span>
+                            <svg id="pdf-skill-arrow-${index}" class="w-5 h-5 text-gray-400 transform transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div id="pdf-skill-body-${index}" class="hidden p-4">
+                        <div class="flex border-b border-gray-200 mb-3">
+                            <button onclick="switchPdfSkillView(${index}, 'edit')" id="pdf-view-edit-${index}" class="px-3 py-1.5 text-sm font-medium text-purple-600 border-b-2 border-purple-600">编辑</button>
+                            <button onclick="switchPdfSkillView(${index}, 'preview')" id="pdf-view-preview-${index}" class="px-3 py-1.5 text-sm font-medium text-gray-500 hover:text-gray-700">预览</button>
+                        </div>
+                        <div id="pdf-edit-${index}">
+                            <textarea id="pdf-skill-md-${index}" rows="15" class="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-purple-600 focus:border-transparent">${escapeHtml(skill.skill_md || '')}</textarea>
+                        </div>
+                        <div id="pdf-preview-${index}" class="hidden">
+                            <div class="markdown-preview border border-gray-200 rounded-lg p-4 bg-gray-50 min-h-[200px] text-sm"></div>
+                        </div>
+                        <div class="mt-3 flex justify-end">
+                            <button onclick="saveSinglePdfSkill(${index})" class="px-4 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition">
+                                保存此技能
+                            </button>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+
+            document.getElementById('pdf-results').classList.remove('hidden');
+        }
+
+        function togglePdfSkillCard(index) {
+            const body = document.getElementById(`pdf-skill-body-${index}`);
+            const arrow = document.getElementById(`pdf-skill-arrow-${index}`);
+            body.classList.toggle('hidden');
+            arrow.classList.toggle('rotate-180');
+        }
+
+        function switchPdfSkillView(index, view) {
+            const editPanel = document.getElementById(`pdf-edit-${index}`);
+            const previewPanel = document.getElementById(`pdf-preview-${index}`);
+            const editBtn = document.getElementById(`pdf-view-edit-${index}`);
+            const previewBtn = document.getElementById(`pdf-view-preview-${index}`);
+
+            if (view === 'edit') {
+                editPanel.classList.remove('hidden');
+                previewPanel.classList.add('hidden');
+                editBtn.className = 'px-3 py-1.5 text-sm font-medium text-purple-600 border-b-2 border-purple-600';
+                previewBtn.className = 'px-3 py-1.5 text-sm font-medium text-gray-500 hover:text-gray-700';
+            } else {
+                const md = document.getElementById(`pdf-skill-md-${index}`).value;
+                previewPanel.querySelector('.markdown-preview').innerHTML = marked.parse(md);
+                editPanel.classList.add('hidden');
+                previewPanel.classList.remove('hidden');
+                editBtn.className = 'px-3 py-1.5 text-sm font-medium text-gray-500 hover:text-gray-700';
+                previewBtn.className = 'px-3 py-1.5 text-sm font-medium text-purple-600 border-b-2 border-purple-600';
+            }
+        }
+
+        async function saveSinglePdfSkill(index) {
+            const skillMd = document.getElementById(`pdf-skill-md-${index}`).value.trim();
+            if (!skillMd) {
+                showError('技能内容为空');
+                return;
+            }
+
+            try {
+                const resp = await fetch('/api/skills/generate/confirm', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({skill_md: skillMd})
+                });
+                const data = await resp.json();
+
+                if (data.status === 'success') {
+                    showSuccess(`技能已保存: ${data.data.display_name || data.data.name || ''}`);
+                    // 标记已保存
+                    const card = document.getElementById(`pdf-skill-body-${index}`).parentElement;
+                    card.querySelector('.bg-gray-50').classList.add('bg-green-50');
+                    card.querySelector('.font-medium').innerHTML += ' <span class="text-green-600 text-xs">✓ 已保存</span>';
+                } else {
+                    showError('保存失败: ' + (data.message || ''));
+                }
+            } catch (err) {
+                showError('网络错误: ' + err.message);
+            }
+        }
+
+        async function saveAllPdfSkills() {
+            const btn = document.getElementById('pdf-save-all-btn');
+            btn.disabled = true;
+            btn.textContent = '保存中...';
+
+            let saved = 0, failed = 0;
+            for (let i = 0; i < pdfGeneratedSkills.length; i++) {
+                const skillMd = document.getElementById(`pdf-skill-md-${i}`).value.trim();
+                if (!skillMd) continue;
+
+                try {
+                    const resp = await fetch('/api/skills/generate/confirm', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({skill_md: skillMd})
+                    });
+                    const data = await resp.json();
+                    if (data.status === 'success') {
+                        saved++;
+                        const card = document.getElementById(`pdf-skill-body-${i}`).parentElement;
+                        card.querySelector('.bg-gray-50').classList.add('bg-green-50');
+                    } else {
+                        failed++;
+                    }
+                } catch {
+                    failed++;
+                }
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = '<svg class="w-5 h-5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> 全部保存';
+
+            if (failed === 0) {
+                showSuccess(`全部 ${saved} 个技能已保存！`);
+            } else {
+                showSuccess(`已保存 ${saved} 个技能，${failed} 个失败`);
+            }
+        }
+
+        function resetPdfUpload() {
+            clearPdfFile();
+            pdfGeneratedSkills = [];
+            document.getElementById('pdf-results').classList.add('hidden');
+            document.getElementById('pdf-upload-form').classList.remove('hidden');
         }
     </script>
 </body>

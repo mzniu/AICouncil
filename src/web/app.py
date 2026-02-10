@@ -390,6 +390,9 @@ def run_backend(issue, backend, model, rounds, planners, auditors, agent_configs
             if user_id:
                 cmd.extend(["--user_id", str(user_id)])
             
+            if tenant_id:
+                cmd.extend(["--tenant_id", str(tenant_id)])
+            
             current_process = subprocess.Popen(
                 cmd,
                 text=True,
@@ -770,6 +773,9 @@ def rereport():
         logger.info(f"[rereport] 工作区路径: {workspace_path}")
 
         # 在后台线程运行，避免阻塞
+        # 提前获取 tenant_id（在请求上下文中）
+        rereport_tenant_id = getattr(current_user, 'tenant_id', None) if (DB_AVAILABLE and current_user.is_authenticated) else None
+        
         def run_rereport():
             global is_running
             is_running = True
@@ -807,7 +813,7 @@ def rereport():
                 
                 # 重新生成报告（注意：agent_configs不影响报告生成，因为使用的是已保存的讨论数据）
                 logger.info(f"[rereport] 调用 generate_report_from_workspace，workspace={workspace_path}, session_id={current_session_id}")
-                generate_report_from_workspace(str(workspace_path), model_cfg, current_session_id)
+                generate_report_from_workspace(str(workspace_path), model_cfg, current_session_id, tenant_id=rereport_tenant_id)
                 logger.info(f"[rereport] 报告生成完成")
             except Exception as e:
                 logger.error(f"[rereport] 重新生成报告失败: {e}")
@@ -1988,8 +1994,14 @@ def revise_report():
         }
         logger.info(f"[revise_report] 使用模型配置: {model_config}")
         
-        # 创建报告审核官chain
-        auditor_chain = make_report_auditor_chain(model_config)
+        # 创建报告审核官chain（尝试获取tenant_id以加载技能）
+        report_tenant_id = None
+        try:
+            if hasattr(current_user, 'tenant_id'):
+                report_tenant_id = current_user.tenant_id
+        except Exception:
+            pass
+        auditor_chain = make_report_auditor_chain(model_config, tenant_id=report_tenant_id)
         
         # 调用审核官进行修订
         prompt_vars = {
@@ -3168,6 +3180,91 @@ def confirm_generated_skill():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
+# ====== PDF Skill Import ======
+
+@app.route('/api/skills/import/pdf', methods=['POST'])
+@login_required
+def import_pdf_skill():
+    """从 PDF 文件提取内容并生成 Skill（返回预览，不自动保存）"""
+    try:
+        # 检查文件
+        if 'file' not in request.files:
+            return jsonify({'status': 'error', 'message': '请上传 PDF 文件'}), 400
+
+        pdf_file = request.files['file']
+        if not pdf_file.filename:
+            return jsonify({'status': 'error', 'message': '文件名为空'}), 400
+
+        if not pdf_file.filename.lower().endswith('.pdf'):
+            return jsonify({'status': 'error', 'message': '仅支持 PDF 格式文件'}), 400
+
+        # 检查文件大小（读取到内存再检查）
+        import io
+        pdf_bytes = pdf_file.read()
+        size_mb = len(pdf_bytes) / (1024 * 1024)
+        if size_mb > 20:
+            return jsonify({'status': 'error', 'message': f'文件过大（{size_mb:.1f}MB），最大支持 20MB'}), 400
+
+        # 获取参数
+        mode = request.form.get('mode', 'auto')  # auto / single / multi
+        if mode not in ('auto', 'single', 'multi'):
+            mode = 'auto'
+        topic_hint = request.form.get('topic_hint', '').strip()
+        category = request.form.get('category', 'analysis')
+        applicable_roles_str = request.form.get('applicable_roles', '')
+        backend = request.form.get('backend', '')
+        model = request.form.get('model', '')
+
+        # 解析适用角色
+        try:
+            applicable_roles = json.loads(applicable_roles_str) if applicable_roles_str else ['策论家', '监察官']
+        except json.JSONDecodeError:
+            applicable_roles = ['策论家', '监察官']
+
+        logger.info(f"[pdf_import] 开始处理: filename='{pdf_file.filename}', "
+                    f"size={size_mb:.1f}MB, mode={mode}")
+
+        # 提取并生成
+        from src.skills.pdf_skill_extractor import PDFSkillExtractor
+        extractor = PDFSkillExtractor(
+            backend=backend or getattr(config, 'DEFAULT_BACKEND', 'deepseek'),
+            model=model or None,
+            timeout=180
+        )
+
+        pdf_io = io.BytesIO(pdf_bytes)
+        result = extractor.generate_skills(
+            pdf_file=pdf_io,
+            mode=mode,
+            topic_hint=topic_hint,
+            category=category,
+            applicable_roles=applicable_roles
+        )
+
+        if not result.success:
+            return jsonify({
+                'status': 'error',
+                'message': result.error,
+                'pdf_info': result.pdf_info.to_dict() if result.pdf_info else None
+            }), 400
+
+        logger.info(f"[pdf_import] 生成完成: {len(result.skills)} 个技能, "
+                    f"耗时 {result.generation_time:.1f}s")
+
+        return jsonify({
+            'status': 'success',
+            'data': {
+                'skills': result.skills,
+                'pdf_info': result.pdf_info.to_dict() if result.pdf_info else None,
+                'generation_time': result.generation_time
+            }
+        }), 200
+
+    except Exception as e:
+        logger.error(f"[pdf_import] Error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': f'PDF 处理异常: {str(e)}'}), 500
+
+
 # ====== Skill Marketplace ======
 
 @app.route('/api/skills/marketplace/search', methods=['GET'])
@@ -3179,13 +3276,15 @@ def marketplace_search():
         category = request.args.get('category', '')
         page = int(request.args.get('page', 1))
         page_size = min(int(request.args.get('page_size', 20)), 50)
+        mode = request.args.get('mode', 'keyword')  # keyword | ai
 
         if not query and not category:
             return jsonify({'status': 'error', 'message': 'Query or category is required'}), 400
 
         from src.skills.marketplace_client import MarketplaceClient
         client = MarketplaceClient()
-        results = client.search(query=query, category=category, page=page, page_size=page_size)
+        results = client.search(query=query, category=category, page=page,
+                                page_size=page_size, mode=mode)
 
         return jsonify({
             'status': 'success',
@@ -3282,6 +3381,18 @@ def marketplace_categories():
         return jsonify({'status': 'success', 'data': categories}), 200
     except Exception as e:
         logger.error(f"[marketplace] Categories error: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/skills/cancel-discovery', methods=['POST'])
+def cancel_skill_discovery_endpoint():
+    """取消技能自动发现/导入"""
+    try:
+        from src.skills.auto_discovery import cancel_skill_discovery
+        cancel_skill_discovery()
+        return jsonify({'status': 'success', 'message': '已取消技能导入'}), 200
+    except Exception as e:
+        logger.error(f"[auto_discovery] Cancel error: {e}", exc_info=True)
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
