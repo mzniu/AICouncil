@@ -649,6 +649,8 @@ def _inject_skills_to_prompt_inner(prompt_text: str, role_chinese: str, tenant_i
         if skills:
             logger.info(f"[{chain_name}] Loaded {len(skills)} skills for role '{role_chinese}' (tenant={tenant_id})")
             skills_text = skill_loader.format_all_skills_for_prompt(skills, include_metadata=False)
+            # 转义 Skills 文本中的花括号，防止被 LangChain PromptTemplate 误解析为模板变量
+            skills_text = skills_text.replace('{', '{{').replace('}', '}}')
             return prompt_text + "\n\n" + skills_text
         else:
             logger.info(f"[{chain_name}] No skills for role '{role_chinese}' (tenant={tenant_id})")

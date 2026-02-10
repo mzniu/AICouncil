@@ -43,6 +43,20 @@ def run_meta_orchestrator_flow(issue_text: str, model_config: dict, agent_config
     logger.info(f"[meta_flow] 启动议事编排官智能规划流程 (User: {user_id}, Tenant: {tenant_id})")
     
     try:
+        # Stage -1: 议题技能自动发现
+        try:
+            from src.skills.auto_discovery import discover_skills_for_issue
+            from src.agents.langchain_agents import send_web_event
+            discovered = discover_skills_for_issue(
+                issue=issue_text,
+                tenant_id=tenant_id,
+                send_event_fn=send_web_event,
+            )
+            if discovered:
+                logger.info(f"[meta_flow] Auto-discovered {len(discovered)} skills for this issue")
+        except Exception as e:
+            logger.warning(f"[meta_flow] Skill auto-discovery failed (non-fatal): {e}")
+        
         # Stage 0: 议事编排官智能规划
         logger.info("[meta_flow] Stage 0: 智能规划中...")
         print("\n🧭 Stage 0: 议事编排官智能规划")
@@ -138,7 +152,8 @@ def run_meta_orchestrator_flow(issue_text: str, model_config: dict, agent_config
             user_requirement=issue_text,
             model_config=model_config,
             agent_configs=agent_configs,
-            user_id=user_id
+            user_id=user_id,
+            tenant_id=tenant_id
         )
         
         print(f"✅ 框架执行完成")
@@ -171,7 +186,7 @@ def run_meta_orchestrator_flow(issue_text: str, model_config: dict, agent_config
             # 传递空字典，让 make_reporter_chain 使用 reporter.yaml 的 default_model
             reporter_config = {"type": model_config.get("type", "deepseek")}
         
-        reporter_chain = make_reporter_chain(reporter_config)
+        reporter_chain = make_reporter_chain(reporter_config, tenant_id=tenant_id)
         
         # 构建Reporter输入（包含所有stage的输出）
         reporter_input = _build_reporter_input(
@@ -186,8 +201,10 @@ def run_meta_orchestrator_flow(issue_text: str, model_config: dict, agent_config
         report_content, search_res = stream_agent_output(
             reporter_chain,
             {
+                "issue": issue_text,
                 "final_data": reporter_input,
-                "search_references": ""  # 议事编排官模式下搜索引用由各Agent自行处理
+                "search_references": "",  # 议事编排官模式下搜索引用由各Agent自行处理
+                "image_pool": ""
             },
             "记录员",
             "reporter",
@@ -299,6 +316,7 @@ def parse_args():
     p.add_argument('--use-meta-orchestrator', action='store_true', 
                    help='使用议事编排官进行智能规划和框架执行（新流程）')
     p.add_argument('--user_id', type=int, default=None, help='User ID for database session tracking')
+    p.add_argument('--tenant_id', type=int, default=None, help='Tenant ID for skill loading')
     return p.parse_args()
 
 
@@ -365,7 +383,8 @@ def run_demo():
         result = run_meta_orchestrator_flow(
             issue_text=issue_text,
             model_config=model_cfg,
-            agent_configs=agent_configs
+            agent_configs=agent_configs,
+            tenant_id=args.tenant_id
         )
     else:
         # 传统流程：run_full_cycle
@@ -377,7 +396,8 @@ def run_demo():
             num_planners=args.planners,
             num_auditors=args.auditors,
             agent_configs=agent_configs,
-            user_id=args.user_id
+            user_id=args.user_id,
+            tenant_id=args.tenant_id
         )
     
     logger.info(f"[demo] 完成流程，结果摘要:\n" + json.dumps(result, indent=2, ensure_ascii=False))
