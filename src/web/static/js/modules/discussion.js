@@ -639,6 +639,58 @@ function appendEvent(event) {
             </div>
             <div class="text-slate-600 leading-relaxed text-base event-content markdown-body">${formatContent(content, event.role_type)}</div>
         `;
+    } else if (event.type === 'system_status') {
+        // 系统状态消息（技能发现进度等）
+        div.className = 'flex justify-center my-2';
+        div.innerHTML = `<span class="bg-blue-50 text-blue-600 px-4 py-1.5 rounded-full text-xs font-medium border border-blue-200 shadow-sm">${escapeHtml(event.message || '')}</span>`;
+    } else if (event.type === 'skill_discovery') {
+        // 技能发现卡片（带可选取消按钮）
+        const skills = event.skills || [];
+        const waitSec = event.wait_seconds || 0;
+        const skillItems = skills.map(s => {
+            const pct = Math.round((s.score || 0) * 100);
+            return `<div class="flex justify-between items-center py-1.5 border-b border-slate-100 last:border-0">
+                <span class="text-sm text-slate-700 font-medium">${escapeHtml(s.name)}</span>
+                <span class="text-xs text-slate-500">${s.author ? escapeHtml(s.author) + ' · ' : ''}匹配度 ${pct}%</span>
+            </div>`;
+        }).join('');
+
+        const cancelBtnHtml = waitSec > 0
+            ? `<div class="mt-3 flex justify-end">
+                   <button onclick="window.cancelSkillDiscovery(this)" class="skill-cancel-btn px-3 py-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-md transition" data-seconds="${waitSec}">
+                       取消导入 (<span class="countdown">${waitSec}</span>s)
+                   </button>
+               </div>`
+            : '';
+
+        div.className = 'my-3';
+        div.innerHTML = `
+            <div class="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg p-4 border border-indigo-200 shadow-sm">
+                <div class="flex items-center mb-2">
+                    <span class="text-lg mr-2">🧩</span>
+                    <h4 class="text-xs font-bold text-indigo-600 uppercase tracking-wider">Skill Discovery</h4>
+                </div>
+                <p class="text-sm text-slate-700 mb-2">${escapeHtml(event.message || '')}</p>
+                <div class="bg-white/70 rounded-md px-3 py-1">${skillItems}</div>
+                ${cancelBtnHtml}
+            </div>
+        `;
+
+        // 启动倒计时
+        if (waitSec > 0) {
+            const appended = div;
+            let remaining = waitSec;
+            const timer = setInterval(() => {
+                remaining--;
+                const span = appended.querySelector('.countdown');
+                if (span) span.textContent = remaining;
+                if (remaining <= 0) {
+                    clearInterval(timer);
+                    const btn = appended.querySelector('.skill-cancel-btn');
+                    if (btn) btn.remove();
+                }
+            }, 1000);
+        }
     } else if (event.type === 'final_report') {
         // 进入报告生成阶段
         State.setIsReportingPhase(true);
@@ -652,6 +704,19 @@ function appendEvent(event) {
     
     flowContainer.appendChild(div);
 }
+
+/**
+ * 取消技能自动导入
+ */
+window.cancelSkillDiscovery = async function(btn) {
+    try {
+        btn.disabled = true;
+        btn.textContent = '取消中...';
+        await API.cancelSkillDiscovery();
+    } catch (e) {
+        console.error('Cancel skill discovery failed:', e);
+    }
+};
 
 /**
  * 切换推理内容折叠

@@ -199,6 +199,39 @@ class TestMarketplaceClient:
         assert 'raw.githubusercontent.com' in result
         assert '/blob/' not in result
 
+        # tree URL (SkillsMP 返回的目录 URL)
+        tree = "https://github.com/anthropics/skills/tree/main/.claude/skills/webapp-testing"
+        result = client._to_raw_url(tree)
+        assert 'raw.githubusercontent.com' in result
+        assert result.endswith('/SKILL.md')
+        assert '/tree/' not in result
+
+    def test_github_tree_to_raw_url(self):
+        """测试 SkillsMP githubUrl 目录转 raw SKILL.md URL"""
+        from src.skills.marketplace_client import MarketplaceClient
+        client = MarketplaceClient()
+
+        # 标准 SkillsMP 返回格式
+        tree = "https://github.com/user/repo/tree/main/.claude/skills/my-skill"
+        result = client._github_tree_to_raw_url(tree)
+        assert result == "https://raw.githubusercontent.com/user/repo/main/.claude/skills/my-skill/SKILL.md"
+
+        # blob URL 也处理
+        blob = "https://github.com/user/repo/blob/main/path/SKILL.md"
+        result = client._github_tree_to_raw_url(blob)
+        assert result == "https://raw.githubusercontent.com/user/repo/main/path/SKILL.md"
+
+        # 已经是 raw URL
+        raw = "https://raw.githubusercontent.com/user/repo/main/SKILL.md"
+        assert client._github_tree_to_raw_url(raw) == raw
+
+        # 空字符串
+        assert client._github_tree_to_raw_url('') == ''
+
+        # 非 GitHub URL（原样返回）
+        other = "https://example.com/skill"
+        assert client._github_tree_to_raw_url(other) == other
+
     def test_parse_skill_md(self):
         """测试 SKILL.md 解析"""
         from src.skills.marketplace_client import MarketplaceClient
@@ -313,6 +346,91 @@ class TestMarketplaceIntegration:
             print(f"\n导入成功: {result['skill_data'].get('name')}")
         else:
             print(f"\n导入失败（预期内）: {result['error']}")
+
+    @pytest.mark.skipif(
+        not os.environ.get('TEST_MARKETPLACE_INTEGRATION'),
+        reason="Set TEST_MARKETPLACE_INTEGRATION=1 to run marketplace integration tests"
+    )
+    def test_skillsmp_keyword_search(self):
+        """SkillsMP 关键词搜索实际调用"""
+        from src.skills.marketplace_client import MarketplaceClient
+        client = MarketplaceClient()
+
+        if not client.skillsmp_key:
+            pytest.skip("SKILLSMP_API_KEY not configured")
+
+        result = client._search_skillsmp('code review', '', 1, 5)
+        assert result['source'] == 'skillsmp'
+        assert len(result['items']) > 0, "Should return at least 1 result"
+
+        item = result['items'][0]
+        assert item['name'], "Item should have a name"
+        assert item['github_url'], "Item should have a github_url"
+        assert 'raw.githubusercontent.com' in item['github_url'], "URL should be converted to raw"
+        assert item['github_url'].endswith('/SKILL.md'), "URL should end with /SKILL.md"
+
+        print(f"\n=== SkillsMP Keyword Search ===")
+        for i in result['items']:
+            print(f"  {i['name']} by {i['author']} ★{i['stars']} → {i['github_url'][:80]}...")
+
+    @pytest.mark.skipif(
+        not os.environ.get('TEST_MARKETPLACE_INTEGRATION'),
+        reason="Set TEST_MARKETPLACE_INTEGRATION=1 to run marketplace integration tests"
+    )
+    def test_skillsmp_ai_search(self):
+        """SkillsMP AI 语义搜索实际调用"""
+        from src.skills.marketplace_client import MarketplaceClient
+        client = MarketplaceClient()
+
+        if not client.skillsmp_key:
+            pytest.skip("SKILLSMP_API_KEY not configured")
+
+        result = client._search_skillsmp_ai('help me write better code reviews')
+        assert result['source'] == 'skillsmp_ai'
+
+        if result['items']:
+            item = result['items'][0]
+            assert item['name'], "Item should have a name"
+            assert 'score' in item, "AI result should have score"
+            assert 0 <= item['score'] <= 1, "Score should be between 0 and 1"
+
+            print(f"\n=== SkillsMP AI Search ===")
+            for i in result['items']:
+                print(f"  {i['name']} (score={i['score']}) by {i['author']} → {i['github_url'][:80]}...")
+        else:
+            print("\nAI search returned 0 items (some results lacked skill object)")
+
+    @pytest.mark.skipif(
+        not os.environ.get('TEST_MARKETPLACE_INTEGRATION'),
+        reason="Set TEST_MARKETPLACE_INTEGRATION=1 to run marketplace integration tests"
+    )
+    def test_search_mode_keyword(self):
+        """通过 search() 接口测试关键词模式"""
+        from src.skills.marketplace_client import MarketplaceClient
+        client = MarketplaceClient()
+
+        if not client.skillsmp_key:
+            pytest.skip("SKILLSMP_API_KEY not configured")
+
+        result = client.search(query='testing', mode='keyword', page=1, page_size=5)
+        assert result['items'], "Should return results"
+        assert result['source'] in ('skillsmp', 'github', 'curated')
+
+    @pytest.mark.skipif(
+        not os.environ.get('TEST_MARKETPLACE_INTEGRATION'),
+        reason="Set TEST_MARKETPLACE_INTEGRATION=1 to run marketplace integration tests"
+    )
+    def test_search_mode_ai(self):
+        """通过 search() 接口测试 AI 模式"""
+        from src.skills.marketplace_client import MarketplaceClient
+        client = MarketplaceClient()
+
+        if not client.skillsmp_key:
+            pytest.skip("SKILLSMP_API_KEY not configured")
+
+        result = client.search(query='make my frontend beautiful', mode='ai')
+        assert result['items'] is not None  # 可能为空但不应报错
+        print(f"\nAI mode via search(): {len(result['items'])} items, source={result['source']}")
 
 
 if __name__ == '__main__':

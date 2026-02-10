@@ -469,3 +469,13 @@ export async function getReportVersions(sessionId) {
 export async function getReportContent(sessionId, filename) {
     return apiFetch(`${API_BASE}/report_content?workspace_id=${sessionId}&filename=${encodeURIComponent(filename)}`);
 }
+
+/**
+ * 取消技能自动发现/导入
+ * @returns {Promise<Object>} 取消结果
+ */
+export async function cancelSkillDiscovery() {
+    return apiFetch(`${API_BASE}/skills/cancel-discovery`, {
+        method: 'POST'
+    });
+}
