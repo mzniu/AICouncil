@@ -195,6 +195,7 @@ def _auto_fix_orchestration_plan(plan: schemas.OrchestrationPlan) -> schemas.Orc
     """自动修正 OrchestrationPlan 的不完整配置（方案E核心逻辑）
     
     修正内容：
+    0. 验证并修正 content_mode
     1. 添加缺失的框架必需角色到 agent_counts
     2. 添加缺失的专业角色到 agent_counts
     3. 为缺失映射的专业角色自动生成 role_stage_mapping
@@ -206,6 +207,19 @@ def _auto_fix_orchestration_plan(plan: schemas.OrchestrationPlan) -> schemas.Orc
         修正后的规划方案
     """
     modified = False
+    
+    # 0. 验证 content_mode
+    valid_modes = set(schemas.CONTENT_MODES.keys())
+    current_mode = getattr(plan.analysis, 'content_mode', None) or 'solution'
+    if current_mode not in valid_modes:
+        logger.warning(f"[auto_fix] 无效的 content_mode '{current_mode}'，修正为 'solution'")
+        plan.analysis.content_mode = 'solution'
+        modified = True
+    elif not getattr(plan.analysis, 'content_mode', None):
+        plan.analysis.content_mode = 'solution'
+        modified = True
+    
+    logger.info(f"[auto_fix] content_mode: {plan.analysis.content_mode}")
     
     # 1. 获取框架定义，识别必需角色
     try:
@@ -237,7 +251,118 @@ def _auto_fix_orchestration_plan(plan: schemas.OrchestrationPlan) -> schemas.Orc
             logger.warning(f"[auto_fix] 🔧 自动添加缺失的框架角色: {role}")
             modified = True
     
-    # 4.2 添加缺失的专业角色
+    # 4.2 添加缺失的专业角色（先校验是否真实存在于 RoleManager）
+    from src.agents.role_manager import RoleManager
+    role_manager = RoleManager()
+    
+    def _find_similar_role(name: str, display_name: str) -> Optional[str]:
+        """模糊查找已有的相似角色，避免重复创建
+        
+        匹配策略（优先级从高到低）：
+        1. 精确 name 匹配
+        2. name 互为前缀（如 fundamental_analyst 匹配 fundamental_analyst_2）
+        3. display_name 完全相同
+        4. name 包含关系（如 stock_analyst 匹配 stock_technical_analyst）
+        """
+        if role_manager.has_role(name):
+            return name
+        
+        all_roles = role_manager.list_roles()
+        name_lower = name.lower()
+        
+        # 策略2: name 互为前缀（捕获 _2, _3 等自动重命名的版本）
+        for role in all_roles:
+            rn = role.name.lower()
+            if rn.startswith(name_lower) or name_lower.startswith(rn):
+                logger.info(f"[auto_fix] 🔗 模糊匹配: '{name}' → 已有角色 '{role.name}' (前缀匹配)")
+                return role.name
+        
+        # 策略3: display_name 完全相同
+        for role in all_roles:
+            if role.display_name == display_name:
+                logger.info(f"[auto_fix] 🔗 模糊匹配: '{name}' → 已有角色 '{role.name}' (display_name相同)")
+                return role.name
+        
+        # 策略4: name 关键词重叠（至少2个词段匹配）
+        name_parts = set(name_lower.split('_'))
+        for role in all_roles:
+            role_parts = set(role.name.lower().split('_'))
+            overlap = name_parts & role_parts
+            # 排除过短的通用词
+            meaningful_overlap = {w for w in overlap if len(w) > 2}
+            if len(meaningful_overlap) >= 2:
+                logger.info(f"[auto_fix] 🔗 模糊匹配: '{name}' → 已有角色 '{role.name}' (关键词重叠: {meaningful_overlap})")
+                return role.name
+        
+        return None
+    
+    validated_professional_roles = []
+    for role_match in professional_roles:
+        # 先尝试模糊匹配已有角色
+        existing_name = _find_similar_role(role_match.name, role_match.display_name)
+        if existing_name:
+            if existing_name != role_match.name:
+                logger.info(f"[auto_fix] ♻️ 复用已有角色: '{role_match.name}' → '{existing_name}'")
+                role_match.name = existing_name
+            validated_professional_roles.append(role_match)
+        else:
+            logger.warning(f"[auto_fix] ⚠️ 角色 '{role_match.name}' ({role_match.display_name}) 不存在于系统中")
+            # 尝试自动创建该角色
+            try:
+                requirement = (
+                    f"需要一位{role_match.display_name}，"
+                    f"匹配理由：{role_match.match_reason}。"
+                    f"请设计该角色的完整配置。"
+                )
+                logger.info(f"[auto_fix] 🔨 尝试自动创建角色: {role_match.display_name}")
+                send_web_event("system_status", message=f"🔨 正在自动创建角色：{role_match.display_name}...")
+                design_output = call_role_designer(requirement)
+                # call_role_designer 内部会保存 YAML 并刷新 RoleManager
+                # 更新 role_match.name 为实际生成的名称
+                actual_name = design_output.role_name
+                role_match.name = actual_name
+                logger.info(f"[auto_fix] ✅ 自动创建角色成功: {actual_name} ({design_output.display_name})")
+                send_web_event("system_status", message=f"✅ 角色 {design_output.display_name} 创建成功")
+                # 重新加载 role_manager 以识别新角色
+                role_manager.refresh_all_roles()
+                validated_professional_roles.append(role_match)
+                modified = True
+            except Exception as e:
+                logger.warning(f"[auto_fix] ❌ 自动创建角色 '{role_match.display_name}' 失败: {e}，降级为 planner")
+                send_web_event("system_status", message=f"⚠️ 角色 {role_match.display_name} 创建失败，将由策论家代替")
+                # 降级：增加 planner 数量
+                plan.execution_config.agent_counts["planner"] = plan.execution_config.agent_counts.get("planner", 2) + 1
+                modified = True
+    
+    professional_roles = validated_professional_roles
+    
+    # 4.3 恢复被 create_role 工具创建但未出现在 existing_roles/agent_counts 中的角色
+    # Meta-orchestrator 在 tool call 阶段已调用 create_role 创建了角色，
+    # 但 LLM 最终输出的 JSON 可能遗漏了它们（roles_to_create 也可能为空）
+    from src.agents.meta_tools import get_session_created_roles
+    session_roles = get_session_created_roles()
+    all_known_names = (
+        set(plan.execution_config.agent_counts.keys()) |
+        {r.name for r in professional_roles}
+    )
+    for rn in session_roles:
+        if rn in framework_role_names or rn in all_known_names:
+            continue
+        if not role_manager.has_role(rn):
+            continue
+        role_config = role_manager.get_role(rn)
+        logger.info(f"[auto_fix] 🔄 恢复遗漏的已创建角色: {rn} ({role_config.display_name})")
+        plan.execution_config.agent_counts[rn] = 1
+        recovered = schemas.ExistingRoleMatch(
+            name=rn,
+            display_name=role_config.display_name,
+            match_score=0.85,
+            match_reason=f"由 create_role 工具创建，自动恢复到执行配置",
+            assigned_count=1,
+        )
+        professional_roles.append(recovered)
+        modified = True
+    
     for role_match in professional_roles:
         if role_match.name not in plan.execution_config.agent_counts:
             count = role_match.assigned_count or 1
@@ -425,13 +550,14 @@ def stream_agent_output(chain, prompt_vars, agent_name, role_type, event_type="a
                 
     return full_content, search_results
 
-def make_generic_role_chain(role_name: str, stage_name: str, model_config: Dict[str, Any]):
+def make_generic_role_chain(role_name: str, stage_name: str, model_config: Dict[str, Any], tenant_id: Optional[int] = None):
     """通用的角色chain创建函数，支持任意自定义角色
     
     Args:
         role_name: 角色名称（如 "international_law_expert"）
         stage_name: Stage名称（如 "analysis"）
         model_config: 模型配置
+        tenant_id: 租户ID（用于加载订阅的Skills）
         
     Returns:
         LangChain chain对象
@@ -456,99 +582,180 @@ def make_generic_role_chain(role_name: str, stage_name: str, model_config: Dict[
     
     # 加载prompt和输入变量
     prompt_text = role_manager.load_prompt(role_name, stage_name)
+    
+    # Skills注入：使用角色的display_name作为中文角色名
+    prompt_text = _inject_skills_to_prompt(prompt_text, role_config.display_name, tenant_id, f"generic_{role_name}")
+    # 注入当前时间
+    prompt_text = _inject_current_time(prompt_text)
+    
     input_vars = role_config.stages[stage_name].input_vars
     
     prompt = PromptTemplate(template=prompt_text, input_variables=input_vars)
     return prompt | llm
 
 
-def make_planner_chain(model_config: Dict[str, Any], tenant_id: Optional[int] = None):
+def _inject_current_time(prompt_text: str) -> str:
+    """在 prompt 末尾注入醒目的当前日期时间提示，确保模型知道"今天"是什么日期。"""
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
+    time_notice = (
+        f"\n\n**⚠️ 当前日期时间: {current_time}**\n"
+        f"你必须以此作为\"今天\"的基准。涉及\"最新\"\"今日\"\"近期\"等时间限定时，请基于此日期进行搜索和分析。\n"
+        f"严禁使用过期日期（如2024年、2025年）。"
+    )
+    return prompt_text + time_notice
+
+
+def _inject_skills_to_prompt(prompt_text: str, role_chinese: str, tenant_id: Optional[int], chain_name: str) -> str:
+    """
+    将角色对应的技能注入到 prompt 末尾（所有角色通用）
+
+    Args:
+        prompt_text: 原始 prompt 文本
+        role_chinese: 角色中文名（如 '策论家'、'议长'），用于匹配 applicable_roles
+        tenant_id: 租户ID
+        chain_name: 日志标识（如 'planner_chain'）
+
+    Returns:
+        拼接了技能文本的 prompt
+    """
+    try:
+        from src.skills.loader_v2 import SkillLoaderV2
+        
+        # Skills 数据库查询需要 Flask app context
+        from flask import has_app_context
+        if not has_app_context():
+            try:
+                from src.web.app import app
+                with app.app_context():
+                    return _inject_skills_to_prompt_inner(prompt_text, role_chinese, tenant_id, chain_name)
+            except Exception as e:
+                logger.warning(f"[{chain_name}] 无法创建 app context 来加载 skills: {e}")
+                return prompt_text
+        
+        return _inject_skills_to_prompt_inner(prompt_text, role_chinese, tenant_id, chain_name)
+    except Exception as e:
+        logger.warning(f"[{chain_name}] Failed to load skills: {e}")
+
+    return prompt_text
+
+
+def _inject_skills_to_prompt_inner(prompt_text: str, role_chinese: str, tenant_id: Optional[int], chain_name: str) -> str:
+    """实际执行 skills 注入（需要在 app context 内调用）"""
+    try:
+        from src.skills.loader_v2 import SkillLoaderV2
+        skill_loader = SkillLoaderV2()
+        skills = skill_loader.get_skills_by_role(role_chinese, tenant_id=tenant_id)
+
+        if skills:
+            logger.info(f"[{chain_name}] Loaded {len(skills)} skills for role '{role_chinese}' (tenant={tenant_id})")
+            skills_text = skill_loader.format_all_skills_for_prompt(skills, include_metadata=False)
+            return prompt_text + "\n\n" + skills_text
+        else:
+            logger.info(f"[{chain_name}] No skills for role '{role_chinese}' (tenant={tenant_id})")
+    except Exception as e:
+        logger.warning(f"[{chain_name}] Failed to load skills: {e}")
+
+    return prompt_text
+
+
+def make_planner_chain(model_config: Dict[str, Any], tenant_id: Optional[int] = None, content_mode: str = "solution"):
     """创建策论家链（使用RoleManager + Skills注入）
     
     Args:
         model_config: 模型配置
         tenant_id: 租户ID（用于加载订阅的Skills）
+        content_mode: 内容模式（solution/analysis/research/evaluation/creative/debate）
     """
     from src.agents.role_manager import RoleManager
-    from src.skills.loader_v2 import SkillLoaderV2
     
     llm = AdapterLLM(backend_config=ModelConfig(**model_config))
     role_manager = RoleManager()
     
-    # 从RoleManager加载prompt和配置
-    stage_name = "proposal"  # planner的stage名称
-    prompt_text = role_manager.load_prompt("planner", stage_name)
-    role_config = role_manager.get_role("planner")
-    input_vars = role_config.stages[stage_name].input_vars
-    
-    # 加载并注入Skills
-    try:
-        skill_loader = SkillLoaderV2()
-        # 加载策论家适用的技能（包含订阅的builtin + custom skills）
-        skills = skill_loader.get_skills_by_role('策论家', tenant_id=tenant_id)
+    # 根据 content_mode 选择不同的 prompt 和 schema
+    if content_mode != "solution" and content_mode in ("analysis", "research", "evaluation", "creative", "debate"):
+        # 非 solution 模式：使用对应的 prompt 变体 + ContentSchema
+        stage_name = "proposal"  # 仍使用 proposal stage 的配置（input_vars）
+        role_config = role_manager.get_role("planner")
+        input_vars = role_config.stages[stage_name].input_vars
         
-        if skills:
-            logger.info(f"[planner_chain] Loaded {len(skills)} skills for tenant {tenant_id}")
-            # 格式化技能为prompt（不包含metadata以节省token）
-            skills_text = skill_loader.format_all_skills_for_prompt(skills, include_metadata=False)
-            # 在prompt末尾注入技能库
-            prompt_text = prompt_text + "\n\n" + skills_text
+        # 直接读取变体 prompt 文件
+        from pathlib import Path
+        prompt_file = Path(__file__).parent / "roles" / f"planner_{content_mode}.md"
+        if prompt_file.exists():
+            prompt_text = prompt_file.read_text(encoding='utf-8')
+            logger.info(f"[make_planner_chain] 使用 {content_mode} 模式 prompt: planner_{content_mode}.md")
         else:
-            logger.info(f"[planner_chain] No skills loaded for tenant {tenant_id}")
-    except Exception as e:
-        logger.warning(f"[planner_chain] Failed to load skills: {e}")
+            # 回退到默认 prompt
+            logger.warning(f"[make_planner_chain] 未找到 planner_{content_mode}.md，回退到 solution 模式")
+            prompt_text = role_manager.load_prompt("planner", stage_name)
+    else:
+        # solution 模式（默认）：使用原始 prompt
+        stage_name = "proposal"
+        prompt_text = role_manager.load_prompt("planner", stage_name)
+        role_config = role_manager.get_role("planner")
+        input_vars = role_config.stages[stage_name].input_vars
+    
+    # 注入技能
+    prompt_text = _inject_skills_to_prompt(prompt_text, '策论家', tenant_id, 'planner_chain')
+    # 注入当前时间
+    prompt_text = _inject_current_time(prompt_text)
     
     prompt = PromptTemplate(template=prompt_text, input_variables=input_vars)
     return prompt | llm
 
 
 
-def make_auditor_chain(model_config: Dict[str, Any], tenant_id: Optional[int] = None):
+def make_auditor_chain(model_config: Dict[str, Any], tenant_id: Optional[int] = None, content_mode: str = "solution"):
     """创建监察官链（使用RoleManager + Skills注入）
     
     Args:
         model_config: 模型配置
         tenant_id: 租户ID（用于加载订阅的Skills）
+        content_mode: 内容模式（solution 使用方案审核，其他使用内容审核）
     """
     from src.agents.role_manager import RoleManager
-    from src.skills.loader_v2 import SkillLoaderV2
     
     llm = AdapterLLM(backend_config=ModelConfig(**model_config))
     role_manager = RoleManager()
     
-    # 从RoleManager加载prompt和配置
-    stage_name = "review"  # auditor的stage名称
-    prompt_text = role_manager.load_prompt("auditor", stage_name)
-    role_config = role_manager.get_role("auditor")
-    input_vars = role_config.stages[stage_name].input_vars
-    
-    # 加载并注入Skills
-    try:
-        skill_loader = SkillLoaderV2()
-        # 加载监察官适用的技能（包含订阅的builtin + custom skills）
-        skills = skill_loader.get_skills_by_role('监察官', tenant_id=tenant_id)
+    # 根据 content_mode 选择审核维度
+    if content_mode != "solution" and content_mode in ("analysis", "research", "evaluation", "creative", "debate"):
+        # 非 solution 模式：使用内容审核 prompt + ContentAuditorSchema
+        stage_name = "review"
+        role_config = role_manager.get_role("auditor")
+        input_vars = role_config.stages[stage_name].input_vars
         
-        if skills:
-            logger.info(f"[auditor_chain] Loaded {len(skills)} skills for tenant {tenant_id}")
-            # 格式化技能为prompt（不包含metadata以节省token）
-            skills_text = skill_loader.format_all_skills_for_prompt(skills, include_metadata=False)
-            # 在prompt末尾注入技能库
-            prompt_text = prompt_text + "\n\n" + skills_text
+        from pathlib import Path
+        prompt_file = Path(__file__).parent / "roles" / "auditor_content_review.md"
+        if prompt_file.exists():
+            prompt_text = prompt_file.read_text(encoding='utf-8')
+            logger.info(f"[make_auditor_chain] 使用内容审核模式 prompt（content_mode={content_mode}）")
         else:
-            logger.info(f"[auditor_chain] No skills loaded for tenant {tenant_id}")
-    except Exception as e:
-        logger.warning(f"[auditor_chain] Failed to load skills: {e}")
+            logger.warning(f"[make_auditor_chain] 未找到 auditor_content_review.md，回退到方案审核模式")
+            prompt_text = role_manager.load_prompt("auditor", stage_name)
+    else:
+        # solution 模式（默认）：使用原始方案审核 prompt
+        stage_name = "review"
+        prompt_text = role_manager.load_prompt("auditor", stage_name)
+        role_config = role_manager.get_role("auditor")
+        input_vars = role_config.stages[stage_name].input_vars
+    
+    # 注入技能
+    prompt_text = _inject_skills_to_prompt(prompt_text, '监察官', tenant_id, 'auditor_chain')
+    # 注入当前时间
+    prompt_text = _inject_current_time(prompt_text)
     
     prompt = PromptTemplate(template=prompt_text, input_variables=input_vars)
     return prompt | llm
 
 
-def make_leader_chain(model_config: Dict[str, Any], is_final_round: bool = False):
-    """创建议长链（使用RoleManager）
+def make_leader_chain(model_config: Dict[str, Any], is_final_round: bool = False, tenant_id: Optional[int] = None):
+    """创建议长链（使用RoleManager + Skills注入）
     
     Args:
         model_config: 模型配置
         is_final_round: 是否为最后一轮（影响prompt策略）
+        tenant_id: 租户ID（用于加载订阅的Skills）
     """
     from src.agents.role_manager import RoleManager
     
@@ -563,17 +770,21 @@ def make_leader_chain(model_config: Dict[str, Any], is_final_round: bool = False
     role_config = role_manager.get_role("leader")
     input_vars = role_config.stages[stage].input_vars
     
+    # 注入技能
+    prompt_text = _inject_skills_to_prompt(prompt_text, '议长', tenant_id, 'leader_chain')
+    
     prompt = PromptTemplate(template=prompt_text, input_variables=input_vars)
     return prompt | llm
 
 
 # 保留原来的函数签名作为过渡（向后兼容，已废弃）
-def make_devils_advocate_chain(model_config: Dict[str, Any], stage: str = "summary"):
-    """创建Devil's Advocate链（使用RoleManager）
+def make_devils_advocate_chain(model_config: Dict[str, Any], stage: str = "summary", tenant_id: Optional[int] = None):
+    """创建质疑官链（使用RoleManager + Skills注入）
     
     Args:
         model_config: 模型配置
         stage: 质疑阶段 ("decomposition" | "summary")
+        tenant_id: 租户ID（用于加载订阅的Skills）
     """
     from src.agents.role_manager import RoleManager
     
@@ -585,12 +796,15 @@ def make_devils_advocate_chain(model_config: Dict[str, Any], stage: str = "summa
     role_config = role_manager.get_role("devils_advocate")
     input_vars = role_config.stages[stage].input_vars
     
+    # 注入技能
+    prompt_text = _inject_skills_to_prompt(prompt_text, '质疑官', tenant_id, 'devils_advocate_chain')
+    
     prompt = PromptTemplate(template=prompt_text, input_variables=input_vars)
     return prompt | llm
 
 
-def make_report_auditor_chain(model_config: Dict[str, Any]):
-    """创建报告审核官链（使用RoleManager）"""
+def make_report_auditor_chain(model_config: Dict[str, Any], tenant_id: Optional[int] = None):
+    """创建报告审核官链（使用RoleManager + Skills注入）"""
     from src.agents.role_manager import RoleManager
     
     llm = AdapterLLM(backend_config=ModelConfig(**model_config))
@@ -602,12 +816,15 @@ def make_report_auditor_chain(model_config: Dict[str, Any]):
     role_config = role_manager.get_role("report_auditor")
     input_vars = role_config.stages[stage_name].input_vars
     
+    # 注入技能
+    prompt_text = _inject_skills_to_prompt(prompt_text, '报告审核官', tenant_id, 'report_auditor_chain')
+    
     prompt = PromptTemplate(template=prompt_text, input_variables=input_vars)
     return prompt | llm
 
 
-def make_reporter_chain(model_config: Dict[str, Any]):
-    """创建记录员链（使用RoleManager）"""
+def make_reporter_chain(model_config: Dict[str, Any], tenant_id: Optional[int] = None):
+    """创建记录员链（使用RoleManager + Skills注入）"""
     from src.agents.role_manager import RoleManager
     
     role_manager = RoleManager()
@@ -625,8 +842,52 @@ def make_reporter_chain(model_config: Dict[str, Any]):
     prompt_text = role_manager.load_prompt("reporter", "generate")
     input_vars = role_config.stages["generate"].input_vars
     
+    # 注入技能
+    prompt_text = _inject_skills_to_prompt(prompt_text, '记录员', tenant_id, 'reporter_chain')
+    
     prompt = PromptTemplate(template=prompt_text, input_variables=input_vars)
     return prompt | llm
+
+
+def _make_reporter_stage_chain(stage_name: str, model_config: Dict[str, Any], tenant_id: Optional[int] = None):
+    """内部工具：创建记录员管线中某个 stage 的 chain"""
+    from src.agents.role_manager import RoleManager
+
+    role_manager = RoleManager()
+    role_config = role_manager.get_role("reporter")
+
+    # 如果 model_config 没有明确指定 model，使用 reporter 的 default_model
+    if not model_config or not model_config.get('model'):
+        model_config = model_config or {}
+        model_config['model'] = role_config.default_model
+        model_config['type'] = model_config.get('type', 'deepseek')
+
+    llm = AdapterLLM(backend_config=ModelConfig(**model_config))
+
+    prompt_text = role_manager.load_prompt("reporter", stage_name)
+    input_vars = role_config.stages[stage_name].input_vars
+
+    # 注入技能 + 当前时间
+    prompt_text = _inject_skills_to_prompt(prompt_text, '记录员', tenant_id, f'reporter_{stage_name}_chain')
+    prompt_text = _inject_current_time(prompt_text)
+
+    prompt = PromptTemplate(template=prompt_text, input_variables=input_vars)
+    return prompt | llm
+
+
+def make_reporter_blueprint_chain(model_config: Dict[str, Any], tenant_id: Optional[int] = None):
+    """创建记录员蓝图阶段链 (Stage 1)"""
+    return _make_reporter_stage_chain("blueprint", model_config, tenant_id)
+
+
+def make_reporter_section_chain(model_config: Dict[str, Any], tenant_id: Optional[int] = None):
+    """创建记录员章节生成链 (Stage 2)"""
+    return _make_reporter_stage_chain("section", model_config, tenant_id)
+
+
+def make_reporter_assembly_chain(model_config: Dict[str, Any], tenant_id: Optional[int] = None):
+    """创建记录员组装阶段链 (Stage 3)"""
+    return _make_reporter_stage_chain("assembly", model_config, tenant_id)
 
 
 # ========== 参考资料整理功能 ==========
@@ -906,6 +1167,40 @@ def refine_search_references(
     return refined_text, output
 
 
+def _detect_content_mode(issue_text: str) -> str:
+    """根据议题文本自动检测内容模式（content_mode）。
+    
+    基于关键词匹配确定最适合的内容模式。如果无法匹配则默认回退到 solution 模式。
+    
+    Returns:
+        content_mode: solution/analysis/research/evaluation/creative/debate
+    """
+    text = issue_text.lower() if issue_text else ""
+    
+    # 各模式的关键词（按优先级和语义分组）
+    mode_keywords = {
+        "analysis": ["分析", "解读", "解析", "资讯", "新闻", "动态", "趋势", "现状", "情况", "进展", "发展", "观察", "梳理", "盘点", "总结", "汇总", "逐条", "归纳"],
+        "research": ["研究", "调研", "调查", "探索", "深入", "论文", "学术", "综述", "文献", "考察", "探究"],
+        "evaluation": ["评估", "评价", "对比", "比较", "选型", "选择", "哪个好", "优劣", "推荐", "测评", "评测", "打分"],
+        "creative": ["创意", "创作", "设计", "构思", "想象", "故事", "文案", "营销", "品牌", "写一篇", "写一个", "生成"],
+        "debate": ["辩论", "争议", "正反", "讨论", "观点", "是否应该", "利弊", "值不值", "好不好"],
+    }
+    
+    # 计算每种模式的匹配分数
+    scores = {}
+    for mode, keywords in mode_keywords.items():
+        scores[mode] = sum(1 for kw in keywords if kw in text)
+    
+    # 选最高分，如果都是0则默认 solution
+    max_mode = max(scores, key=scores.get)
+    if scores[max_mode] > 0:
+        logger.info(f"[_detect_content_mode] 自动检测内容模式: {max_mode} (匹配{scores[max_mode]}个关键词, 议题: {issue_text[:50]}...)")
+        return max_mode
+    
+    logger.info(f"[_detect_content_mode] 未匹配到特定模式关键词，使用默认 solution 模式 (议题: {issue_text[:50]}...)")
+    return "solution"
+
+
 def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rounds: int = 3, num_planners: int = 2, num_auditors: int = 2, agent_configs: Dict[str, Any] = None, user_id: Optional[int] = None, tenant_id: Optional[int] = None, session_id: Optional[str] = None) -> Dict[str, Any]:
     """Run a multi-round LangChain-driven cycle: leader decomposes, planners generate plans, auditors review, leader summarizes.
     
@@ -989,30 +1284,49 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
     
     max_retries = 3
     
+    # ===== 议题技能自动发现 =====
+    try:
+        from src.skills.auto_discovery import discover_skills_for_issue
+        discovered = discover_skills_for_issue(
+            issue=issue_text,
+            tenant_id=tenant_id,
+            send_event_fn=send_web_event,
+        )
+        if discovered:
+            logger.info(f"[cycle] Auto-discovered {len(discovered)} skills for this issue")
+    except Exception as e:
+        logger.warning(f"[cycle] Skill auto-discovery failed (non-fatal): {e}")
+    
     # 初始化各角色的 Chain
     leader_cfg = agent_configs.get("leader") or model_config
     # 初始拆解阶段明确使用中间轮次行为（因为不是最后一轮）
-    leader_chain = make_leader_chain(leader_cfg, is_final_round=False)
+    leader_chain = make_leader_chain(leader_cfg, is_final_round=False, tenant_id=tenant_id)
     
     devils_advocate_cfg = agent_configs.get("devils_advocate") or model_config
-    devils_advocate_decomposition_chain = make_devils_advocate_chain(devils_advocate_cfg, stage="decomposition")
-    devils_advocate_summary_chain = make_devils_advocate_chain(devils_advocate_cfg, stage="summary")
+    devils_advocate_decomposition_chain = make_devils_advocate_chain(devils_advocate_cfg, stage="decomposition", tenant_id=tenant_id)
+    devils_advocate_summary_chain = make_devils_advocate_chain(devils_advocate_cfg, stage="summary", tenant_id=tenant_id)
     
     reporter_cfg = agent_configs.get("reporter") or model_config
-    reporter_chain = make_reporter_chain(reporter_cfg)
+    reporter_chain = make_reporter_chain(reporter_cfg, tenant_id=tenant_id)
 
-    # 策论家和监察官的 Chain 列表
+    # ===== 内容模式自动检测 =====
+    content_mode = _detect_content_mode(issue_text)
+    _cm_display = schemas.CONTENT_MODES.get(content_mode, content_mode)
+    send_web_event("system_info", message=f"📌 内容模式: {_cm_display}（{content_mode}）", chunk_id=str(uuid.uuid4()))
+    logger.info(f"[cycle] 内容模式: {content_mode} ({_cm_display})")
+
+    # 策论家和监察官的 Chain 列表（根据 content_mode 选择 prompt 和 schema）
     planner_chains = []
     for i in range(num_planners):
         # 优先从 agent_configs 获取 planner_i，否则使用全局 model_config
         p_cfg = agent_configs.get(f"planner_{i}") or model_config
-        planner_chains.append(make_planner_chain(p_cfg, tenant_id=tenant_id))
+        planner_chains.append(make_planner_chain(p_cfg, tenant_id=tenant_id, content_mode=content_mode))
         
     auditor_chains = []
     for i in range(num_auditors):
         # 优先从 agent_configs 获取 auditor_i，否则使用全局 model_config
         a_cfg = agent_configs.get(f"auditor_{i}") or model_config
-        auditor_chains.append(make_auditor_chain(a_cfg, tenant_id=tenant_id))
+        auditor_chains.append(make_auditor_chain(a_cfg, tenant_id=tenant_id, content_mode=content_mode))
 
     # 1. Leader initial decomposition
     logger.info("[cycle] 议长正在进行初始议题拆解...")
@@ -1154,6 +1468,8 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
             try:
                 current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 out, search_res = stream_agent_output(leader_chain, {"inputs": json.dumps(revision_inputs, ensure_ascii=False), "current_time": current_time_str}, "议长", "Leader")
+                if search_res:
+                    all_search_references.append(search_res)
                 
                 cleaned = clean_json_string(out)
                 if not cleaned:
@@ -1169,8 +1485,29 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
                 logger.warning(f"[cycle] 议长修正拆解尝试 {attempt + 1} 失败: {e}")
                 logger.error(traceback.format_exc())
 
+    # ===== 议长 suggested_content_mode 覆盖检查 =====
+    leader_suggested_mode = decomposition.get("suggested_content_mode")
+    valid_modes = ("solution", "analysis", "research", "evaluation", "creative", "debate")
+    if leader_suggested_mode and leader_suggested_mode in valid_modes and leader_suggested_mode != content_mode:
+        logger.info(f"[cycle] 议长建议内容模式: {leader_suggested_mode}，覆盖关键词检测的: {content_mode}")
+        content_mode = leader_suggested_mode
+        _cm_display = schemas.CONTENT_MODES.get(content_mode, content_mode)
+        send_web_event("system_info", message=f"📌 内容模式已更新（议长建议）: {_cm_display}（{content_mode}）", chunk_id=str(uuid.uuid4()))
+        
+        # 重建策论家和监察官的 Chain（使用新的 content_mode）
+        planner_chains = []
+        for i in range(num_planners):
+            p_cfg = agent_configs.get(f"planner_{i}") or model_config
+            planner_chains.append(make_planner_chain(p_cfg, tenant_id=tenant_id, content_mode=content_mode))
+        auditor_chains = []
+        for i in range(num_auditors):
+            a_cfg = agent_configs.get(f"auditor_{i}") or model_config
+            auditor_chains.append(make_auditor_chain(a_cfg, tenant_id=tenant_id, content_mode=content_mode))
+        logger.info(f"[cycle] 已使用新 content_mode={content_mode} 重建策论家/监察官 Chain")
+
     history = []
-    current_instructions = f"议题: {issue_text}\n核心目标: {decomposition['core_goal']}\n关键问题: {decomposition['key_questions']}"
+    current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    current_instructions = f"[当前时间: {current_time_str}]\n议题: {issue_text}\n核心目标: {decomposition['core_goal']}\n关键问题: {decomposition['key_questions']}"
     
     last_plans_map = {i: None for i in range(1, num_planners + 1)}
     last_audits = []
@@ -1213,8 +1550,21 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
                 for audit in last_audits:
                     if isinstance(audit, dict) and "reviews" in audit:
                         for review in audit["reviews"]:
-                            if review.get("plan_id") == target_id:
-                                relevant_feedbacks.append(f"评级: {review.get('rating')}\n质疑: {review.get('issues')}\n建议: {review.get('suggestions')}")
+                            # 兼容 AuditorSchema（plan_id）和 ContentAuditorSchema（content_id）
+                            review_target_id = review.get("plan_id") or review.get("content_id")
+                            if review_target_id == target_id:
+                                if "accuracy_issues" in review:
+                                    # ContentAuditorSchema 格式
+                                    relevant_feedbacks.append(
+                                        f"评级: {review.get('rating')}\n"
+                                        f"准确性问题: {review.get('accuracy_issues')}\n"
+                                        f"覆盖遗漏: {review.get('coverage_gaps')}\n"
+                                        f"质量评价: {review.get('quality_notes')}\n"
+                                        f"建议: {review.get('suggestions')}"
+                                    )
+                                else:
+                                    # AuditorSchema 格式
+                                    relevant_feedbacks.append(f"评级: {review.get('rating')}\n质疑: {review.get('issues')}\n建议: {review.get('suggestions')}")
                 if relevant_feedbacks:
                     feedback = "\n---\n".join(relevant_feedbacks)
 
@@ -1252,9 +1602,13 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
                         raise ValueError("策论家输出为空或不包含 JSON")
                         
                     parsed = json.loads(cleaned)
-                    p = schemas.PlanSchema(**parsed)
+                    # 根据 content_mode 选择正确的 Schema
+                    if content_mode != "solution" and content_mode in ("analysis", "research", "evaluation", "creative", "debate"):
+                        p = schemas.ContentSchema(**parsed)
+                    else:
+                        p = schemas.PlanSchema(**parsed)
                     plan_dict = p.model_dump()
-                    logger.info(f"[round {r}] 策论家 {i} 成功 (尝试 {attempt + 1})")
+                    logger.info(f"[round {r}] 策论家 {i} 成功 (尝试 {attempt + 1}, mode={content_mode})")
                     return plan_dict
                 except Exception as e:
                     logger.warning(f"[round {r}] 策论家 {i} 尝试 {attempt + 1} 失败: {e}")
@@ -1322,8 +1676,12 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
                         raise ValueError("监察官输出为空或不包含 JSON")
                         
                     parsed = json.loads(cleaned)
-                    a = schemas.AuditorSchema(**parsed)
-                    logger.info(f"[round {r}] 监察官 {j} 成功 (尝试 {attempt + 1})")
+                    # 根据 content_mode 选择正确的审核 Schema
+                    if content_mode != "solution" and content_mode in ("analysis", "research", "evaluation", "creative", "debate"):
+                        a = schemas.ContentAuditorSchema(**parsed)
+                    else:
+                        a = schemas.AuditorSchema(**parsed)
+                    logger.info(f"[round {r}] 监察官 {j} 成功 (尝试 {attempt + 1}, mode={content_mode})")
                     return a.model_dump()
                 except Exception as e:
                     logger.warning(f"[round {r}] 监察官 {j} 尝试 {attempt + 1} 失败: {e}")
@@ -1350,9 +1708,10 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
         
         # 根据是否为最后一轮动态创建Leader chain
         is_final_round = (r == max_rounds)
-        current_leader_chain = make_leader_chain(leader_cfg, is_final_round=is_final_round)
+        current_leader_chain = make_leader_chain(leader_cfg, is_final_round=is_final_round, tenant_id=tenant_id)
         
         inputs = {
+            "original_issue": issue_text,
             "original_goal": decomposition['core_goal'],
             "previous_decomposition": decomposition,
             "plans": plans,
@@ -1385,7 +1744,6 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
                     search_results = [tc for tc in tool_calls if tc['tool_name'] == 'web_search']
                     if search_results:
                         all_search_references.append("\n".join([sr['formatted_result'] for sr in search_results]))
-                    all_search_references.append(search_res)
                 
                 cleaned = clean_json_string(out)
                 if not cleaned:
@@ -1475,6 +1833,7 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
             send_web_event("agent_action", agent_name="议长", role_type="Leader", content="正在根据质疑官反馈进行最终修正...", chunk_id=str(uuid.uuid4()))
             
             revision_inputs = {
+                "original_issue": issue_text,
                 "original_summary": final_summary,
                 "devils_advocate_feedback": da_result,
                 "core_goal": decomposition['core_goal'],
@@ -1533,7 +1892,8 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
                 logger.error(f"[round {r}] 数据库保存失败: {e}")
 
         # 更新下一轮指令
-        current_instructions = f"核心目标: {decomposition['core_goal']}\n上轮总结: {final_summary['summary']}\n议长指令: {final_summary['instructions']}"
+        current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        current_instructions = f"[当前时间: {current_time_str}]\n核心目标: {decomposition['core_goal']}\n上轮总结: {final_summary['summary']}\n议长指令: {final_summary['instructions']}"
 
         # 5. 检查终止条件
         has_excellent = False
@@ -1543,7 +1903,7 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
                 for review in audit["reviews"]:
                     if review.get("rating") == "优秀":
                         has_excellent = True
-                        excellent_plan_ids.append(review.get("plan_id"))
+                        excellent_plan_ids.append(review.get("plan_id") or review.get("content_id"))
         
         no_controversies = False
         controversies = []
@@ -1585,9 +1945,32 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
             simplified_history.append(h)
             continue
             
+        def _extract_plan_summary(p):
+            """从方案dict中提取摘要文本，兼容PlanSchema和ContentSchema"""
+            if "detailed_analysis" in p:
+                # ContentSchema 模式
+                parts = []
+                if p.get("topic"):
+                    parts.append(f"主题: {p['topic']}")
+                if p.get("key_findings"):
+                    parts.append(f"核心发现: {json.dumps(p['key_findings'], ensure_ascii=False)}")
+                if p.get("detailed_analysis"):
+                    parts.append(f"详细分析: {p['detailed_analysis'][:500]}")
+                return "\n".join(parts) if parts else str(p)
+            elif "core_idea" in p:
+                # PlanSchema 模式
+                parts = []
+                if p.get("core_idea"):
+                    parts.append(f"核心思路: {p['core_idea']}")
+                if p.get("steps"):
+                    parts.append(f"步骤: {json.dumps(p['steps'], ensure_ascii=False)}")
+                return "\n".join(parts) if parts else str(p)
+            else:
+                return p.get("text", str(p))
+        
         simplified_history.append({
             "round": h["round"],
-            "plans": [{"id": p.get("id"), "text": p.get("text")} for p in h.get("plans", [])],
+            "plans": [{"id": p.get("id"), "text": _extract_plan_summary(p)} for p in h.get("plans", [])],
             "audits": [{"auditor_id": a.get("auditor_id"), "reviews": a.get("reviews")} for a in h.get("audits", [])],
             "devils_advocate": h.get("devils_advocate"),
             "summary": h.get("summary")
@@ -1605,7 +1988,9 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
         "decomposition": decomposition,
         "decomposition_challenge": decomposition_da_result,
         "history": simplified_history,
-        "final_summary": last_summary
+        "final_summary": last_summary,
+        "content_mode": content_mode,
+        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
     
     # 保存最终数据到数据库（需要应用上下文）
@@ -1619,7 +2004,7 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
         except Exception as e:
             logger.error(f"[cycle] 数据库保存失败: {e}")
 
-    report_html = generate_report_from_workspace(workspace_path, model_config, session_id)
+    report_html = generate_report_from_workspace(workspace_path, model_config, session_id, tenant_id=tenant_id)
     
     # 保存报告到数据库（需要应用上下文）
     if DB_AVAILABLE and user_id and SessionRepository:
@@ -1639,14 +2024,16 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
         "session_id": session_id  # 返回session_id供app.py使用
     }
 
-def generate_report_from_workspace(workspace_path: str, model_config: Dict[str, Any], session_id: str = None) -> str:
+def generate_report_from_workspace(workspace_path: str, model_config: Dict[str, Any], session_id: str = None, tenant_id: Optional[int] = None) -> str:
     """从数据库重新生成报告（不再使用文件）。
     
     Args:
         workspace_path: 工作区路径（保留兼容性，实际不再使用）
         model_config: 模型配置
         session_id: 会话ID，必需
+        tenant_id: 租户ID（用于Skills注入）
     """
+    max_retries = 2
     if not session_id:
         session_id = os.path.basename(workspace_path)
     
@@ -1658,6 +2045,7 @@ def generate_report_from_workspace(workspace_path: str, model_config: Dict[str, 
             raise RuntimeError("数据库功能未启用，无法生成报告")
         
         # 导入Flask app并创建应用上下文
+        # 注意：整个报告生成过程都需要 app context（数据库读取 + Skills注入）
         from src.web.app import app
         with app.app_context():
             session = SessionRepository.get_session_by_id(session_id)
@@ -1677,110 +2065,240 @@ def generate_report_from_workspace(workspace_path: str, model_config: Dict[str, 
             all_search_references = session.search_references or []
             logger.info(f"[report] 从数据库加载: 议题={session.issue}, 轮次={len(final_data['history'])}, 搜索结果={len(all_search_references)}条")
         
-        # ===== 参考资料整理环节 =====
-        # 获取原始议题用于相关性判断
-        issue_text = final_data.get("issue", "")
-        if not issue_text:
-            # 尝试从其他字段获取
-            issue_text = final_data.get("decomposition", {}).get("core_goal", "")
-        
-        if all_search_references and len(all_search_references) > 0:
-            logger.info(f"[report] 开始参考资料整理，原始结果: {len(all_search_references)}条")
+            # ===== 参考资料整理环节 =====
+            # 获取原始议题用于相关性判断
+            issue_text = final_data.get("issue", "")
+            if not issue_text:
+                # 尝试从其他字段获取
+                issue_text = final_data.get("decomposition", {}).get("core_goal", "")
             
-            # 每次动态精简引用（不再依赖文件缓存）
-            search_refs_text, refined_output = refine_search_references(
-                all_search_references,
-                issue_text,
-                model_config,
-                workspace_path
-            )
-        else:
-            search_refs_text = "无联网搜索参考资料。"
-            logger.info(f"[report] 无搜索结果需要整理")
+            if all_search_references and len(all_search_references) > 0:
+                logger.info(f"[report] 开始参考资料整理，原始结果: {len(all_search_references)}条")
+                
+                # 每次动态精简引用（不再依赖文件缓存）
+                search_refs_text, refined_output = refine_search_references(
+                    all_search_references,
+                    issue_text,
+                    model_config,
+                    workspace_path
+                )
+            else:
+                search_refs_text = "无联网搜索参考资料。"
+                logger.info(f"[report] 无搜索结果需要整理")
             
-        reporter_chain = make_reporter_chain(model_config)
-
-        max_retries = 3
-        report_html = "报告生成失败"
-        
-        for attempt in range(max_retries):
+            # ===== 图片资源收集环节 =====
+            image_pool_text = ""
+            image_pool = []
             try:
-                logger.info(f"[report] 正在调用模型生成最终报告 (尝试 {attempt + 1}/{max_retries})...")
-                report_html, _ = stream_agent_output(
-                    reporter_chain, 
-                    {
-                        "final_data": json.dumps(final_data, ensure_ascii=False),
-                        "search_references": search_refs_text
-                    }, 
-                    "报告者", 
-                    "Reporter",
-                    event_type="final_report"
+                logger.info(f"[report] ===== 图片资源收集环节开始 =====")
+                from src.utils.image_utils import (
+                    _parse_urls_from_refs,
+                    extract_images_from_search_results,
+                    build_image_pool,
+                    format_image_pool_for_prompt,
                 )
                 
-                report_html = report_html.strip()
-                if report_html.startswith("```html"):
-                    report_html = report_html[7:]
-                elif report_html.startswith("```"):
-                    report_html = report_html[3:]
-                if report_html.endswith("```"):
-                    report_html = report_html[:-3]
-                report_html = report_html.strip()
+                # 解析搜索结果中的页面 URL
+                pages = _parse_urls_from_refs(all_search_references)
+                logger.info(f"[report] 从搜索结果解析到 {len(pages)} 个页面 URL（search_refs 数量: {len(all_search_references)}）")
+                crawler_candidates = []
+                c_candidates = []
                 
-                # **核心修复**: 将 workspace_id 注入 HTML（查找meta标签并替换内容）
-                if session_id:
-                    # 查找并替换 meta 标签中的 workspace-id（如果LLM已生成）
-                    import re
-                    if 'name="workspace-id"' in report_html:
-                        # 如果LLM生成了meta标签，替换其中的内容
-                        report_html = re.sub(
-                            r'<meta\s+name="workspace-id"\s+content="[^"]*">',
-                            f'<meta name="workspace-id" content="{session_id}">',
-                            report_html
-                        )
-                    else:
-                        # 如果没有生成meta标签，在<head>后插入
-                        if '<head>' in report_html:
-                            report_html = report_html.replace(
-                                '<head>',
-                                f'<head>\n    <meta name="workspace-id" content="{session_id}">',
-                                1
-                            )
-                    logger.info(f"[report] 已将 workspace-id 注入 HTML: {session_id}")
+                # --- 并行执行: Playwright 爬取 + Phase C API 搜索 ---
+                from concurrent.futures import ThreadPoolExecutor, as_completed as _as_completed
                 
-                send_web_event("final_report", content=report_html)
-                
-                # 保存到 Workspace
-                filepath = os.path.join(workspace_path, "report.html")
-                
-                # 如果已存在旧报告，则重命名备份
-                if os.path.exists(filepath):
-                    old_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    backup_path = os.path.join(workspace_path, f"report_old_{old_timestamp}.html")
+                def _run_crawler():
+                    """Playwright 爬取搜索结果页面的图片"""
                     try:
-                        os.rename(filepath, backup_path)
-                        logger.info(f"[report] 已将旧报告重命名为: {backup_path}")
+                        from src.utils.image_crawler import crawl_images_from_urls
+                        send_web_event("system_status", content="正在用浏览器爬取页面图片...")
+                        result = crawl_images_from_urls(pages)
+                        logger.info(f"[report] Playwright 爬取: {len(result)} 张候选图片")
+                        return ('crawler', result)
+                    except ImportError:
+                        logger.info("[report] Playwright 爬取模块不可用，将使用 requests 回退")
+                        return ('crawler', [])
                     except Exception as e:
-                        logger.warning(f"[report] 重命名旧报告失败: {e}")
-
-                with open(filepath, "w", encoding="utf-8") as f:
-                    f.write(report_html)
+                        logger.warning(f"[report] Playwright 爬取失败: {e}")
+                        return ('crawler', [])
                 
-                # 同时保留一份到全局 reports 目录
-                reports_dir = os.path.join(os.getcwd(), "reports")
-                if not os.path.exists(reports_dir):
-                    os.makedirs(reports_dir)
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                legacy_filepath = os.path.join(reports_dir, f"report_{timestamp}.html")
-                with open(legacy_filepath, "w", encoding="utf-8") as f:
-                    f.write(report_html)
+                def _run_phase_c():
+                    """Phase C: 图片搜索 API"""
+                    try:
+                        from src.utils.image_search import search_images_for_report, extract_keywords_from_report_data
+                        from src.config_manager import (
+                            GOOGLE_API_KEY, GOOGLE_SEARCH_ENGINE_ID,
+                            UNSPLASH_ACCESS_KEY, PEXELS_API_KEY
+                        )
+                        
+                        img_config = {}
+                        if hasattr(GOOGLE_API_KEY, '__len__') and GOOGLE_API_KEY:
+                            img_config['google_api_key'] = GOOGLE_API_KEY
+                            img_config['google_search_engine_id'] = GOOGLE_SEARCH_ENGINE_ID
+                            logger.info("[report] Phase C: Google API Key 已配置")
+                        if hasattr(UNSPLASH_ACCESS_KEY, '__len__') and UNSPLASH_ACCESS_KEY:
+                            img_config['unsplash_access_key'] = UNSPLASH_ACCESS_KEY
+                        if hasattr(PEXELS_API_KEY, '__len__') and PEXELS_API_KEY:
+                            img_config['pexels_api_key'] = PEXELS_API_KEY
+                        
+                        logger.info(f"[report] Phase C: img_config keys = {list(img_config.keys())}")
+                        
+                        if img_config:
+                            keywords = extract_keywords_from_report_data(final_data)
+                            if keywords:
+                                send_web_event("system_status", content=f"正在搜索配图（关键词: {', '.join(keywords[:3])}）...")
+                                result = search_images_for_report(keywords, img_config)
+                                logger.info(f"[report] Phase C API 搜索: {len(result)} 张候选图片")
+                                return ('phase_c', result)
+                        return ('phase_c', [])
+                    except ImportError:
+                        logger.debug("[report] Phase C 配置未就绪，跳过 API 图片搜索")
+                        return ('phase_c', [])
+                    except Exception as e:
+                        logger.warning(f"[report] Phase C 图片搜索失败: {e}")
+                        return ('phase_c', [])
                 
-                logger.info(f"[report] 报告已保存至 Workspace: {filepath}")
-                return report_html
+                send_web_event("system_status", content="正在收集配图候选（爬虫 + API 并行）...")
+                with ThreadPoolExecutor(max_workers=2) as img_pool_exec:
+                    futures = [img_pool_exec.submit(_run_crawler), img_pool_exec.submit(_run_phase_c)]
+                    for f in _as_completed(futures, timeout=90):
+                        try:
+                            source, result = f.result()
+                            if source == 'crawler':
+                                crawler_candidates = result
+                            else:
+                                c_candidates = result
+                        except Exception as e:
+                            logger.warning(f"[report] 并行图片收集任务异常: {e}")
+                
+                # 如果 Playwright 没有结果，回退到 requests 方式
+                if not crawler_candidates and pages:
+                    logger.info("[report] Playwright 无结果，回退到 requests 方式提取图片")
+                    try:
+                        send_web_event("system_status", content="正在用 requests 提取页面图片...")
+                        crawler_candidates = extract_images_from_search_results(all_search_references)
+                        logger.info(f"[report] Requests 回退提取: {len(crawler_candidates)} 张候选图片")
+                    except Exception as e:
+                        logger.warning(f"[report] Requests 回退也失败: {e}")
+                
+                # --- 合并去重 ---
+                all_candidates = crawler_candidates + c_candidates
+                if all_candidates:
+                    # 按 URL 去重
+                    seen_urls = set()
+                    deduped = []
+                    for c in all_candidates:
+                        u = c.get('url', '')
+                        if u and u not in seen_urls:
+                            seen_urls.add(u)
+                            deduped.append(c)
+                    logger.info(f"[report] 合并去重: {len(all_candidates)} → {len(deduped)} 张候选图片")
+                    all_candidates = deduped
+                
+                # --- 多模态分析（评估相关度、生成描述） ---
+                if all_candidates:
+                    try:
+                        from src.utils.image_analyzer import analyze_images
+                        send_web_event("system_status", content=f"正在用多模态模型分析 {len(all_candidates)} 张候选图片...")
+                        all_candidates = analyze_images(all_candidates, issue_text)
+                        logger.info(f"[report] 多模态分析后: {len(all_candidates)} 张相关图片")
+                    except ImportError:
+                        logger.info("[report] 多模态分析模块不可用，跳过")
+                    except Exception as e:
+                        logger.warning(f"[report] 多模态分析失败（不影响报告生成）: {e}")
+                
+                # --- 构建最终图片池 ---
+                if all_candidates:
+                    image_pool = build_image_pool(all_candidates)
+                    image_pool_text = format_image_pool_for_prompt(image_pool)
+                    logger.info(f"[report] 最终图片池: {len(image_pool)} 张可用配图")
+                    send_web_event("system_status", content=f"配图准备完成: {len(image_pool)} 张可用")
+                else:
+                    logger.info("[report] 无可用候选图片")
+            except ImportError as ie:
+                logger.info(f"[report] image_utils 模块未安装，跳过图片收集: {ie}")
             except Exception as e:
-                logger.warning(f"[report] 报告生成尝试 {attempt + 1} 失败: {e}")
-                logger.error(traceback.format_exc())
-        
-        return report_html
+                logger.warning(f"[report] 图片收集失败（不影响报告生成）: {e}")
+            
+            logger.info(f"[report] ===== 图片资源收集完成: image_pool={len(image_pool)} 张, pool_text 长度={len(image_pool_text)} =====")
+                
+            # ===== 使用多阶段管线生成报告 =====
+            from src.agents.report_pipeline import ReportPipeline
+            
+            _issue_for_report = final_data.get('issue', '') if isinstance(final_data, dict) else ''
+            pipeline = ReportPipeline(
+                model_config=model_config,
+                tenant_id=tenant_id,
+                max_parallel_sections=3,
+            )
+            report_html = pipeline.generate(
+                issue=_issue_for_report,
+                final_data=final_data,
+                search_refs_text=search_refs_text,
+                image_pool_text=image_pool_text,
+                image_pool=image_pool,
+            )
+            
+            if not report_html or report_html == "报告生成失败":
+                return report_html
+            
+            # ===== 后处理（图片注入、workspace-id、保存文件） =====
+            
+            # 注入图片：替换 <!-- IMG_N --> 标记为实际图片
+            if image_pool:
+                try:
+                    from src.utils.image_utils import inject_images_into_html
+                    report_html = inject_images_into_html(report_html, image_pool)
+                    logger.info(f"[report] 图片注入完成")
+                except Exception as e:
+                    logger.warning(f"[report] 图片注入失败（不影响报告）: {e}")
+            
+            # 将 workspace_id 注入 HTML
+            if session_id:
+                import re
+                if 'name="workspace-id"' in report_html:
+                    report_html = re.sub(
+                        r'<meta\s+name="workspace-id"\s+content="[^"]*">',
+                        f'<meta name="workspace-id" content="{session_id}">',
+                        report_html
+                    )
+                else:
+                    if '<head>' in report_html:
+                        report_html = report_html.replace(
+                            '<head>',
+                            f'<head>\n    <meta name="workspace-id" content="{session_id}">',
+                            1
+                        )
+                logger.info(f"[report] 已将 workspace-id 注入 HTML: {session_id}")
+            
+            send_web_event("final_report", content=report_html)
+            
+            # 保存到 Workspace
+            filepath = os.path.join(workspace_path, "report.html")
+            
+            if os.path.exists(filepath):
+                old_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                backup_path = os.path.join(workspace_path, f"report_old_{old_timestamp}.html")
+                try:
+                    os.rename(filepath, backup_path)
+                    logger.info(f"[report] 已将旧报告重命名为: {backup_path}")
+                except Exception as e:
+                    logger.warning(f"[report] 重命名旧报告失败: {e}")
+
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(report_html)
+            
+            # 同时保留一份到全局 reports 目录
+            reports_dir = os.path.join(os.getcwd(), "reports")
+            if not os.path.exists(reports_dir):
+                os.makedirs(reports_dir)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            legacy_filepath = os.path.join(reports_dir, f"report_{timestamp}.html")
+            with open(legacy_filepath, "w", encoding="utf-8") as f:
+                f.write(report_html)
+            
+            logger.info(f"[report] 报告已保存至 Workspace: {filepath}")
+            return report_html
         
     except Exception as e:
         logger.error(f"[report] 从工作区生成报告失败: {e}")
@@ -1859,20 +2377,48 @@ def call_role_designer(requirement: str, backend_config: Optional[Dict[str, Any]
         
         logger.info(f"[role_designer] Reasoning长度: {len(full_reasoning)}, 输出长度: {len(raw_output)}")
         
-        # 清理并解析JSON
+        # 清理并解析JSON（带重试）
         json_str = clean_json_string(raw_output)
         
-        try:
-            json_obj = json.loads(json_str)
-            design = schemas.RoleDesignOutput(**json_obj)
-            logger.info(f"[role_designer] ✅ 成功生成角色: {design.display_name}")
-            return design
-            
-        except (json.JSONDecodeError, ValidationError) as e:
-            logger.error(f"[role_designer] JSON解析失败: {e}")
-            logger.error(f"[role_designer] 原始输出: {raw_output[:500]}")
-            logger.error(f"[role_designer] 完整Reasoning: {full_reasoning[:1000]}")
-            raise Exception(f"角色设计格式错误: {str(e)}")
+        last_error = None
+        for attempt in range(3):  # 最多3次尝试（1次初始 + 2次重试）
+            try:
+                if attempt == 0:
+                    parse_str = json_str
+                else:
+                    # 重试：重新调用 LLM，附带错误提示
+                    logger.info(f"[role_designer] 重试第 {attempt} 次...")
+                    send_web_event("role_designer_content", 
+                                  content=f"\n\n⚠️ JSON格式错误，重试中({attempt}/2)...\n",
+                                  agent_name="角色设计师")
+                    retry_prompt = (
+                        f"{prompt_text}\n\n"
+                        f"⚠️ 你上一次的输出有 JSON 格式错误：{last_error}\n"
+                        f"请重新输出严格的JSON，不要包含注释或多余文本。"
+                    )
+                    retry_parts = []
+                    for chunk in llm.stream(retry_prompt):
+                        if chunk.text:
+                            retry_parts.append(chunk.text)
+                            send_web_event("role_designer_content", content=chunk.text, agent_name="角色设计师")
+                    retry_raw = ''.join(retry_parts)
+                    parse_str = clean_json_string(retry_raw)
+                
+                json_obj = json.loads(parse_str)
+                design = schemas.RoleDesignOutput(**json_obj)
+                logger.info(f"[role_designer] ✅ 成功生成角色: {design.display_name}" + 
+                           (f" (重试{attempt}次)" if attempt > 0 else ""))
+                return design
+                
+            except (json.JSONDecodeError, ValidationError) as e:
+                last_error = str(e)
+                logger.warning(f"[role_designer] 第{attempt+1}次解析失败: {e}")
+                if attempt == 0:
+                    logger.error(f"[role_designer] 原始输出: {raw_output[:500]}")
+        
+        # 所有重试都失败
+        logger.error(f"[role_designer] 3次解析均失败，最后错误: {last_error}")
+        raise Exception(f"角色设计格式错误（已重试2次）: {last_error}")
         
     except Exception as e:
         logger.error(f"[role_designer] 调用失败: {e}")
@@ -1895,6 +2441,10 @@ def run_meta_orchestrator(user_requirement: str, model_config: Dict[str, Any] = 
     """
     try:
         logger.info(f"[meta_orchestrator] 开始规划，需求: {user_requirement[:100]}...")
+        
+        # 清空本次会话的角色创建追踪
+        from src.agents.meta_tools import clear_session_created_roles
+        clear_session_created_roles()
         
         # 使用固定的chunk_id，所有议事编排官的输出都追加到同一个卡片
         orchestrator_chunk_id = str(uuid.uuid4())
@@ -1971,8 +2521,11 @@ def run_meta_orchestrator(user_requirement: str, model_config: Dict[str, Any] = 
             plan_dict = json.loads(cleaned)
             plan = schemas.OrchestrationPlan(**plan_dict)
             
+            _cm = getattr(plan.analysis, 'content_mode', 'solution') or 'solution'
+            _cm_label = schemas.CONTENT_MODES.get(_cm, '未知')
             logger.info(f"[meta_orchestrator] ✅ 成功生成规划方案")
             logger.info(f"  - 问题类型: {plan.analysis.problem_type}")
+            logger.info(f"  - 意图识别: {_cm} ({_cm_label})")
             logger.info(f"  - 推荐框架: {plan.framework_selection.framework_name}")
             logger.info(f"  - 现有角色: {len(plan.role_planning.existing_roles)} 个")
             logger.info(f"  - 需创建角色: {len(plan.role_planning.roles_to_create)} 个")
@@ -2022,6 +2575,7 @@ def run_meta_orchestrator(user_requirement: str, model_config: Dict[str, Any] = 
 
 📋 **需求分析**
 • 问题类型：{plan.analysis.problem_type}
+• 意图识别：{_cm_label}（{_cm}）
 • 复杂度：{plan.analysis.complexity}
 • 所需能力：{', '.join(plan.analysis.required_capabilities[:5])}
 {'  ...' if len(plan.analysis.required_capabilities) > 5 else ''}
@@ -2040,7 +2594,8 @@ def run_meta_orchestrator(user_requirement: str, model_config: Dict[str, Any] = 
 
 ⚙️ **执行配置**
 • 讨论轮次：{plan.execution_config.total_rounds} 轮
-• Agent数量：{sum(plan.execution_config.agent_counts.values())} 个
+• Agent总数：{sum(plan.execution_config.agent_counts.values())} 个
+{chr(10).join(f'  - {role}: {count} 个' for role, count in plan.execution_config.agent_counts.items())}
 • 预估耗时：{plan.execution_config.estimated_duration}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -2079,7 +2634,8 @@ def execute_orchestration_plan(
     workspace_path: Path = None,
     session_id: str = None,
     agent_configs: Dict[str, Any] = None,
-    user_id: int = None
+    user_id: int = None,
+    tenant_id: int = None
 ) -> Dict[str, Any]:
     """
     执行议事编排官生成的规划方案
@@ -2092,6 +2648,7 @@ def execute_orchestration_plan(
         session_id: 会话ID（可选，如果不提供会自动生成）
         agent_configs: 可选的每个Agent的模型配置覆盖
         user_id: 用户ID（用于数据库保存）
+        tenant_id: 租户ID（用于加载订阅的Skills）
         
     Returns:
         执行结果字典
@@ -2198,13 +2755,23 @@ def execute_orchestration_plan(
         agent_configs = agent_configs or {}
         
         # 5. 创建并执行FrameworkEngine
-        send_web_event("system_info", message=f"🚀 开始执行框架: {framework.name}", chunk_id=str(uuid.uuid4()))
+        # 提取 content_mode（意图识别结果）
+        content_mode = getattr(plan.analysis, 'content_mode', 'solution') or 'solution'
+        if content_mode not in ('solution', 'analysis', 'research', 'evaluation', 'creative', 'debate'):
+            logger.warning(f"[execute_orchestration_plan] 未知 content_mode '{content_mode}'，回退到 solution")
+            content_mode = 'solution'
+        logger.info(f"[execute_orchestration_plan] 内容模式: {content_mode} ({schemas.CONTENT_MODES.get(content_mode, '未知')})")
+        
+        _cm_display = schemas.CONTENT_MODES.get(content_mode, content_mode)
+        send_web_event("system_info", message=f"🚀 开始执行框架: {framework.name}\n📌 内容模式: {_cm_display}（{content_mode}）", chunk_id=str(uuid.uuid4()))
         
         engine = FrameworkEngine(
             framework=framework,
             model_config=model_config,
             workspace_path=workspace_path,
-            session_id=session_id
+            session_id=session_id,
+            tenant_id=tenant_id,
+            content_mode=content_mode
         )
         
         execution_result = engine.execute(
@@ -2239,7 +2806,7 @@ def execute_orchestration_plan(
         # 7. 生成报告
         logger.info(f"[execute_orchestration_plan] 开始生成报告...")
         try:
-            report_html = generate_report_from_workspace(str(workspace_path), model_config, session_id)
+            report_html = generate_report_from_workspace(str(workspace_path), model_config, session_id, tenant_id=tenant_id)
             final_result["report_html"] = report_html
             logger.info(f"[execute_orchestration_plan] 报告生成完成")
         except Exception as e:

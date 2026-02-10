@@ -1,7 +1,19 @@
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 
-# 策论家 schema
+# ========== 内容模式定义 ==========
+# content_mode 决定 Planner/Auditor/Reporter 的行为模式
+CONTENT_MODES = {
+    "solution": "解决方案/策略制定",
+    "analysis": "信息分析/资讯解读",
+    "research": "深度调研/技术研究",
+    "evaluation": "评估对比/选型决策",
+    "creative": "创意生成/内容创作",
+    "debate": "辩论探讨/观点碰撞",
+}
+DEFAULT_CONTENT_MODE = "solution"
+
+# 策论家 schema（solution 模式）
 class PlanFeasibility(BaseModel):
     advantages: List[str]
     requirements: List[str]
@@ -12,6 +24,32 @@ class PlanSchema(BaseModel):
     steps: List[str]
     feasibility: PlanFeasibility
     limitations: List[str]
+
+# 策论家 schema（非 solution 模式通用）
+class ContentSchema(BaseModel):
+    """通用内容输出 Schema，适用于 analysis/research/evaluation/creative/debate 模式"""
+    id: str
+    topic: str                        # 分析主题 / 研究课题 / 评估对象 / 创意主题 / 辩论论点
+    key_findings: List[str]           # 核心发现 / 关键要点 / 评估结论 / 核心创意 / 主要论据
+    evidence_and_sources: List[str]   # 支撑证据 / 数据来源 / 参考文献 / 灵感来源 / 论据出处
+    detailed_analysis: str            # 详细分析 / 深度论述 / 对比分析 / 创意阐述 / 完整论证
+    caveats: List[str]                # 局限 / 不确定性 / 注意事项 / 改进空间 / 反方观点
+
+# 监察官 schema（非 solution 模式通用）
+class ContentReviewItem(BaseModel):
+    """通用内容审查项"""
+    content_id: str                   # 对应的内容ID
+    accuracy_issues: List[str]        # 准确性问题
+    coverage_gaps: List[str]          # 覆盖遗漏
+    quality_notes: List[str]          # 质量评价
+    suggestions: List[str]            # 改进建议
+    rating: str                       # 评级
+
+class ContentAuditorSchema(BaseModel):
+    """通用内容审查 Schema"""
+    auditor_id: str
+    reviews: List[ContentReviewItem]
+    summary: str
 
 # 监察官 schema
 class ReviewItem(BaseModel):
@@ -31,6 +69,7 @@ class Decomposition(BaseModel):
     key_questions: List[str]
     boundaries: Optional[str]
     report_design: Optional[Dict[str, str]] = None # 报告结构设计：{"模块名": "内容要求"}
+    suggested_content_mode: Optional[str] = None  # 议长建议的内容模式（solution/analysis/research/evaluation/creative/debate）
 
 class LeaderSummary(BaseModel):
     round: int
@@ -193,6 +232,7 @@ class RoleDesignOutput(BaseModel):
 class RequirementAnalysis(BaseModel):
     """需求分析结果"""
     problem_type: str  # 问题类型：决策类/论证类/分析类/综合类
+    content_mode: str = "solution"  # 内容模式：solution/analysis/research/evaluation/creative/debate
     complexity: str  # 复杂度：简单/中等/复杂
     required_capabilities: List[str]  # 所需能力维度
     reasoning: str  # 分析推理过程
@@ -200,11 +240,22 @@ class RequirementAnalysis(BaseModel):
 
 class ExistingRoleMatch(BaseModel):
     """现有角色匹配结果"""
-    name: str  # 角色ID
+    name: str  # 角色ID（必须是英文标识符，如 planner, macro_economic_analyst）
     display_name: str  # 角色显示名
     match_score: float  # 匹配度 0.0-1.0
     match_reason: str  # 匹配理由
     assigned_count: int = 1  # 分配该角色的Agent数量
+
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v):
+        import re
+        if not re.match(r'^[a-z][a-z0-9_]*$', v):
+            raise ValueError(
+                f'角色name必须是英文标识符（小写字母+数字+下划线），不能使用中文。'
+                f'收到: "{v}"。请使用如 planner, stock_analyst 的格式。'
+            )
+        return v
 
 
 class RoleToCreate(BaseModel):
@@ -277,3 +328,30 @@ class OrchestrationPlan(BaseModel):
     framework_selection: FrameworkSelection  # 框架选择
     execution_config: ExecutionConfig  # 执行配置
     summary: PlanSummary  # 方案摘要
+
+
+# ========== 报告管线 Schemas ==========
+
+class SectionBlueprint(BaseModel):
+    """单个章节的蓝图"""
+    section_id: str  # "section_1", "section_2"...
+    title: str  # 章节标题
+    content_brief: str  # 本章节核心内容摘要（2-3句话）
+    data_sources: List[str]  # 指向 final_data 中的数据路径
+    chart_hints: Optional[List[Dict[str, str]]] = None  # [{"type": "radar", "data_description": "..."}]
+    mermaid_hints: Optional[List[str]] = None  # ["flowchart: 技术栈选型流程"]
+    design_keywords: Optional[List[str]] = None  # ["dashboard", "comparison"]
+    estimated_length: str = "medium"  # "short" | "medium" | "long"
+    relevant_ref_indices: Optional[List[int]] = None  # 该章节相关的搜索引用索引
+
+
+class ReportBlueprint(BaseModel):
+    """完整报告蓝图"""
+    report_title: str  # 报告标题
+    overall_style: str  # "professional-minimal" | "modern-gradient" | "dark-tech" 等
+    color_scheme: Optional[Dict[str, str]] = None  # {"primary": "#2563eb", "accent": "#f59e0b"}
+    font_suggestion: Optional[str] = None  # "Inter + Noto Sans SC"
+    sections: List[SectionBlueprint]  # 章节蓝图列表
+    executive_summary_brief: str  # 执行摘要内容提示
+    has_framework_flow: bool = False  # 是否需要生成框架执行流程图
+    framework_info: Optional[str] = None  # 框架信息（用于流程图）

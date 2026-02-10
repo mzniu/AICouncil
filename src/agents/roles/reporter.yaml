@@ -1,17 +1,48 @@
 name: reporter
 display_name: 记录员 (Reporter)
-version: "1.0.0"
+version: "2.0.0"
 description: |
   记录员角色，负责根据完整议事记录生成最终HTML报告。
-  强调可视化、交互性和专业性。
+  支持多阶段管线模式（蓝图→章节→组装）和单次生成模式。
 
 stages:
+  # ===== 多阶段管线 (Pipeline Mode) =====
+  blueprint:
+    prompt_file: reporter_blueprint.md
+    schema: ReportBlueprint  # 输出严格JSON，Pydantic校验
+    input_vars:
+      - issue
+      - final_data
+      - search_references
+
+  section:
+    prompt_file: reporter_section.md
+    schema: null  # 输出HTML片段
+    input_vars:
+      - issue
+      - section_blueprint
+      - section_data
+      - design_system
+      - search_refs_subset
+
+  assembly:
+    prompt_file: reporter_assembly.md
+    schema: null  # 输出完整HTML页面
+    input_vars:
+      - blueprint_json
+      - all_sections_html
+      - reference_list
+      - image_pool
+
+  # ===== 单次生成回退 (Fallback Mode) =====
   generate:
     prompt_file: reporter_generate.md
     schema: null  # Reporter直接输出HTML，不使用Pydantic schema
     input_vars:
+      - issue
       - final_data
       - search_references
+      - image_pool
 
 default_model: deepseek-reasoner
 
@@ -19,13 +50,17 @@ parameters:
   max_retries: 2
   temperature: 0.6
   max_tokens: 8000
+  # 管线特有参数
+  pipeline_parallel_sections: 3  # 并行生成章节数
+  pipeline_section_max_tokens: 4000  # 每个章节最大token
 
 tags:
   - reporting
   - visualization
   - final
+  - pipeline
 
 ui:
   icon: "📝"
   color: "#F59E0B"
-  description_short: "生成专业的可视化报告"
+  description_short: "生成专业的可视化报告（支持管线模式）"
