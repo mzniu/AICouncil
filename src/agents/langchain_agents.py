@@ -8,6 +8,7 @@ from src.agents.frameworks import get_framework
 from src.agents.tool_calling_agent import stream_tool_calling_agent
 from pydantic import ValidationError
 import json
+import re
 import requests
 import os
 from typing import List, Dict, Any, Optional
@@ -590,8 +591,46 @@ def make_generic_role_chain(role_name: str, stage_name: str, model_config: Dict[
     
     input_vars = role_config.stages[stage_name].input_vars
     
-    prompt = PromptTemplate(template=prompt_text, input_variables=input_vars)
+    prompt = _create_safe_prompt(prompt_text, input_vars)
     return prompt | llm
+
+
+def _create_safe_prompt(template_text: str, input_vars: list) -> PromptTemplate:
+    """创建 PromptTemplate，自动转义模板文本中不属于 input_vars 的 {word} 占位符。
+
+    LangChain 的 PromptTemplate 使用 Python str.format()，要求所有 {word} 都在
+    input_variables 中。Skills 注入的文本可能包含 {keyword}、{report_id} 等不应被
+    当作模板变量的占位符——这些需要转义为 {{keyword}}。而同时出现在 input_vars 中的
+    {issue} 等变量则必须保留以便正常替换。
+
+    策略：
+      1. 先保护已有的 {{ / }} 转义（避免被二次转义）
+      2. 对所有 {word} 做判断：在 input_vars 中 → 保留，否则 → 转义
+      3. 恢复第 1 步的保护占位符
+    """
+    if not input_vars:
+        input_vars = []
+
+    var_set = set(input_vars)
+
+    # 1. 临时替换已有的 {{ 和 }}，防止被后续正则误匹配
+    PLACEHOLDER_OPEN = "\x00__DOUBLE_OPEN__\x00"
+    PLACEHOLDER_CLOSE = "\x00__DOUBLE_CLOSE__\x00"
+    text = template_text.replace("{{", PLACEHOLDER_OPEN).replace("}}", PLACEHOLDER_CLOSE)
+
+    # 2. 对 {word} 做选择性转义
+    def _escape_if_not_var(match: re.Match) -> str:
+        name = match.group(1)
+        if name in var_set:
+            return match.group(0)  # 保留，让 PromptTemplate 替换
+        return PLACEHOLDER_OPEN + name + PLACEHOLDER_CLOSE  # 转义
+
+    text = re.sub(r'\{(\w+)\}', _escape_if_not_var, text)
+
+    # 3. 恢复占位符为 {{ / }}
+    text = text.replace(PLACEHOLDER_OPEN, "{{").replace(PLACEHOLDER_CLOSE, "}}")
+
+    return PromptTemplate(template=text, input_variables=input_vars)
 
 
 def _inject_current_time(prompt_text: str) -> str:
@@ -649,8 +688,9 @@ def _inject_skills_to_prompt_inner(prompt_text: str, role_chinese: str, tenant_i
         if skills:
             logger.info(f"[{chain_name}] Loaded {len(skills)} skills for role '{role_chinese}' (tenant={tenant_id})")
             skills_text = skill_loader.format_all_skills_for_prompt(skills, include_metadata=False)
-            # 转义 Skills 文本中的花括号，防止被 LangChain PromptTemplate 误解析为模板变量
-            skills_text = skills_text.replace('{', '{{').replace('}', '}}')
+            # 注意：不在此处转义花括号。Skills 文本中的 {word} 占位符
+            # 由 _create_safe_prompt() 统一处理——属于 input_vars 的保留替换，
+            # 不属于的自动转义为 {{word}}，避免 PromptTemplate 报错。
             return prompt_text + "\n\n" + skills_text
         else:
             logger.info(f"[{chain_name}] No skills for role '{role_chinese}' (tenant={tenant_id})")
@@ -702,7 +742,7 @@ def make_planner_chain(model_config: Dict[str, Any], tenant_id: Optional[int] = 
     # 注入当前时间
     prompt_text = _inject_current_time(prompt_text)
     
-    prompt = PromptTemplate(template=prompt_text, input_variables=input_vars)
+    prompt = _create_safe_prompt(prompt_text, input_vars)
     return prompt | llm
 
 
@@ -747,7 +787,7 @@ def make_auditor_chain(model_config: Dict[str, Any], tenant_id: Optional[int] = 
     # 注入当前时间
     prompt_text = _inject_current_time(prompt_text)
     
-    prompt = PromptTemplate(template=prompt_text, input_variables=input_vars)
+    prompt = _create_safe_prompt(prompt_text, input_vars)
     return prompt | llm
 
 
@@ -775,7 +815,7 @@ def make_leader_chain(model_config: Dict[str, Any], is_final_round: bool = False
     # 注入技能
     prompt_text = _inject_skills_to_prompt(prompt_text, '议长', tenant_id, 'leader_chain')
     
-    prompt = PromptTemplate(template=prompt_text, input_variables=input_vars)
+    prompt = _create_safe_prompt(prompt_text, input_vars)
     return prompt | llm
 
 
@@ -801,7 +841,7 @@ def make_devils_advocate_chain(model_config: Dict[str, Any], stage: str = "summa
     # 注入技能
     prompt_text = _inject_skills_to_prompt(prompt_text, '质疑官', tenant_id, 'devils_advocate_chain')
     
-    prompt = PromptTemplate(template=prompt_text, input_variables=input_vars)
+    prompt = _create_safe_prompt(prompt_text, input_vars)
     return prompt | llm
 
 
@@ -821,7 +861,7 @@ def make_report_auditor_chain(model_config: Dict[str, Any], tenant_id: Optional[
     # 注入技能
     prompt_text = _inject_skills_to_prompt(prompt_text, '报告审核官', tenant_id, 'report_auditor_chain')
     
-    prompt = PromptTemplate(template=prompt_text, input_variables=input_vars)
+    prompt = _create_safe_prompt(prompt_text, input_vars)
     return prompt | llm
 
 
@@ -847,7 +887,7 @@ def make_reporter_chain(model_config: Dict[str, Any], tenant_id: Optional[int] =
     # 注入技能
     prompt_text = _inject_skills_to_prompt(prompt_text, '记录员', tenant_id, 'reporter_chain')
     
-    prompt = PromptTemplate(template=prompt_text, input_variables=input_vars)
+    prompt = _create_safe_prompt(prompt_text, input_vars)
     return prompt | llm
 
 
@@ -873,7 +913,7 @@ def _make_reporter_stage_chain(stage_name: str, model_config: Dict[str, Any], te
     prompt_text = _inject_skills_to_prompt(prompt_text, '记录员', tenant_id, f'reporter_{stage_name}_chain')
     prompt_text = _inject_current_time(prompt_text)
 
-    prompt = PromptTemplate(template=prompt_text, input_variables=input_vars)
+    prompt = _create_safe_prompt(prompt_text, input_vars)
     return prompt | llm
 
 
