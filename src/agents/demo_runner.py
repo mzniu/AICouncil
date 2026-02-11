@@ -170,54 +170,19 @@ def run_meta_orchestrator_flow(issue_text: str, model_config: dict, agent_config
             agent_count = len(stage_output.get("agents", []))
             print(f"  - {stage_name}: {agent_count} 个Agent参与")
         
-        # Stage Final: Reporter生成报告
-        logger.info("[meta_flow] Stage Final: 生成最终报告...")
-        print(f"\n📝 Stage Final: 生成报告")
-        print("-" * 60)
+        # 报告已由 execute_orchestration_plan 内部通过 ReportPipeline 生成
+        # （generate_report_from_workspace → ReportPipeline.generate）
+        # 无需再次调用 make_reporter_chain
+        report_content = execution_result.get("report_html", "")
+        if not report_content or report_content == "报告生成失败":
+            logger.warning("[meta_flow] execute_orchestration_plan 未成功生成报告")
+            print("⚠️ Pipeline 报告生成失败，报告可能为空")
+        else:
+            print(f"✅ 报告由多阶段管线生成完成 (长度: {len(report_content)})")
         
-        # 使用Reporter生成HTML报告
-        from src.agents.langchain_agents import make_reporter_chain
-        from pathlib import Path
-        import uuid
-        
-        # 获取 reporter 的配置（如果 agent_configs 中没有，传递空字典让 make_reporter_chain 使用 default_model）
-        reporter_config = agent_configs.get("reporter") if agent_configs else None
-        if not reporter_config:
-            # 传递空字典，让 make_reporter_chain 使用 reporter.yaml 的 default_model
-            reporter_config = {"type": model_config.get("type", "deepseek")}
-        
-        reporter_chain = make_reporter_chain(reporter_config, tenant_id=tenant_id)
-        
-        # 构建Reporter输入（包含所有stage的输出）
-        reporter_input = _build_reporter_input(
-            user_requirement=issue_text,
-            orchestration_plan=orchestration_plan,
-            execution_result=execution_result
-        )
-        
-        # 调用Reporter
-        from src.agents.langchain_agents import stream_agent_output
-        
-        report_content, search_res = stream_agent_output(
-            reporter_chain,
-            {
-                "issue": issue_text,
-                "final_data": reporter_input,
-                "search_references": "",  # 议事编排官模式下搜索引用由各Agent自行处理
-                "image_pool": ""
-            },
-            "记录员",
-            "reporter",
-            event_type="agent_action"
-        )
-        
-        # 报告已通过数据库保存，不再写入文件
-        print(f"✅ 报告已保存到数据库")
-        
-        # 发送讨论完成事件和最终报告内容
+        # 补发讨论完成事件（generate_report_from_workspace 内部已发送 final_report）
         from src.agents.langchain_agents import send_web_event
         send_web_event("discussion_complete", session_id=execution_result['session_id'])
-        send_web_event("final_report", content=report_content, session_id=execution_result['session_id'])
         
         # 返回完整结果
         final_result = {

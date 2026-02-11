@@ -1348,8 +1348,8 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
     devils_advocate_decomposition_chain = make_devils_advocate_chain(devils_advocate_cfg, stage="decomposition", tenant_id=tenant_id)
     devils_advocate_summary_chain = make_devils_advocate_chain(devils_advocate_cfg, stage="summary", tenant_id=tenant_id)
     
-    reporter_cfg = agent_configs.get("reporter") or model_config
-    reporter_chain = make_reporter_chain(reporter_cfg, tenant_id=tenant_id)
+    # 注意：reporter chain 不在此处创建。报告生成由 generate_report_from_workspace()
+    # 内部的 ReportPipeline 处理（多阶段管线），模型配置在报告阶段传递。
 
     # ===== 内容模式自动检测 =====
     content_mode = _detect_content_mode(issue_text)
@@ -2046,7 +2046,9 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
         except Exception as e:
             logger.error(f"[cycle] 数据库保存失败: {e}")
 
-    report_html = generate_report_from_workspace(workspace_path, model_config, session_id, tenant_id=tenant_id)
+    # 使用 reporter 专用配置（如 agent_configs 中有指定），否则用全局 model_config
+    report_model_cfg = agent_configs.get("reporter") or model_config
+    report_html = generate_report_from_workspace(workspace_path, report_model_cfg, session_id, tenant_id=tenant_id)
     
     # 保存报告到数据库（需要应用上下文）
     if DB_AVAILABLE and user_id and SessionRepository:
