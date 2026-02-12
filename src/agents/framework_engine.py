@@ -23,12 +23,14 @@ from src.agents.langchain_agents import (
     stream_agent_output,
     send_web_event,
     clean_json_string,
+    convert_chain_to_tool_calling_format,
     make_leader_chain,
     make_planner_chain,
     make_auditor_chain,
     make_devils_advocate_chain,
     make_reporter_chain
 )
+from src.agents.tool_calling_agent import stream_tool_calling_agent
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -643,7 +645,7 @@ class FrameworkEngine:
         display_name: str,
         agent_input: Dict[str, str]
     ) -> Dict[str, Any]:
-        """执行单个Agent
+        """执行单个Agent（使用 Function Calling 工具调用）
         
         Args:
             chain: LangChain chain
@@ -661,17 +663,28 @@ class FrameworkEngine:
             try:
                 logger.info(f"[FrameworkEngine] {agent_id} 正在思考 (尝试 {attempt+1}/{max_retries})...")
                 
-                # 流式输出（会自动发送Web事件）
-                output, search_res = stream_agent_output(
-                    chain, 
-                    agent_input, 
-                    display_name, 
-                    role_type,
+                # 转换为 tool-calling 格式
+                system_prompt, user_prompt, mc = convert_chain_to_tool_calling_format(
+                    chain, agent_input, role_type
+                )
+                
+                # 使用 Function Calling Agent 执行
+                output, tool_calls = stream_tool_calling_agent(
+                    role_type=role_type,
+                    agent_name=display_name,
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    model_config=mc,
                     event_type="agent_action"
                 )
                 
-                if search_res:
-                    self.all_search_references.append(search_res)
+                # 收集搜索引用
+                if tool_calls:
+                    for tc in tool_calls:
+                        if tc.get('tool_name') == 'web_search':
+                            search_result = tc.get('result', {})
+                            if search_result.get('success') and search_result.get('results'):
+                                self.all_search_references.append(search_result['results'])
                 
                 # 返回结构化输出
                 return {
@@ -679,6 +692,7 @@ class FrameworkEngine:
                     "role_type": role_type,
                     "display_name": display_name,
                     "content": output,
+                    "tool_calls": tool_calls,
                     "timestamp": datetime.now().isoformat(),
                     "attempt": attempt + 1
                 }
@@ -715,21 +729,34 @@ class FrameworkEngine:
         # 构建综合输入（包含所有stage的输出）
         synthesis_input = self._build_synthesis_input()
         
+        prompt_vars = {"inputs": synthesis_input, "current_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+        
         max_retries = 3
         for attempt in range(max_retries):
             try:
                 logger.info(f"[FrameworkEngine] 议长正在进行最终综合 (尝试 {attempt+1}/{max_retries})...")
                 
-                output, search_res = stream_agent_output(
-                    leader_chain,
-                    {"inputs": synthesis_input, "current_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")},
-                    "议长",
-                    "leader",
+                # 使用 Function Calling Agent 执行最终综合
+                system_prompt, user_prompt, mc = convert_chain_to_tool_calling_format(
+                    leader_chain, prompt_vars, "leader"
+                )
+                
+                output, tool_calls = stream_tool_calling_agent(
+                    role_type="leader",
+                    agent_name="议长",
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    model_config=mc,
                     event_type="synthesis"
                 )
                 
-                if search_res:
-                    self.all_search_references.append(search_res)
+                # 收集搜索引用
+                if tool_calls:
+                    for tc in tool_calls:
+                        if tc.get('tool_name') == 'web_search':
+                            search_result = tc.get('result', {})
+                            if search_result.get('success') and search_result.get('results'):
+                                self.all_search_references.append(search_result['results'])
                 
                 # 尝试解析JSON
                 cleaned = clean_json_string(output)

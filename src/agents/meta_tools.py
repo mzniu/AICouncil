@@ -461,9 +461,11 @@ def get_tools_for_role(role_type: str) -> tuple:
         return executors, schemas
     
     else:
-        # 未知角色类型，返回空工具集
-        logger.warning(f"Unknown role_type: {role_type}, returning empty tools")
-        return {}, []
+        # 未知/自定义角色类型：默认分配 Search 工具（确保联网搜索能力）
+        logger.info(f"[get_tools_for_role] Custom role_type: {role_type}, assigning Search tools")
+        executors = {**SEARCH_TOOL_EXECUTORS}
+        schemas = list(_SEARCH_TOOL_SCHEMAS)
+        return executors, schemas
 
 
 # ========== 工具调用执行器 ==========# ========== 工具调用执行器 ==========

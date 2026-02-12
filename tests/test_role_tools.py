@@ -46,10 +46,11 @@ for role_type in roles_to_test:
             print(f"  ❌ 期望: {expected}")
     
     elif role_type == "unknown":
-        if len(executors) == 0:
-            print("  ✅ 未知角色返回空工具集")
+        expected = ["web_search"]
+        if set(executors.keys()) == set(expected):
+            print("  ✅ 未知/自定义角色获得Search工具")
         else:
-            print("  ❌ 应该返回空工具集")
+            print(f"  ❌ 期望自定义角色获得Search工具: {expected}")
 
 print("\n" + "=" * 80)
 print("✅ 所有角色工具分配测试完成")
