@@ -24,6 +24,17 @@ from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
+# 本次 meta-orchestrator 会话中通过 create_role 创建的角色名集合
+_session_created_roles: set = set()
+
+def clear_session_created_roles():
+    """清空本次会话创建的角色记录（在 meta-orchestrator 启动前调用）"""
+    _session_created_roles.clear()
+
+def get_session_created_roles() -> set:
+    """获取本次会话创建的角色名集合"""
+    return set(_session_created_roles)
+
 
 # ========== 工具1: list_roles ==========
 
@@ -180,6 +191,9 @@ def create_role(requirement: str) -> Dict[str, Any]:
         }
         
         logger.info(f"[create_role] ✅ 成功创建角色: {design_output.role_name}")
+        
+        # 记录到本次会话追踪集合
+        _session_created_roles.add(design_output.role_name)
         
         return {
             "success": True,

@@ -107,9 +107,13 @@ class MarketplaceClient:
         self.github_token = getattr(config, 'GITHUB_TOKEN', None)
 
     def search(self, query: str = '', category: str = '',
-               page: int = 1, page_size: int = 20) -> Dict[str, Any]:
+               page: int = 1, page_size: int = 20,
+               mode: str = 'keyword') -> Dict[str, Any]:
         """
         搜索技能（依次尝试 SkillsMP API → GitHub → 精选列表）
+
+        Args:
+            mode: 'keyword' (关键词搜索) | 'ai' (AI 语义搜索)
 
         Returns:
             {
@@ -117,10 +121,21 @@ class MarketplaceClient:
                 "total": int,
                 "page": int,
                 "page_size": int,
-                "source": "skillsmp" | "github" | "curated"
+                "source": "skillsmp" | "skillsmp_ai" | "github" | "curated"
             }
         """
-        # 尝试 SkillsMP API
+        # AI 语义搜索模式
+        if mode == 'ai' and self.skillsmp_key and query:
+            try:
+                result = self._search_skillsmp_ai(query)
+                if result and result.get('items'):
+                    return result
+            except Exception as e:
+                logger.warning(f"[marketplace] SkillsMP AI search failed: {e}")
+            # AI搜索失败，fallback到关键词搜索
+            logger.info("[marketplace] AI search failed, falling back to keyword search")
+
+        # 尝试 SkillsMP API 关键词搜索
         if self.skillsmp_key:
             try:
                 result = self._search_skillsmp(query, category, page, page_size)
@@ -147,21 +162,31 @@ class MarketplaceClient:
 
     def import_skill(self, github_url: str) -> Dict[str, Any]:
         """
-        从 GitHub URL 下载并解析 Skill
+        从 GitHub URL 下载并解析 Skill，自动尝试 URL 变体
 
         Returns:
             {"success": bool, "skill_md": str, "skill_data": dict, "error": str}
         """
         try:
-            # 将 GitHub 页面URL转为 raw URL
-            raw_url = self._to_raw_url(github_url)
+            # 构建候选 URL 列表（原始 + 分支/路径变体）
+            urls_to_try = self._build_url_variants(github_url)
 
-            resp = self.session.get(raw_url, timeout=self.timeout)
-            resp.raise_for_status()
-            content = resp.text
+            content = None
+            last_error = None
+            for url in urls_to_try:
+                try:
+                    resp = self.session.get(url, timeout=self.timeout)
+                    resp.raise_for_status()
+                    if resp.text.strip():
+                        content = resp.text
+                        break
+                except RequestException as e:
+                    last_error = e
+                    continue
 
-            if not content.strip():
-                return {"success": False, "error": "Downloaded content is empty"}
+            if content is None:
+                logger.error(f"[marketplace] Download failed for all URL variants of: {github_url}, last error: {last_error}")
+                return {"success": False, "error": f"Download failed: {str(last_error)}"}
 
             # 解析 frontmatter
             skill_data = self._parse_skill_md(content)
@@ -183,9 +208,6 @@ class MarketplaceClient:
                 "skill_data": skill_data
             }
 
-        except RequestException as e:
-            logger.error(f"[marketplace] Download failed: {github_url}, {e}")
-            return {"success": False, "error": f"Download failed: {str(e)}"}
         except Exception as e:
             logger.error(f"[marketplace] Import error: {github_url}, {e}")
             return {"success": False, "error": f"Import error: {str(e)}"}
@@ -259,12 +281,12 @@ class MarketplaceClient:
 
     def _search_skillsmp(self, query: str, category: str,
                          page: int, page_size: int) -> Dict[str, Any]:
-        """调用 SkillsMP API 搜索"""
+        """调用 SkillsMP API 关键词搜索"""
         headers = {'Authorization': f'Bearer {self.skillsmp_key}'}
         params = {
-            'q': query,
+            'q': query or '*',
             'page': page,
-            'per_page': page_size,
+            'limit': min(page_size, 100),
         }
         if category:
             params['category'] = category
@@ -274,28 +296,95 @@ class MarketplaceClient:
             params=params, headers=headers, timeout=self.timeout
         )
         resp.raise_for_status()
-        data = resp.json()
+        body = resp.json()
 
-        # 适配返回格式
+        if not body.get('success'):
+            logger.warning(f"[marketplace] SkillsMP API returned success=false")
+            return {'items': [], 'total': 0, 'page': page, 'page_size': page_size, 'source': 'skillsmp'}
+
+        data = body.get('data', {})
+        skills_list = data.get('skills', [])
+        pagination = data.get('pagination', {})
+
         items = []
-        for item in data.get('skills', data.get('items', [])):
+        for skill in skills_list:
+            # githubUrl 是目录 URL (github.com/owner/repo/tree/branch/.claude/skills/name)
+            # 需要转为 raw SKILL.md URL
+            github_url = skill.get('githubUrl', '')
+            raw_url = self._github_tree_to_raw_url(github_url) if github_url else ''
+
             items.append({
-                'name': item.get('name', ''),
-                'displayName': item.get('display_name', item.get('name', '')),
-                'description': item.get('description', ''),
-                'category': item.get('category', ''),
-                'stars': item.get('stars', 0),
-                'slug': item.get('slug', ''),
-                'github_url': item.get('github_url', ''),
+                'name': skill.get('name', ''),
+                'displayName': skill.get('name', ''),
+                'description': skill.get('description', ''),
+                'author': skill.get('author', ''),
+                'category': '',
+                'stars': skill.get('stars', 0),
+                'slug': '',
+                'github_url': raw_url,
+                'skill_url': skill.get('skillUrl', ''),
+                'updated_at': skill.get('updatedAt', ''),
                 'source': 'skillsmp'
             })
 
         return {
             'items': items,
-            'total': data.get('total', len(items)),
-            'page': page,
-            'page_size': page_size,
+            'total': pagination.get('total', len(items)),
+            'page': pagination.get('page', page),
+            'page_size': pagination.get('limit', page_size),
             'source': 'skillsmp'
+        }
+
+    def _search_skillsmp_ai(self, query: str) -> Dict[str, Any]:
+        """调用 SkillsMP AI 语义搜索（Cloudflare AI 向量检索）"""
+        headers = {'Authorization': f'Bearer {self.skillsmp_key}'}
+        params = {'q': query}
+
+        resp = self.session.get(
+            f'{self.skillsmp_base}/skills/ai-search',
+            params=params, headers=headers, timeout=self.timeout
+        )
+        resp.raise_for_status()
+        body = resp.json()
+
+        if not body.get('success'):
+            logger.warning(f"[marketplace] SkillsMP AI search returned success=false")
+            return {'items': [], 'total': 0, 'page': 1, 'page_size': 20, 'source': 'skillsmp_ai'}
+
+        data = body.get('data', {})
+        results = data.get('data', [])  # data.data[] 是结果数组
+
+        items = []
+        for result in results:
+            skill = result.get('skill')
+            if not skill:
+                # 部分结果只有 file_id/filename/score，没有 skill 对象
+                continue
+
+            github_url = skill.get('githubUrl', '')
+            raw_url = self._github_tree_to_raw_url(github_url) if github_url else ''
+
+            items.append({
+                'name': skill.get('name', ''),
+                'displayName': skill.get('name', ''),
+                'description': skill.get('description', ''),
+                'author': skill.get('author', ''),
+                'category': '',
+                'stars': skill.get('stars', 0),
+                'slug': '',
+                'github_url': raw_url,
+                'skill_url': skill.get('skillUrl', ''),
+                'updated_at': skill.get('updatedAt', ''),
+                'score': round(result.get('score', 0), 3),
+                'source': 'skillsmp_ai'
+            })
+
+        return {
+            'items': items,
+            'total': len(items),
+            'page': 1,
+            'page_size': len(items),
+            'source': 'skillsmp_ai'
         }
 
     def _search_github(self, query: str, page: int, page_size: int) -> Dict[str, Any]:
@@ -391,7 +480,7 @@ class MarketplaceClient:
         }
 
     def _to_raw_url(self, url: str) -> str:
-        """将 GitHub URL 转为 raw URL"""
+        """将 GitHub URL 转为 raw URL（支持 blob 和 tree URL）"""
         if 'raw.githubusercontent.com' in url:
             return url
         # https://github.com/owner/repo/blob/branch/path → raw URL
@@ -399,7 +488,81 @@ class MarketplaceClient:
         if m:
             owner, repo, path = m.groups()
             return f"https://raw.githubusercontent.com/{owner}/{repo}/{path}"
+        # https://github.com/owner/repo/tree/branch/path → raw URL (目录，追加 /SKILL.md)
+        m = re.match(r'https?://github\.com/([^/]+)/([^/]+)/tree/(.+)', url)
+        if m:
+            owner, repo, path = m.groups()
+            return f"https://raw.githubusercontent.com/{owner}/{repo}/{path}/SKILL.md"
         return url
+
+    def _build_url_variants(self, github_url: str) -> List[str]:
+        """
+        构建候选 URL 列表，用于容错下载。
+        针对 raw URL 尝试不同分支和路径变体。
+        """
+        primary = self._to_raw_url(github_url)
+        variants = [primary]
+
+        # 解析 raw URL: raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}
+        m = re.match(
+            r'https://raw\.githubusercontent\.com/([^/]+)/([^/]+)/([^/]+)/(.+)',
+            primary
+        )
+        if not m:
+            return variants
+
+        owner, repo, branch, path = m.groups()
+
+        # 1) 尝试另一个分支
+        alt_branch = 'master' if branch == 'main' else 'main'
+        variants.append(f"https://raw.githubusercontent.com/{owner}/{repo}/{alt_branch}/{path}")
+
+        # 2) 如果路径是 skills/xxx/SKILL.md，也尝试 .claude/skills/xxx/SKILL.md
+        if path.startswith('skills/') and not path.startswith('.claude/'):
+            claude_path = '.claude/' + path
+            variants.append(f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{claude_path}")
+            variants.append(f"https://raw.githubusercontent.com/{owner}/{repo}/{alt_branch}/{claude_path}")
+
+        # 3) 如果路径是 .claude/skills/xxx/SKILL.md，也尝试去掉 .claude/
+        if path.startswith('.claude/skills/'):
+            short_path = path.replace('.claude/', '', 1)
+            variants.append(f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{short_path}")
+            variants.append(f"https://raw.githubusercontent.com/{owner}/{repo}/{alt_branch}/{short_path}")
+
+        # 去重保序
+        seen = set()
+        unique = []
+        for v in variants:
+            if v not in seen:
+                seen.add(v)
+                unique.append(v)
+        return unique
+
+    def _github_tree_to_raw_url(self, github_url: str) -> str:
+        """
+        将 SkillsMP 返回的 GitHub 目录 URL 转为 raw SKILL.md URL
+
+        输入: https://github.com/owner/repo/tree/main/.claude/skills/name
+        输出: https://raw.githubusercontent.com/owner/repo/main/.claude/skills/name/SKILL.md
+        """
+        if not github_url:
+            return ''
+        if 'raw.githubusercontent.com' in github_url:
+            return github_url
+
+        m = re.match(r'https?://github\.com/([^/]+)/([^/]+)/tree/(.+)', github_url)
+        if m:
+            owner, repo, path = m.groups()
+            return f"https://raw.githubusercontent.com/{owner}/{repo}/{path}/SKILL.md"
+
+        # 如果是 blob URL，也处理
+        m = re.match(r'https?://github\.com/([^/]+)/([^/]+)/blob/(.+)', github_url)
+        if m:
+            owner, repo, path = m.groups()
+            return f"https://raw.githubusercontent.com/{owner}/{repo}/{path}"
+
+        logger.warning(f"[marketplace] Cannot convert github URL to raw: {github_url}")
+        return github_url
 
     def _parse_skill_md(self, content: str) -> Dict[str, Any]:
         """解析 SKILL.md 内容为元数据字典"""

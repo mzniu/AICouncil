@@ -76,7 +76,7 @@ class SkillSecurityScanner:
         r"(?i)(ignore\s+(previous|all|above)\s+(instructions?|prompts?|commands?|rules?))",
         r"(?i)(disregard|forget|override)\s+(previous|all|above)",
         r"(?i)(you\s+are\s+now|from\s+now\s+on|new\s+instructions?)",
-        r"(?i)(system\s*:\s*|assistant\s*:\s*|user\s*:\s*).*(\n|$)",
+        r"(?im)^\s*(system|assistant)\s*:\s*.{20,}$",
         r"(?i)(reveal|show|print|output)\s+(your|the)\s+(prompt|instructions?|system\s+message)",
         r"(?i)(jailbreak|DAN\s+mode|developer\s+mode)"
     ]

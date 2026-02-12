@@ -59,8 +59,7 @@ def google_image_search(
             'searchType': 'image',
             'num': min(max_results, 10),
             'safe': safe,
-            'imgSize': 'large',  # 优先大图
-            'imgType': 'photo',  # 优先照片类型
+            # 不限制 imgSize/imgType，避免过度过滤导致无结果
         }
         
         url = f"https://www.googleapis.com/customsearch/v1?{urlencode(params)}"
@@ -86,6 +85,92 @@ def google_image_search(
         logger.warning(f"[image_search] Google Images API 失败: {e}")
     except Exception as e:
         logger.warning(f"[image_search] Google Images 解析失败: {e}")
+    
+    return results
+
+
+# ========== Google Custom Search - Text Search with Image Extraction ==========
+
+def google_text_search_images(
+    query: str,
+    api_key: str,
+    search_engine_id: str,
+    max_results: int = MAX_RESULTS_PER_QUERY,
+    safe: str = "active"
+) -> List[Dict]:
+    """使用 Google Custom Search 的文本搜索模式提取页面关联图片
+    
+    与 google_image_search 互补：文本搜索不要求 CSE 开启图片搜索，
+    通过 pagemap 中的 cse_image / cse_thumbnail / metatags.og:image 获取图片。
+    实测 4/5 页面可提取到有效图片。
+    
+    Args:
+        query: 搜索关键词
+        api_key: Google API Key
+        search_engine_id: 自定义搜索引擎 ID
+        max_results: 最大结果数
+        safe: 安全搜索级别
+    
+    Returns:
+        候选图片列表（格式与 google_image_search 兼容）
+    """
+    if not api_key or not search_engine_id:
+        return []
+    
+    results = []
+    try:
+        params = {
+            'key': api_key,
+            'cx': search_engine_id,
+            'q': query,
+            'num': min(max_results * 2, 10),  # 多取一些，因为不是每个都有图
+            'safe': safe,
+        }
+        
+        url = f"https://www.googleapis.com/customsearch/v1?{urlencode(params)}"
+        resp = requests.get(url, timeout=SEARCH_TIMEOUT)
+        resp.raise_for_status()
+        data = resp.json()
+        
+        for item in data.get('items', []):
+            pagemap = item.get('pagemap', {})
+            img_url = None
+            
+            # 优先级：cse_image > cse_thumbnail > metatags.og:image
+            cse_images = pagemap.get('cse_image', [])
+            if cse_images and isinstance(cse_images, list):
+                img_url = cse_images[0].get('src', '')
+            
+            if not img_url:
+                cse_thumbs = pagemap.get('cse_thumbnail', [])
+                if cse_thumbs and isinstance(cse_thumbs, list):
+                    img_url = cse_thumbs[0].get('src', '')
+            
+            if not img_url:
+                metatags = pagemap.get('metatags', [])
+                if metatags and isinstance(metatags, list):
+                    img_url = metatags[0].get('og:image', '')
+            
+            if img_url and img_url.startswith('http'):
+                results.append({
+                    'url': img_url,
+                    'alt': item.get('title', item.get('snippet', query)),
+                    'source_url': item.get('link', ''),
+                    'source_title': item.get('displayLink', ''),
+                    'width': 0,
+                    'height': 0,
+                    'type': 'google_text_image',
+                })
+                
+                if len(results) >= max_results:
+                    break
+        
+        logger.info(f"[image_search] Google Text+PageMap: '{query}' → {len(results)} 结果")
+        
+    except requests.RequestException as e:
+        logger.warning(f"[image_search] Google Text Search API 失败: {e}")
+    except Exception as e:
+        logger.warning(f"[image_search] Google Text Search 解析失败: {e}")
     
     return results
 
@@ -269,6 +354,8 @@ def search_images_for_report(
                 futures.append(executor.submit(pexels_search, kw, pexels_key))
             if google_key and google_cx:
                 futures.append(executor.submit(google_image_search, kw, google_key, google_cx))
+                # 同时使用文本搜索提取 pagemap 图片（互补）
+                futures.append(executor.submit(google_text_search_images, kw, google_key, google_cx))
         
         for future in as_completed(futures):
             if time.time() - start_time > 30:
@@ -322,14 +409,32 @@ def extract_keywords_from_report_data(final_data: Dict, max_keywords: int = 5) -
             if q:
                 keywords.append(q[:50])
     
-    # 3. 从 report_design 的 sections 提取
+    # 3. 从 report_design 提取：兼容两种格式
+    #    - dict格式（常见）：{"模块一：标题": "描述", ...} → 用 key 作为关键词
+    #    - list格式：[{"title": "...", ...}, ...] → 用 title 作为关键词
     if isinstance(decomposition, dict):
         report_design = decomposition.get('report_design', {})
         if isinstance(report_design, dict):
-            for section in report_design.get('sections', [])[:3]:
+            # dict 格式：key 就是 section 标题
+            sections = report_design.get('sections', None)
+            if sections and isinstance(sections, list):
+                # list 格式（嵌套在 sections 字段中）
+                for section in sections[:3]:
+                    if isinstance(section, dict):
+                        title = section.get('title', '')
+                        if title:
+                            keywords.append(title[:50])
+            else:
+                # flat dict 格式：key 是标题，value 是描述
+                for title in list(report_design.keys())[:3]:
+                    if title and isinstance(title, str):
+                        keywords.append(title[:50])
+        elif isinstance(report_design, list):
+            for section in report_design[:3]:
                 if isinstance(section, dict):
                     title = section.get('title', '')
                     if title:
                         keywords.append(title[:50])
     
+    logger.info(f"[image_search] 提取关键词: {keywords}")
     return keywords[:max_keywords]

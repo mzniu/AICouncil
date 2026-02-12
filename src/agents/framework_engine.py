@@ -63,7 +63,9 @@ class FrameworkEngine:
         framework: Framework, 
         model_config: Dict[str, Any],
         workspace_path: Path,
-        session_id: str
+        session_id: str,
+        tenant_id: int = None,
+        content_mode: str = "solution"
     ):
         """初始化框架引擎
         
@@ -72,11 +74,15 @@ class FrameworkEngine:
             model_config: 模型配置（backend、model等）
             workspace_path: 工作目录路径
             session_id: 会话ID
+            tenant_id: 租户ID（用于加载订阅的Skills）
+            content_mode: 内容模式（solution/analysis/research/evaluation/creative/debate）
         """
         self.framework = framework
         self.model_config = model_config
         self.workspace_path = workspace_path
         self.session_id = session_id
+        self.tenant_id = tenant_id
+        self.content_mode = content_mode
         
         # Stage输出缓存 {stage_name: stage_output}
         self.stage_outputs = {}
@@ -259,18 +265,19 @@ class FrameworkEngine:
                 if make_chain_func:
                     # 固定角色类型（某些角色需要特殊参数）
                     if role_type == "leader":
-                        # Leader需要is_final_round参数（中间stage都是False）
-                        chain = make_chain_func(agent_model_config, is_final_round=False)
+                        chain = make_chain_func(agent_model_config, is_final_round=False, tenant_id=self.tenant_id)
                     elif role_type == "devils_advocate":
-                        # Devil's Advocate需要stage参数
-                        chain = make_chain_func(agent_model_config, stage="general")
+                        chain = make_chain_func(agent_model_config, stage="general", tenant_id=self.tenant_id)
+                    elif role_type == "planner":
+                        chain = make_chain_func(agent_model_config, tenant_id=self.tenant_id, content_mode=self.content_mode)
+                    elif role_type == "auditor":
+                        chain = make_chain_func(agent_model_config, tenant_id=self.tenant_id, content_mode=self.content_mode)
                     else:
-                        chain = make_chain_func(agent_model_config)
+                        chain = make_chain_func(agent_model_config, tenant_id=self.tenant_id)
                 else:
                     # 自定义角色，使用通用chain创建函数
-                    # 使用stage的第一个阶段（或者可以从role_config中获取）
                     stage_name = list(role_config.stages.keys())[0] if role_config.stages else "default"
-                    chain = make_generic_role_chain(role_type, stage_name, agent_model_config)
+                    chain = make_generic_role_chain(role_type, stage_name, agent_model_config, tenant_id=self.tenant_id)
                 
                 chains.append((chain, agent_id, role_type, display_name))
                 
@@ -310,7 +317,7 @@ class FrameworkEngine:
                         
                         # 使用通用chain创建函数
                         stage_name_for_role = list(role_config.stages.keys())[0] if role_config.stages else "default"
-                        chain = make_generic_role_chain(role_name, stage_name_for_role, agent_model_config)
+                        chain = make_generic_role_chain(role_name, stage_name_for_role, agent_model_config, tenant_id=self.tenant_id)
                         
                         chains.append((chain, agent_id, role_name, display_name))
                         logger.info(f"[FrameworkEngine] 创建映射Agent: {agent_id} ({display_name})")
@@ -703,7 +710,7 @@ class FrameworkEngine:
         """
         # 使用Leader进行最终综合
         leader_config = agent_configs.get("leader") or self.model_config
-        leader_chain = make_leader_chain(leader_config, is_final_round=True)
+        leader_chain = make_leader_chain(leader_config, is_final_round=True, tenant_id=self.tenant_id)
         
         # 构建综合输入（包含所有stage的输出）
         synthesis_input = self._build_synthesis_input()

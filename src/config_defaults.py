@@ -48,6 +48,19 @@ DEFAULT_OLLAMA_HTTP_URL = 'http://127.0.0.1:11434/api/generate'
 # ============= 浏览器路径配置 =============
 DEFAULT_BROWSER_PATH = ''  # 空字符串表示自动检测
 
+# ============= SkillsMP 技能市场配置 =============
+DEFAULT_SKILLSMP_API_KEY = ''
+DEFAULT_GITHUB_TOKEN = ''
+
+# ============= 图片搜索 API 配置 =============
+DEFAULT_UNSPLASH_ACCESS_KEY = ''
+DEFAULT_PEXELS_API_KEY = ''
+
+# ============= 图片多模态分析配置 =============
+DEFAULT_IMAGE_ANALYSIS_MODEL = ''       # 视觉模型名称（留空则自动选择 OpenRouter/Aliyun/OpenAI）
+DEFAULT_IMAGE_ANALYSIS_API_KEY = ''     # 专用API密钥（留空则复用已配置的后端密钥）
+DEFAULT_IMAGE_ANALYSIS_BASE_URL = ''    # 专用API地址
+
 # ============= 配置优先级说明 =============
 """
 配置加载优先级（从高到低）：

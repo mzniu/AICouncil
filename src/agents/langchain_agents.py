@@ -2048,7 +2048,10 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
 
     # 使用 reporter 专用配置（如 agent_configs 中有指定），否则用全局 model_config
     report_model_cfg = agent_configs.get("reporter") or model_config
-    report_html = generate_report_from_workspace(workspace_path, report_model_cfg, session_id, tenant_id=tenant_id)
+    report_html = generate_report_from_workspace(
+        workspace_path, report_model_cfg, session_id, tenant_id=tenant_id,
+        final_data=final_data, search_references=all_search_references
+    )
     
     # 保存报告到数据库（需要应用上下文）
     if DB_AVAILABLE and user_id and SessionRepository:
@@ -2068,46 +2071,51 @@ def run_full_cycle(issue_text: str, model_config: Dict[str, Any] = None, max_rou
         "session_id": session_id  # 返回session_id供app.py使用
     }
 
-def generate_report_from_workspace(workspace_path: str, model_config: Dict[str, Any], session_id: str = None, tenant_id: Optional[int] = None) -> str:
-    """从数据库重新生成报告（不再使用文件）。
+def generate_report_from_workspace(workspace_path: str, model_config: Dict[str, Any], session_id: str = None, tenant_id: Optional[int] = None, final_data: Dict[str, Any] = None, search_references: list = None) -> str:
+    """生成报告。优先使用传入的 final_data/search_references，否则从数据库加载。
     
     Args:
-        workspace_path: 工作区路径（保留兼容性，实际不再使用）
+        workspace_path: 工作区路径（保留兼容性，用于保存报告文件）
         model_config: 模型配置
-        session_id: 会话ID，必需
+        session_id: 会话ID
         tenant_id: 租户ID（用于Skills注入）
+        final_data: 可选，直接传入的议事数据（跳过DB加载）
+        search_references: 可选，直接传入的搜索引用列表（跳过DB加载）
     """
     max_retries = 2
     if not session_id:
         session_id = os.path.basename(workspace_path)
     
-    logger.info(f"[report] 正在从数据库重新生成报告（Session ID: {session_id}）...")
+    logger.info(f"[report] 正在生成报告（Session ID: {session_id}）...")
     
     try:
-        # 从数据库加载会话数据（需要Flask应用上下文）
-        if not DB_AVAILABLE or not SessionRepository:
-            raise RuntimeError("数据库功能未启用，无法生成报告")
-        
         # 导入Flask app并创建应用上下文
-        # 注意：整个报告生成过程都需要 app context（数据库读取 + Skills注入）
+        # 注意：整个报告生成过程都需要 app context（Skills注入等）
         from src.web.app import app
         with app.app_context():
-            session = SessionRepository.get_session_by_id(session_id)
-            if not session:
-                raise ValueError(f"数据库中不存在会话: {session_id}")
-            
-            # 构造 final_data 结构
-            final_data = {
-                "issue": session.issue,
-                "decomposition": session.decomposition or {},
-                "decomposition_challenge": "",
-                "history": session.history or [],
-                "final_summary": session.final_session_data or {}
-            }
-            
-            # 从数据库获取搜索引用
-            all_search_references = session.search_references or []
-            logger.info(f"[report] 从数据库加载: 议题={session.issue}, 轮次={len(final_data['history'])}, 搜索结果={len(all_search_references)}条")
+            # 如果调用方直接提供了数据，则跳过数据库加载
+            if final_data is not None:
+                all_search_references = search_references or []
+                logger.info(f"[report] 使用调用方传入的数据: 议题={final_data.get('issue', '?')}, 搜索结果={len(all_search_references)}条")
+            elif DB_AVAILABLE and SessionRepository:
+                session = SessionRepository.get_session_by_id(session_id)
+                if not session:
+                    raise ValueError(f"数据库中不存在会话: {session_id}")
+                
+                # 构造 final_data 结构
+                final_data = {
+                    "issue": session.issue,
+                    "decomposition": session.decomposition or {},
+                    "decomposition_challenge": "",
+                    "history": session.history or [],
+                    "final_summary": session.final_session_data or {}
+                }
+                
+                # 从数据库获取搜索引用
+                all_search_references = session.search_references or []
+                logger.info(f"[report] 从数据库加载: 议题={session.issue}, 轮次={len(final_data['history'])}, 搜索结果={len(all_search_references)}条")
+            else:
+                raise RuntimeError("数据库功能未启用且未传入 final_data，无法生成报告")
         
             # ===== 参考资料整理环节 =====
             # 获取原始议题用于相关性判断
@@ -2850,7 +2858,29 @@ def execute_orchestration_plan(
         # 7. 生成报告
         logger.info(f"[execute_orchestration_plan] 开始生成报告...")
         try:
-            report_html = generate_report_from_workspace(str(workspace_path), model_config, session_id, tenant_id=tenant_id)
+            # 构造 final_data 供报告生成使用（不强依赖数据库）
+            # 动态提取stage输出：第一个stage作为分解，final_synthesis作为总结
+            stages = all_outputs.get("stages", {}) if all_outputs else {}
+            stage_names = [k for k in stages.keys() if k != "final_synthesis"]
+            
+            _report_final_data = {
+                "issue": user_requirement,
+                "decomposition": stages.get(stage_names[0], {}) if stage_names else {},
+                "decomposition_challenge": "",
+                "history": [],
+                "final_summary": stages.get("final_synthesis", {}) or (stages.get(stage_names[-1], {}) if stage_names else {}),
+                "all_outputs": all_outputs,
+            }
+            # 将所有stage输出合并到history中供报告参考
+            for stage_name in stage_names:
+                _report_final_data["history"].append({
+                    "stage": stage_name,
+                    "summary": stages[stage_name]
+                })
+            report_html = generate_report_from_workspace(
+                str(workspace_path), model_config, session_id, tenant_id=tenant_id,
+                final_data=_report_final_data, search_references=search_refs
+            )
             final_result["report_html"] = report_html
             logger.info(f"[execute_orchestration_plan] 报告生成完成")
         except Exception as e:

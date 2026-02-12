@@ -47,36 +47,93 @@ def get_roles_directory() -> Path:
         else:
             print(f"[RoleManager] ⚠️ 警告：未找到内置roles模板目录")
     else:
-        # 4. 开发环境下自动同步新增的角色文件
+        # 4. 自动同步：新增角色 + 已有角色的版本升级 + 缺失的prompt文件
         if not getattr(sys, 'frozen', False) and builtin_roles.exists():
             builtin_yamls = set(f.name for f in builtin_roles.glob('*.yaml'))
             user_yamls = set(f.name for f in user_roles_dir.glob('*.yaml'))
             new_roles = builtin_yamls - user_yamls
             
+            # 4a. 同步新增角色（YAML + prompt文件）
             if new_roles:
                 print(f"[RoleManager] 发现 {len(new_roles)} 个新角色，正在同步...")
                 for role_name in new_roles:
-                    # 复制YAML文件
+                    _sync_role_files(builtin_roles, user_roles_dir, role_name)
+            
+            # 4b. 同步已有角色的版本升级（比较version字段）
+            common_roles = builtin_yamls & user_yamls
+            for role_name in common_roles:
+                try:
                     src_yaml = builtin_roles / role_name
                     dest_yaml = user_roles_dir / role_name
-                    shutil.copy2(src_yaml, dest_yaml)
-                    print(f"[RoleManager]   • 同步: {role_name}")
-                    
-                    # 同步对应的prompt文件
-                    import yaml
                     with open(src_yaml, 'r', encoding='utf-8') as f:
-                        role_config = yaml.safe_load(f)
+                        builtin_config = yaml.safe_load(f)
+                    with open(dest_yaml, 'r', encoding='utf-8') as f:
+                        user_config = yaml.safe_load(f)
                     
-                    for stage_data in role_config.get('stages', {}).values():
-                        prompt_file = stage_data.get('prompt_file')
-                        if prompt_file:
-                            src_prompt = builtin_roles / prompt_file
-                            dest_prompt = user_roles_dir / prompt_file
-                            if src_prompt.exists():
-                                shutil.copy2(src_prompt, dest_prompt)
-                                print(f"[RoleManager]   • 同步: {prompt_file}")
+                    builtin_ver = builtin_config.get('version', '0.0.0')
+                    user_ver = user_config.get('version', '0.0.0')
+                    
+                    if _version_gt(builtin_ver, user_ver):
+                        print(f"[RoleManager] 角色 {role_name} 版本升级: {user_ver} → {builtin_ver}")
+                        # 备份旧版本
+                        backups_dir = user_roles_dir / "backups"
+                        backups_dir.mkdir(exist_ok=True)
+                        backup_name = f"{role_name}.v{user_ver}.bak"
+                        shutil.copy2(dest_yaml, backups_dir / backup_name)
+                        # 同步新版本（YAML + prompt文件）
+                        _sync_role_files(builtin_roles, user_roles_dir, role_name)
+                    else:
+                        # 4c. 即使版本相同，也检查缺失的prompt文件
+                        _sync_missing_prompts(builtin_roles, user_roles_dir, builtin_config)
+                except Exception as e:
+                    print(f"[RoleManager] ⚠️ 同步角色 {role_name} 版本时出错: {e}")
     
     return user_roles_dir
+
+
+def _version_gt(v1: str, v2: str) -> bool:
+    """比较两个语义化版本号 v1 > v2"""
+    try:
+        parts1 = [int(x) for x in str(v1).split('.')]
+        parts2 = [int(x) for x in str(v2).split('.')]
+        # 补齐长度
+        while len(parts1) < 3:
+            parts1.append(0)
+        while len(parts2) < 3:
+            parts2.append(0)
+        return tuple(parts1) > tuple(parts2)
+    except (ValueError, AttributeError):
+        return str(v1) > str(v2)
+
+
+def _sync_role_files(src_dir: Path, dest_dir: Path, role_yaml_name: str):
+    """同步单个角色的YAML + 所有关联prompt文件"""
+    src_yaml = src_dir / role_yaml_name
+    dest_yaml = dest_dir / role_yaml_name
+    
+    # 1. 复制YAML
+    shutil.copy2(src_yaml, dest_yaml)
+    print(f"[RoleManager]   • 同步: {role_yaml_name}")
+    
+    # 2. 同步所有关联的prompt文件
+    try:
+        with open(src_yaml, 'r', encoding='utf-8') as f:
+            role_config = yaml.safe_load(f)
+        _sync_missing_prompts(src_dir, dest_dir, role_config, force=True)
+    except Exception as e:
+        print(f"[RoleManager]   ⚠️ 同步prompt文件失败: {e}")
+
+
+def _sync_missing_prompts(src_dir: Path, dest_dir: Path, role_config: dict, force: bool = False):
+    """同步角色配置中引用但用户目录缺失的prompt文件"""
+    for stage_data in role_config.get('stages', {}).values():
+        prompt_file = stage_data.get('prompt_file')
+        if prompt_file:
+            src_prompt = src_dir / prompt_file
+            dest_prompt = dest_dir / prompt_file
+            if src_prompt.exists() and (force or not dest_prompt.exists()):
+                shutil.copy2(src_prompt, dest_prompt)
+                print(f"[RoleManager]   • 同步: {prompt_file}")
 
 ROLES_DIR = get_roles_directory()
 

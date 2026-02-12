@@ -10,6 +10,7 @@
 """
 
 import json
+import uuid
 import traceback
 from typing import Dict, Any, Optional, List
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -415,6 +416,11 @@ class ReportPipeline:
         for attempt in range(max_retries):
             try:
                 _issue = final_data.get("issue", "") if isinstance(final_data, dict) else ""
+                send_web_event(
+                    "system_status",
+                    message="📝 正在生成报告（单次模式）...",
+                    chunk_id=str(uuid.uuid4())
+                )
                 report_html, _ = stream_agent_output(
                     chain,
                     {
@@ -423,9 +429,9 @@ class ReportPipeline:
                         "search_references": search_refs_text,
                         "image_pool": image_pool_text,
                     },
-                    "报告者",
-                    "Reporter",
-                    event_type="final_report",
+                    "记录员",
+                    "reporter",
+                    event_type="agent_action",
                 )
 
                 report_html = report_html.strip()
